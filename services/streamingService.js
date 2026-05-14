@@ -107,7 +107,13 @@ function resolvePublicFilePath(relativePath) {
 
   // Support absolute paths for local server/RDP usage (e.g., D:\Videos or C:/Videos)
   const isWinAbsolute = process.platform === 'win32' && /^[a-zA-Z]:[\\\/]/.test(normalizedPath);
-  const isPosixAbsolute = normalizedPath.startsWith('/');
+  
+  // On Linux/POSIX, we check if it's truly an absolute path.
+  // CRITICAL FIX: If it starts with /uploads/ or /temp/, it's likely a web-relative path that should be in public/
+  const isWebRelative = normalizedPath.startsWith('/uploads/') || normalizedPath.startsWith('/temp/') || 
+                       normalizedPath.startsWith('uploads/') || normalizedPath.startsWith('temp/');
+  
+  const isPosixAbsolute = normalizedPath.startsWith('/') && !isWebRelative;
 
   if (isWinAbsolute || isPosixAbsolute) {
     return normalizedPath;
