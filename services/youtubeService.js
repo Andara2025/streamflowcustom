@@ -3,6 +3,7 @@ const { encrypt, decrypt } = require('../utils/encryption');
 const User = require('../models/User');
 const Stream = require('../models/Stream');
 const YoutubeChannel = require('../models/YoutubeChannel');
+const Video = require('../models/Video');
 const fs = require('fs');
 const path = require('path');
 
@@ -87,7 +88,7 @@ async function syncBroadcastMonetization(youtube, broadcastId, enabled) {
 }
 
 async function createYouTubeBroadcast(streamId, baseUrl) {
-  const stream = await Stream.getStreamWithVideo(streamId);
+  const stream = await Stream.findById(streamId);
   if (!stream) {
     throw new Error('Stream not found');
   }
@@ -241,7 +242,19 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     }
   }
 
-  const thumbnailPathStr = stream.youtube_thumbnail || stream.video_thumbnail;
+  // --- Otomatis Ambil Thumbnail dari Galeri ---
+  let thumbnailPathStr = stream.youtube_thumbnail;
+  
+  if (!thumbnailPathStr && stream.video_id) {
+    try {
+      const video = await Video.findById(stream.video_id);
+      if (video && video.thumbnail_path) {
+        thumbnailPathStr = video.thumbnail_path;
+      }
+    } catch (e) {
+      console.log('[YouTubeService] Note: Could not fetch video thumbnail fallback:', e.message);
+    }
+  }
   
   if (thumbnailPathStr) {
     try {
