@@ -644,19 +644,22 @@ window.handleImportRotation = async function(input) {
   const formData = new FormData();
   formData.append('backup', file);
 
+  // Ambil CSRF Token dari input hidden di halaman
+  const token = document.querySelector('input[name="_csrf"]')?.value;
+
   try {
     showToast('success', 'Importing rotation...');
     const response = await fetch('/api/rotations/import', {
       method: 'POST',
       headers: {
-        'X-CSRF-Token': csrfToken
+        'X-CSRF-Token': token
       },
       body: formData
     });
 
     const data = await response.json();
     if (data.success) {
-      showToast('success', 'Rotation imported successfully!');
+      showToast('success', data.message || 'Rotation imported successfully!');
       setTimeout(() => {
         window.location.reload();
       }, 1000);

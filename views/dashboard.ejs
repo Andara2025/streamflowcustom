@@ -4693,7 +4693,39 @@
     }
 
     window.handleImportStream = async function(input) {
-      // ... (existing code kept)
+      if (!input.files || !input.files[0]) return;
+      
+      const file = input.files[0];
+      const formData = new FormData();
+      formData.append('backup', file);
+
+      const token = document.querySelector('input[name="_csrf"]')?.value;
+
+      try {
+        showToast('success', 'Importing stream...');
+        const response = await fetch('/api/streams/import', {
+          method: 'POST',
+          headers: {
+            'X-CSRF-Token': token
+          },
+          body: formData
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          showToast('success', data.message || 'Stream imported successfully!');
+          setTimeout(() => {
+            refreshStreamsView();
+          }, 1000);
+        } else {
+          showToast('error', data.error || 'Failed to import stream.');
+        }
+      } catch (error) {
+        console.error('Import error:', error);
+        showToast('error', 'An error occurred during import.');
+      } finally {
+        input.value = '';
+      }
     };
 
     window.updateStreamSelectedCount = function() {
