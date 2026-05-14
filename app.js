@@ -17,11 +17,11 @@ if (process.platform === 'win32') {
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-const fs = require('fs');
+const fs = require('fs-extra');
 const dbDir = path.join(__dirname, 'db');
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
+const backupDir = path.join(__dirname, 'backups');
+if (!fs.existsSync(dbDir)) fs.ensureDirSync(dbDir);
+if (!fs.existsSync(backupDir)) fs.ensureDirSync(backupDir);
 
 require('./services/logger.js');
 const express = require('express');
@@ -3759,8 +3759,8 @@ app.post('/api/streams/import', isAuthenticated, uploadBackup.single('backup'), 
     
     res.json({ success: true, message: `${streamsToImport.length} stream(s) imported successfully` });
   } catch (error) {
-    console.error('Import error:', error);
-    res.status(500).json({ success: false, error: 'Failed to import stream' });
+    console.error('Stream Import Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to import stream: ' + error.message });
   }
 });
 
@@ -5035,8 +5035,8 @@ app.post('/api/rotations/import', isAuthenticated, uploadBackup.single('backup')
     
     res.json({ success: true, message: `${rotationsToImport.length} rotation(s) imported successfully` });
   } catch (error) {
-    console.error('Import error:', error);
-    res.status(500).json({ success: false, error: 'Failed to import rotation' });
+    console.error('Rotation Import Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to import rotation: ' + error.message });
   }
 });
 
