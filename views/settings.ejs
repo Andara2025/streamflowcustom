@@ -25,6 +25,11 @@
       </button>
       <button
         class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
+        data-tab="backup">
+        <i class="ti ti-database mr-2"></i>Backup
+      </button>
+      <button
+        class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
         data-tab="logs">
         <i class="ti ti-file-text mr-2"></i>Logs
       </button>
@@ -463,6 +468,52 @@
       </div>
     </div>
 
+    <div id="backup-tab" class="settings-content hidden">
+      <div class="bg-gray-800 rounded-lg p-6 max-w-2xl">
+        <h3 class="text-lg font-semibold mb-2">Backup & Restore</h3>
+        <p class="text-gray-400 text-sm mb-6">Backup your database to move it to another VPS or keep it safe.</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Export Section -->
+          <div class="bg-dark-900 rounded-lg p-5 border border-gray-700">
+            <div class="w-12 h-12 rounded-full bg-blue-900/30 flex items-center justify-center mb-4 text-blue-400">
+              <i class="ti ti-download text-2xl"></i>
+            </div>
+            <h4 class="font-medium text-white mb-2">Export Data</h4>
+            <p class="text-xs text-gray-500 mb-4">Download your database containing all schedules, channels, and metadata.</p>
+            <a href="/api/backup/export" class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors text-sm w-full justify-center">
+              <i class="ti ti-download"></i>
+              Download Backup (.db)
+            </a>
+          </div>
+
+          <!-- Import Section -->
+          <div class="bg-dark-900 rounded-lg p-5 border border-gray-700">
+            <div class="w-12 h-12 rounded-full bg-amber-900/30 flex items-center justify-center mb-4 text-amber-400">
+              <i class="ti ti-upload text-2xl"></i>
+            </div>
+            <h4 class="font-medium text-white mb-2">Restore Data</h4>
+            <p class="text-xs text-gray-500 mb-4">Upload a previously exported .db file to restore all your data.</p>
+            <button type="button" onclick="document.getElementById('import-db-input').click()" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors text-sm w-full justify-center">
+              <i class="ti ti-upload"></i>
+              Upload & Restore
+            </button>
+            <input type="file" id="import-db-input" class="hidden" accept=".db" onchange="handleRestore(this)">
+          </div>
+        </div>
+
+        <div class="mt-8 p-4 bg-red-900/10 border border-red-900/30 rounded-lg">
+          <div class="flex gap-3 text-red-400">
+            <i class="ti ti-alert-triangle text-xl flex-shrink-0"></i>
+            <div class="text-sm">
+              <p class="font-bold mb-1">Peringatan Penting!</p>
+              <p>Mengembalikan data (Restore) akan <b>menghapus seluruh data jadwal saat ini</b> dan menggantinya dengan data dari file backup. Aplikasi akan otomatis restart setelah proses selesai.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="logs-tab" class="settings-content hidden h-[calc(100vh-220px)]">
       <div class="bg-gray-800 rounded-lg p-6 h-full flex flex-col">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4 flex-shrink-0">
@@ -644,17 +695,54 @@
       });
       const settingsInitData = document.getElementById('settings-init-data').dataset;
       const hashTab = window.location.hash.replace('#', '');
-      const validTabs = ['profile', 'security', 'integration', 'logs', 'about'];
+      const validTabs = ['profile', 'security', 'integration', 'backup', 'logs', 'about'];
       if (hashTab && validTabs.includes(hashTab)) {
         activateTab(hashTab);
       } else {
         const activeTab = settingsInitData.activeTab;
         if (activeTab) {
           activateTab(activeTab);
-        } else {
-          activateTab('profile');
         }
       }
+
+      window.handleRestore = async function(input) {
+        if (!input.files || !input.files[0]) return;
+        
+        const file = input.files[0];
+        if (!confirm(`Are you sure you want to restore data from "${file.name}"?\n\nThis will OVERWRITE all current schedules and settings. The application will restart automatically.`)) {
+          input.value = '';
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('backup', file);
+
+        try {
+          showToast('success', 'Restoring data... Please wait.');
+          const response = await fetch('/api/backup/restore', {
+            method: 'POST',
+            headers: {
+              'X-CSRF-Token': settingsInitData.csrfToken
+            },
+            body: formData
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            showToast('success', 'Data restored successfully! Restarting application...');
+            setTimeout(() => {
+              window.location.reload();
+            }, 3000);
+          } else {
+            showToast('error', data.error || 'Failed to restore data.');
+          }
+        } catch (error) {
+          console.error('Restore error:', error);
+          showToast('error', 'An error occurred during restore.');
+        } finally {
+          input.value = '';
+        }
+      };
     const profileUpload = document.getElementById('profile-upload');
       const profilePreview = document.getElementById('profile-preview');
       const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];

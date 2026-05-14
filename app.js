@@ -38,7 +38,7 @@ const rateLimit = require('express-rate-limit');
 const User = require('./models/User');
 const { db, checkIfUsersExist, initializeDatabase } = require('./db/database');
 const systemMonitor = require('./services/systemMonitor');
-const { uploadVideo, upload, uploadThumbnail, uploadAudio } = require('./middleware/uploadMiddleware');
+const { uploadVideo, upload, uploadThumbnail, uploadAudio, uploadBackup } = require('./middleware/uploadMiddleware');
 const chunkUploadService = require('./services/chunkUploadService');
 const audioConverter = require('./services/audioConverter');
 const { ensureDirectories } = require('./utils/storage');
@@ -4681,6 +4681,55 @@ app.get('/api/server-time', (req, res) => {
     formattedTime: formattedTime,
     timezoneOffset: serverTimezoneOffset
   });
+});
+
+app.get('/api/backup/export', isAuthenticated, async (req, res) => {
+  try {
+    const dbPath = path.join(__dirname, 'db', 'streamflow.db');
+    const filename = `streamflow-backup-${new Date().toISOString().split('T')[0]}.db`;
+    res.download(dbPath, filename);
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ success: false, error: 'Failed to export database' });
+  }
+});
+
+app.post('/api/backup/restore', isAuthenticated, uploadBackup.single('backup'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No backup file provided' });
+    }
+
+    const backupPath = req.file.path;
+    const dbPath = path.join(__dirname, 'db', 'streamflow.db');
+
+    // Close DB connection before replacing
+    const { db } = require('./db/database');
+    db.close(async (err) => {
+      if (err) {
+        console.error('Error closing database:', err);
+      }
+      
+      try {
+        const fs = require('fs-extra');
+        await fs.copy(backupPath, dbPath);
+        await fs.remove(backupPath);
+        
+        res.json({ success: true, message: 'Database restored. Restarting...' });
+        
+        // Force exit to let PM2 restart with new DB
+        setTimeout(() => {
+          process.exit(0);
+        }, 1000);
+      } catch (copyErr) {
+        console.error('Restore copy error:', copyErr);
+        res.status(500).json({ success: false, error: 'Failed to replace database file' });
+      }
+    });
+  } catch (error) {
+    console.error('Restore error:', error);
+    res.status(500).json({ success: false, error: 'Failed to restore database' });
+  }
 });
 
 const Rotation = require('./models/Rotation');

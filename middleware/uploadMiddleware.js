@@ -32,6 +32,16 @@ const avatarStorage = multer.diskStorage({
   }
 });
 
+const backupStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, paths.temp);
+  },
+  filename: (req, file, cb) => {
+    const uniqueFilename = getUniqueFilename(file.originalname);
+    cb(null, uniqueFilename);
+  }
+});
+
 const thumbnailStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, paths.thumbnails);
@@ -75,6 +85,15 @@ const imageFilter = (req, file, cb) => {
   }
 };
 
+const backupFilter = (req, file, cb) => {
+  const fileExt = path.extname(file.originalname).toLowerCase();
+  if (fileExt === '.db') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only .db backup files are allowed'), false);
+  }
+};
+
 const uploadVideo = multer({
   storage: videoStorage,
   fileFilter: videoFilter
@@ -95,9 +114,15 @@ const uploadThumbnail = multer({
   fileFilter: imageFilter
 });
 
+const uploadBackup = multer({
+  storage: backupStorage,
+  fileFilter: backupFilter
+});
+
 module.exports = {
   uploadVideo,
   uploadAudio,
   upload,
-  uploadThumbnail
+  uploadThumbnail,
+  uploadBackup
 };
