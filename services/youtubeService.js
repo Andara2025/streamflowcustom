@@ -87,7 +87,7 @@ async function syncBroadcastMonetization(youtube, broadcastId, enabled) {
 }
 
 async function createYouTubeBroadcast(streamId, baseUrl) {
-  const stream = await Stream.findById(streamId);
+  const stream = await Stream.getStreamWithVideo(streamId);
   if (!stream) {
     throw new Error('Stream not found');
   }
@@ -241,10 +241,12 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     }
   }
 
-  if (stream.youtube_thumbnail) {
+  const thumbnailPathStr = stream.youtube_thumbnail || stream.video_thumbnail;
+  
+  if (thumbnailPathStr) {
     try {
       const projectRoot = path.resolve(__dirname, '..');
-      const thumbnailPath = path.join(projectRoot, 'public', stream.youtube_thumbnail);
+      const thumbnailPath = path.join(projectRoot, 'public', thumbnailPathStr);
       if (fs.existsSync(thumbnailPath)) {
         const thumbnailStream = fs.createReadStream(thumbnailPath);
         await youtube.thumbnails.set({
@@ -254,7 +256,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
             body: thumbnailStream
           }
         });
-        console.log(`[YouTubeService] Uploaded thumbnail for broadcast ${broadcast.id}`);
+        console.log(`[YouTubeService] Uploaded thumbnail for broadcast ${broadcast.id} using path: ${thumbnailPathStr}`);
       }
     } catch (thumbError) {
       console.log('[YouTubeService] Note: Could not upload thumbnail:', thumbError.message);
