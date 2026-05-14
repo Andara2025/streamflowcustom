@@ -3722,41 +3722,42 @@ app.post('/api/streams/import', isAuthenticated, uploadBackup.single('backup'), 
     await fs.remove(req.file.path);
     
     const importData = JSON.parse(content);
-    if (importData.type !== 'stream_export' || !importData.data) {
+    const streamsToImport = importData.type === 'stream_bulk_export' ? importData.data : (importData.type === 'stream_export' ? [importData.data] : null);
+    
+    if (!streamsToImport) {
       return res.status(400).json({ success: false, error: 'Invalid stream export file' });
     }
     
-    const streamData = importData.data;
+    for (const streamData of streamsToImport) {
+      await Stream.create({
+        user_id: req.session.userId,
+        title: `${streamData.title} (Imported)`,
+        platform: streamData.platform,
+        rtmp_url: streamData.rtmp_url,
+        stream_key: streamData.stream_key,
+        video_id: streamData.video_id,
+        bitrate: streamData.bitrate,
+        fps: streamData.fps,
+        resolution: streamData.resolution,
+        orientation: streamData.orientation || 'horizontal',
+        use_advanced_settings: streamData.use_advanced_settings || 0,
+        loop_video: streamData.loop_video || 1,
+        schedule_time: streamData.schedule_time,
+        end_time: streamData.end_time,
+        status: 'offline',
+        stream_mode: streamData.stream_mode || 'manual',
+        youtube_channel_id: null,
+        youtube_privacy: streamData.youtube_privacy || 'unlisted',
+        youtube_category: streamData.youtube_category || '22',
+        youtube_tags: streamData.youtube_tags || '',
+        youtube_description: streamData.youtube_description || '',
+        youtube_monetization: streamData.youtube_monetization || 0,
+        youtube_altered_content: streamData.youtube_altered_content || 0,
+        youtube_made_for_kids: streamData.youtube_made_for_kids || 0
+      });
+    }
     
-    // Create new stream
-    const newStream = await Stream.create({
-      user_id: req.session.userId,
-      title: `${streamData.title} (Imported)`,
-      platform: streamData.platform,
-      rtmp_url: streamData.rtmp_url,
-      stream_key: streamData.stream_key,
-      video_id: streamData.video_id,
-      bitrate: streamData.bitrate,
-      fps: streamData.fps,
-      resolution: streamData.resolution,
-      orientation: streamData.orientation || 'horizontal',
-      use_advanced_settings: streamData.use_advanced_settings || 0,
-      loop_video: streamData.loop_video || 1,
-      schedule_time: streamData.schedule_time,
-      end_time: streamData.end_time,
-      status: 'offline',
-      stream_mode: streamData.stream_mode || 'manual',
-      youtube_channel_id: null,
-      youtube_privacy: streamData.youtube_privacy || 'unlisted',
-      youtube_category: streamData.youtube_category || '22',
-      youtube_tags: streamData.youtube_tags || '',
-      youtube_description: streamData.youtube_description || '',
-      youtube_monetization: streamData.youtube_monetization || 0,
-      youtube_altered_content: streamData.youtube_altered_content || 0,
-      youtube_made_for_kids: streamData.youtube_made_for_kids || 0
-    });
-    
-    res.json({ success: true, message: 'Stream imported successfully', streamId: newStream.id });
+    res.json({ success: true, message: `${streamsToImport.length} stream(s) imported successfully` });
   } catch (error) {
     console.error('Import error:', error);
     res.status(500).json({ success: false, error: 'Failed to import stream' });
@@ -4870,6 +4871,78 @@ app.get('/rotations', isAuthenticated, async (req, res) => {
   }
 });
 
+app.get('/api/rotations/export-bulk', isAuthenticated, async (req, res) => {
+  try {
+    const ids = req.query.ids ? req.query.ids.split(',') : [];
+    if (ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    
+    const results = [];
+    for (const id of ids) {
+      const rotation = await Rotation.findByIdWithItems(id);
+      if (rotation && rotation.user_id === req.session.userId) {
+        results.push({
+          name: rotation.name,
+          repeat_mode: rotation.repeat_mode,
+          start_time: rotation.start_time,
+          end_time: rotation.end_time,
+          is_loop: rotation.is_loop,
+          items: rotation.items.map(item => ({
+            order_index: item.order_index,
+            title: item.title,
+            description: item.description,
+            tags: item.tags,
+            privacy: item.privacy,
+            category: item.category,
+            youtube_monetization: item.youtube_monetization,
+            youtube_altered_content: item.youtube_altered_content,
+            youtube_made_for_kids: item.youtube_made_for_kids,
+            video_title: item.video_title
+          }))
+        });
+      }
+    }
+    
+    const exportData = {
+      version: '1.0',
+      type: 'rotation_bulk_export',
+      data: results
+    };
+    
+    res.setHeader('Content-disposition', 'attachment; filename=bulk-rotations-export.json');
+    res.setHeader('Content-type', 'application/json');
+    res.send(JSON.stringify(exportData, null, 2));
+  } catch (error) {
+    res.status(500).json({ error: 'Bulk export failed' });
+  }
+});
+
+app.get('/api/streams/export-bulk', isAuthenticated, async (req, res) => {
+  try {
+    const ids = req.query.ids ? req.query.ids.split(',') : [];
+    if (ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    
+    const results = [];
+    for (const id of ids) {
+      const stream = await Stream.findById(id);
+      if (stream && stream.user_id === req.session.userId) {
+        results.push(stream);
+      }
+    }
+    
+    const exportData = {
+      version: '1.0',
+      type: 'stream_bulk_export',
+      data: results
+    };
+    
+    res.setHeader('Content-disposition', 'attachment; filename=bulk-streams-export.json');
+    res.setHeader('Content-type', 'application/json');
+    res.send(JSON.stringify(exportData, null, 2));
+  } catch (error) {
+    res.status(500).json({ error: 'Bulk export failed' });
+  }
+});
+
 app.get('/api/rotations/:id/export', isAuthenticated, async (req, res) => {
   try {
     const rotation = await Rotation.findByIdWithItems(req.params.id);
@@ -4922,44 +4995,45 @@ app.post('/api/rotations/import', isAuthenticated, uploadBackup.single('backup')
     await fs.remove(req.file.path);
     
     const importData = JSON.parse(content);
-    if (importData.type !== 'rotation_export' || !importData.data) {
+    const rotationsToImport = importData.type === 'rotation_bulk_export' ? importData.data : (importData.type === 'rotation_export' ? [importData.data] : null);
+    
+    if (!rotationsToImport) {
       return res.status(400).json({ success: false, error: 'Invalid rotation export file' });
     }
-    
-    const rotationData = importData.data;
-    const newRotation = await Rotation.create({
-      user_id: req.session.userId,
-      name: `${rotationData.name} (Imported)`,
-      is_loop: rotationData.is_loop || 1,
-      start_time: rotationData.start_time,
-      end_time: rotationData.end_time,
-      repeat_mode: rotationData.repeat_mode || 'daily',
-      youtube_channel_id: null
-    });
     
     // Try to find videos by title
     const allVideos = await Video.findAll(req.session.userId);
     
-    for (const item of rotationData.items) {
-      // Find matching video by title
-      const matchedVideo = allVideos.find(v => v.title === item.video_title);
-      
-      await Rotation.addItem({
-        rotation_id: newRotation.id,
-        order_index: item.order_index,
-        video_id: matchedVideo ? matchedVideo.id : (allVideos[0]?.id || ''), // Use first video as fallback if not found
-        title: item.title,
-        description: item.description,
-        tags: item.tags,
-        privacy: item.privacy,
-        category: item.category,
-        youtube_monetization: item.youtube_monetization,
-        youtube_altered_content: item.youtube_altered_content,
-        youtube_made_for_kids: item.youtube_made_for_kids
+    for (const rotationData of rotationsToImport) {
+      const newRotation = await Rotation.create({
+        user_id: req.session.userId,
+        name: `${rotationData.name} (Imported)`,
+        is_loop: rotationData.is_loop || 1,
+        start_time: rotationData.start_time,
+        end_time: rotationData.end_time,
+        repeat_mode: rotationData.repeat_mode || 'daily',
+        youtube_channel_id: null
       });
+      
+      for (const item of rotationData.items) {
+        const matchedVideo = allVideos.find(v => v.title === item.video_title);
+        await Rotation.addItem({
+          rotation_id: newRotation.id,
+          order_index: item.order_index,
+          video_id: matchedVideo ? matchedVideo.id : (allVideos[0]?.id || ''),
+          title: item.title,
+          description: item.description,
+          tags: item.tags,
+          privacy: item.privacy,
+          category: item.category,
+          youtube_monetization: item.youtube_monetization,
+          youtube_altered_content: item.youtube_altered_content,
+          youtube_made_for_kids: item.youtube_made_for_kids
+        });
+      }
     }
     
-    res.json({ success: true, message: 'Rotation imported successfully' });
+    res.json({ success: true, message: `${rotationsToImport.length} rotation(s) imported successfully` });
   } catch (error) {
     console.error('Import error:', error);
     res.status(500).json({ success: false, error: 'Failed to import rotation' });
