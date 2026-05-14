@@ -4684,7 +4684,7 @@ app.get('/api/server-time', (req, res) => {
 });
 
 const Rotation = require('./models/Rotation');
-const rotationService = require('./services/RotationService');
+const rotationService = require('./services/rotationService');
 
 app.get('/rotations', isAuthenticated, async (req, res) => {
   try {
