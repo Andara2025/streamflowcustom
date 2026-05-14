@@ -87,10 +87,10 @@ const imageFilter = (req, file, cb) => {
 
 const backupFilter = (req, file, cb) => {
   const fileExt = path.extname(file.originalname).toLowerCase();
-  if (fileExt === '.db') {
+  if (fileExt === '.db' || fileExt === '.json') {
     cb(null, true);
   } else {
-    cb(new Error('Only .db backup files are allowed'), false);
+    cb(new Error('Only .db and .json backup files are allowed'), false);
   }
 };
 
