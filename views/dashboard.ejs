@@ -147,6 +147,12 @@
             class="w-full bg-dark-700 border border-gray-600 text-white pl-9 pr-4 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
           <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
         </div>
+        <button onclick="document.getElementById('import-stream-input').click()"
+          class="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+          <i class="ti ti-download"></i>
+          <span>Import</span>
+        </button>
+        <input type="file" id="import-stream-input" class="hidden" accept=".json" onchange="handleImportStream(this)">
         <button onclick="openNewStreamModal()"
           class="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
           <i class="ti ti-plus"></i>
@@ -2263,6 +2269,7 @@
         <div class="flex items-center gap-1.5">
           ${getActionButtonHTML(stream.status, stream.id, 'mobile')}
           <button class="p-1 hover:bg-dark-700 rounded transition-colors ${stream.status === 'live' || stream.status === 'scheduled' ? 'opacity-50 cursor-not-allowed' : ''}" onclick="${stream.status === 'live' || stream.status === 'scheduled' ? '' : `editStream('${stream.id}')`}" ${stream.status === 'live' || stream.status === 'scheduled' ? 'disabled' : ''} title="Edit Stream"><i class="ti ti-edit text-gray-400 hover:text-white text-sm"></i></button>
+          <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="location.href='/api/streams/${stream.id}/export'" title="Export Stream"><i class="ti ti-download text-blue-400 hover:text-blue-300 text-sm"></i></button>
           <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="duplicateStream('${stream.id}')" title="Duplicate Stream"><i class="ti ti-copy text-gray-400 hover:text-white text-sm"></i></button>
           <button class="p-1 hover:bg-dark-700 rounded transition-colors ${stream.status === 'live' || stream.status === 'scheduled' ? 'opacity-50 cursor-not-allowed' : ''}" onclick="${stream.status === 'live' || stream.status === 'scheduled' ? '' : `deleteStream('${stream.id}')`}" ${stream.status === 'live' || stream.status === 'scheduled' ? 'disabled' : ''} title="Delete Stream"><i class="ti ti-trash text-gray-400 hover:text-red-400 text-sm"></i></button>
         </div>
@@ -2421,6 +2428,11 @@
         <div class="flex items-center justify-end space-x-2">
           ${getActionButtonHTML(stream.status, stream.id, 'desktop')}
           <div class="ml-2 flex items-center gap-1">
+            <button class="p-1.5 hover:bg-dark-700 rounded transition-colors" 
+                    onclick="location.href='/api/streams/${stream.id}/export'"
+                    title="Export Stream">
+              <i class="ti ti-download text-blue-400 hover:text-blue-300"></i>
+            </button>
             <button class="p-1.5 hover:bg-dark-700 rounded transition-colors" 
                     onclick="duplicateStream('${stream.id}')"
                     title="Duplicate Stream">
@@ -4665,6 +4677,40 @@
     function goToPage(page) {
       fetchStreams(page, currentLimit, currentSearch);
     }
+
+    window.handleImportStream = async function(input) {
+      if (!input.files || !input.files[0]) return;
+      
+      const file = input.files[0];
+      const formData = new FormData();
+      formData.append('backup', file);
+
+      try {
+        showToast('success', 'Importing stream...');
+        const response = await fetch('/api/streams/import', {
+          method: 'POST',
+          headers: {
+            'X-CSRF-Token': document.querySelector('input[name="_csrf"]')?.value || ''
+          },
+          body: formData
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          showToast('success', 'Stream imported successfully!');
+          setTimeout(() => {
+            refreshStreamsView();
+          }, 1000);
+        } else {
+          showToast('error', data.error || 'Failed to import stream.');
+        }
+      } catch (error) {
+        console.error('Import error:', error);
+        showToast('error', 'An error occurred during import.');
+      } finally {
+        input.value = '';
+      }
+    };
 
     function debounceSearch(func, wait) {
       let timeout;

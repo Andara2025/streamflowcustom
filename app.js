@@ -3664,6 +3664,105 @@ app.get('/api/stream/content', isAuthenticated, async (req, res) => {
   }
 });
 
+app.get('/api/streams/:id/export', isAuthenticated, async (req, res) => {
+  try {
+    const stream = await Stream.findById(req.params.id);
+    if (!stream || stream.user_id !== req.session.userId) {
+      return res.status(404).json({ success: false, error: 'Stream not found' });
+    }
+    
+    const exportData = {
+      version: '1.0',
+      type: 'stream_export',
+      data: {
+        title: stream.title,
+        platform: stream.platform,
+        rtmp_url: stream.rtmp_url,
+        stream_key: stream.stream_key,
+        video_id: stream.video_id,
+        video_title: stream.video_title,
+        bitrate: stream.bitrate,
+        fps: stream.fps,
+        resolution: stream.resolution,
+        orientation: stream.orientation,
+        use_advanced_settings: stream.use_advanced_settings,
+        loop_video: stream.loop_video,
+        schedule_time: stream.schedule_time,
+        end_time: stream.end_time,
+        stream_mode: stream.stream_mode,
+        youtube_broadcast_id: stream.youtube_broadcast_id,
+        youtube_privacy: stream.youtube_privacy,
+        youtube_category: stream.youtube_category,
+        youtube_tags: stream.youtube_tags,
+        youtube_description: stream.youtube_description,
+        youtube_monetization: stream.youtube_monetization,
+        youtube_altered_content: stream.youtube_altered_content,
+        youtube_made_for_kids: stream.youtube_made_for_kids
+      }
+    };
+    
+    const filename = `stream-${stream.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+    res.setHeader('Content-disposition', `attachment; filename=${filename}`);
+    res.setHeader('Content-type', 'application/json');
+    res.send(JSON.stringify(exportData, null, 2));
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ success: false, error: 'Failed to export stream' });
+  }
+});
+
+app.post('/api/streams/import', isAuthenticated, uploadBackup.single('backup'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No export file provided' });
+    }
+    
+    const fs = require('fs-extra');
+    const content = await fs.readFile(req.file.path, 'utf8');
+    await fs.remove(req.file.path);
+    
+    const importData = JSON.parse(content);
+    if (importData.type !== 'stream_export' || !importData.data) {
+      return res.status(400).json({ success: false, error: 'Invalid stream export file' });
+    }
+    
+    const streamData = importData.data;
+    
+    // Create new stream
+    const newStream = await Stream.create({
+      user_id: req.session.userId,
+      title: `${streamData.title} (Imported)`,
+      platform: streamData.platform,
+      rtmp_url: streamData.rtmp_url,
+      stream_key: streamData.stream_key,
+      video_id: streamData.video_id,
+      bitrate: streamData.bitrate,
+      fps: streamData.fps,
+      resolution: streamData.resolution,
+      orientation: streamData.orientation || 'horizontal',
+      use_advanced_settings: streamData.use_advanced_settings || 0,
+      loop_video: streamData.loop_video || 1,
+      schedule_time: streamData.schedule_time,
+      end_time: streamData.end_time,
+      status: 'offline',
+      stream_mode: streamData.stream_mode || 'manual',
+      youtube_channel_id: null,
+      youtube_privacy: streamData.youtube_privacy || 'unlisted',
+      youtube_category: streamData.youtube_category || '22',
+      youtube_tags: streamData.youtube_tags || '',
+      youtube_description: streamData.youtube_description || '',
+      youtube_monetization: streamData.youtube_monetization || 0,
+      youtube_altered_content: streamData.youtube_altered_content || 0,
+      youtube_made_for_kids: streamData.youtube_made_for_kids || 0
+    });
+    
+    res.json({ success: true, message: 'Stream imported successfully', streamId: newStream.id });
+  } catch (error) {
+    console.error('Import error:', error);
+    res.status(500).json({ success: false, error: 'Failed to import stream' });
+  }
+});
+
 app.get('/api/streams', isAuthenticated, async (req, res) => {
   try {
     const filter = req.query.filter;
@@ -4768,6 +4867,102 @@ app.get('/rotations', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Rotations page error:', error);
     res.redirect('/dashboard');
+  }
+});
+
+app.get('/api/rotations/:id/export', isAuthenticated, async (req, res) => {
+  try {
+    const rotation = await Rotation.findByIdWithItems(req.params.id);
+    if (!rotation || rotation.user_id !== req.session.userId) {
+      return res.status(404).json({ success: false, error: 'Rotation not found' });
+    }
+    
+    const exportData = {
+      version: '1.0',
+      type: 'rotation_export',
+      data: {
+        name: rotation.name,
+        repeat_mode: rotation.repeat_mode,
+        start_time: rotation.start_time,
+        end_time: rotation.end_time,
+        is_loop: rotation.is_loop,
+        items: rotation.items.map(item => ({
+          order_index: item.order_index,
+          title: item.title,
+          description: item.description,
+          tags: item.tags,
+          privacy: item.privacy,
+          category: item.category,
+          youtube_monetization: item.youtube_monetization,
+          youtube_altered_content: item.youtube_altered_content,
+          youtube_made_for_kids: item.youtube_made_for_kids,
+          video_title: item.video_title // Used for matching on import
+        }))
+      }
+    };
+    
+    const filename = `rotation-${rotation.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+    res.setHeader('Content-disposition', `attachment; filename=${filename}`);
+    res.setHeader('Content-type', 'application/json');
+    res.send(JSON.stringify(exportData, null, 2));
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ success: false, error: 'Failed to export rotation' });
+  }
+});
+
+app.post('/api/rotations/import', isAuthenticated, uploadBackup.single('backup'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No export file provided' });
+    }
+    
+    const fs = require('fs-extra');
+    const content = await fs.readFile(req.file.path, 'utf8');
+    await fs.remove(req.file.path);
+    
+    const importData = JSON.parse(content);
+    if (importData.type !== 'rotation_export' || !importData.data) {
+      return res.status(400).json({ success: false, error: 'Invalid rotation export file' });
+    }
+    
+    const rotationData = importData.data;
+    const newRotation = await Rotation.create({
+      user_id: req.session.userId,
+      name: `${rotationData.name} (Imported)`,
+      is_loop: rotationData.is_loop || 1,
+      start_time: rotationData.start_time,
+      end_time: rotationData.end_time,
+      repeat_mode: rotationData.repeat_mode || 'daily',
+      youtube_channel_id: null
+    });
+    
+    // Try to find videos by title
+    const allVideos = await Video.findAll(req.session.userId);
+    
+    for (const item of rotationData.items) {
+      // Find matching video by title
+      const matchedVideo = allVideos.find(v => v.title === item.video_title);
+      
+      await Rotation.addItem({
+        rotation_id: newRotation.id,
+        order_index: item.order_index,
+        video_id: matchedVideo ? matchedVideo.id : (allVideos[0]?.id || ''), // Use first video as fallback if not found
+        title: item.title,
+        description: item.description,
+        tags: item.tags,
+        privacy: item.privacy,
+        category: item.category,
+        youtube_monetization: item.youtube_monetization,
+        youtube_altered_content: item.youtube_altered_content,
+        youtube_made_for_kids: item.youtube_made_for_kids
+      });
+    }
+    
+    res.json({ success: true, message: 'Rotation imported successfully' });
+  } catch (error) {
+    console.error('Import error:', error);
+    res.status(500).json({ success: false, error: 'Failed to import rotation' });
   }
 });
 
