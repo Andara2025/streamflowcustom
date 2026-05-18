@@ -18,7 +18,7 @@
     <input type="file" id="import-rotation-input" class="hidden" accept=".json" onchange="handleImportRotation(this)">
     
     <% if (youtubeConnected) { %>
-    <button onclick="openCreateRotationModal()" class="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+    <button onclick="openCreateRotationModal()" class="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary hover:bg-rose-600 text-white px-4 py-2 rounded-lg transition-colors">
       <i class="ti ti-plus"></i>
       <span>New Rotation</span>
     </button>
@@ -129,9 +129,9 @@
       </div>
       <div class="flex items-center gap-1.5">
         <% if (rotation.status === 'inactive' || rotation.status === 'paused' || rotation.status === 'completed') { %>
-        <button onclick="activateRotation('<%= rotation.id %>')" class="px-2.5 py-1 text-white text-[10px] font-medium rounded transition-colors bg-primary hover:bg-blue-600">Start</button>
+        <button onclick="activateRotation('<%= rotation.id %>')" class="px-2.5 py-1 text-white text-[10px] font-medium rounded transition-colors bg-emerald-600 hover:bg-emerald-700">Start</button>
         <% } else if (rotation.status === 'active' || rotation.status === 'live') { %>
-        <button onclick="stopRotation('<%= rotation.id %>')" class="px-2.5 py-1 text-white text-[10px] font-medium rounded transition-colors bg-red-500 hover:bg-red-600">Stop</button>
+        <button onclick="stopRotation('<%= rotation.id %>')" class="px-2.5 py-1 text-white text-[10px] font-medium rounded transition-colors bg-red-600 hover:bg-red-700">Stop</button>
         <% } %>
         <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="location.href='/api/rotations/<%= rotation.id %>/export'" title="Export Rotation">
           <i class="ti ti-download text-blue-400 hover:text-blue-300 text-sm"></i>
@@ -284,11 +284,11 @@
           <td class="px-6 py-4 whitespace-nowrap text-right">
             <div class="flex items-center justify-end space-x-2">
               <% if (rotation.status === 'inactive' || rotation.status === 'paused' || rotation.status === 'completed') { %>
-              <button onclick="activateRotation('<%= rotation.id %>')" class="inline-flex items-center px-2.5 py-1.5 text-white text-xs font-medium rounded transition-colors bg-primary hover:bg-blue-600">
+              <button onclick="activateRotation('<%= rotation.id %>')" class="inline-flex items-center px-2.5 py-1.5 text-white text-xs font-medium rounded transition-colors bg-emerald-600 hover:bg-emerald-700">
                 Start
               </button>
               <% } else if (rotation.status === 'active' || rotation.status === 'live') { %>
-              <button onclick="stopRotation('<%= rotation.id %>')" class="inline-flex items-center px-2.5 py-1.5 text-white text-xs font-medium rounded transition-colors bg-red-500 hover:bg-red-600">
+              <button onclick="stopRotation('<%= rotation.id %>')" class="inline-flex items-center px-2.5 py-1.5 text-white text-xs font-medium rounded transition-colors bg-red-600 hover:bg-red-700">
                 Stop
               </button>
               <% } %>
@@ -495,7 +495,7 @@
       </div>
       <div class="flex-shrink-0 flex items-center justify-end gap-3 p-4 sm:px-6 border-t border-gray-700">
         <button onclick="closeCreateRotationModal()" class="px-5 py-2.5 text-sm font-medium text-gray-300 hover:text-white transition-colors">Cancel</button>
-        <button type="button" onclick="saveRotation()" class="px-5 py-2.5 text-sm font-medium bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">Save Rotation</button>
+        <button type="button" onclick="saveRotation()" class="px-5 py-2.5 text-sm font-medium bg-primary hover:bg-rose-600 text-white rounded-lg transition-colors">Save Rotation</button>
       </div>
     </div>
   </div>
@@ -1935,7 +1935,7 @@ async function duplicateRotation(id) {
           <button onclick="closeAiEnhanceModal()" class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">
             Cancel
           </button>
-          <button id="aiEnhanceSubmitBtn" onclick="runAiEnhancement()" class="px-5 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2 text-sm">
+          <button id="aiEnhanceSubmitBtn" onclick="runAiEnhancement()" class="px-5 py-2 bg-primary hover:bg-rose-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2 text-sm">
             <i class="ti ti-sparkles"></i>
             <span>Generate & Enhance</span>
           </button>

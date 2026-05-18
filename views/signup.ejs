@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign Up - StreamFlow Lite</title>
+  <title>Sign Up - LIVORA</title>
   <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
   <link rel="preload" href="/images/logo.svg" as="image" type="image/svg+xml">
   <link rel="alternate icon" href="/images/favicon.ico" type="image/x-icon">
@@ -26,13 +26,13 @@
         },
         extend: {
           colors: {
-            'primary': '#0055FF',
-            'secondary': '#0043CA',
+            'primary': '#E11D48',
+            'secondary': '#BE123C',
             'dark': {
-              '900': '#121212',
-              '800': '#252525',
-              '700': '#2D2D2D',
-              '600': '#3D3D3D',
+              '900': '#0B0B0F',
+              '800': '#161622',
+              '700': '#222235',
+              '600': '#33334d',
               '500': '#6E6E6E',
               '400': '#8F8F8F',
               '100': '#E5E5E5',
@@ -43,13 +43,19 @@
     }
   </script>
 </head>
-<body class="bg-dark-900 text-white font-inter">
-  <div class="min-h-screen flex flex-col">
+<body class="bg-dark-900 text-white font-inter relative overflow-x-hidden">
+  <!-- Premium ambient background glows -->
+  <div class="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[120px] pointer-events-none"></div>
+  <div class="absolute bottom-[-10%] right-[-10%] w-[300px] h-[300px] rounded-full bg-secondary/10 blur-[80px] pointer-events-none"></div>
+
+  <div class="min-h-screen flex flex-col relative z-10">
     <div class="flex-1 flex items-center justify-center px-6 py-10">
-      <div class="w-full max-w-lg bg-dark-800 rounded-xl shadow-xl p-6 sm:p-8">
+      <div class="w-full max-w-lg bg-dark-800/80 backdrop-blur-md border border-dark-600/30 rounded-xl shadow-2xl p-6 sm:p-8">
       
-        <div class="text-center mb-8">
-          <h1 class="text-2xl font-bold">Create Account</h1>
+        <div class="flex flex-col items-center justify-center mb-8">
+          <img src="/images/logo_mobile.svg" alt="LIVORA Logo" class="h-12 hover:scale-105 transition-transform duration-300">
+          <p class="text-xs text-primary font-medium tracking-widest uppercase mt-2">PREMIUM LIVE STREAMING</p>
+          <h1 class="text-2xl font-bold mt-4">Create Account</h1>
           <p class="text-gray-400 mt-1">Join streaming membership</p>
         </div>
 
@@ -78,12 +84,12 @@
               <div class="flex flex-col items-center justify-center">
                 <div class="relative group">
                   <div id="avatar-preview"
-                    class="w-28 h-28 rounded-full bg-dark-700 border-2 border-gray-600 group-hover:border-primary flex items-center justify-center text-gray-400 overflow-hidden transition-colors">
+                    class="w-28 h-28 rounded-full bg-dark-700/60 border-2 border-gray-600/40 group-hover:border-primary flex items-center justify-center text-gray-400 overflow-hidden transition-all duration-300">
                     <i class="ti ti-user text-4xl"></i>
                   </div>
                   <div class="absolute bottom-0 right-0">
                     <label for="avatar-upload"
-                      class="flex items-center justify-center w-8 h-8 rounded-full bg-primary cursor-pointer shadow-lg">
+                      class="flex items-center justify-center w-8 h-8 rounded-full bg-primary hover:bg-rose-600 cursor-pointer shadow-lg transition-colors">
                       <i class="ti ti-camera text-white"></i>
                     </label>
                     <input id="avatar-upload" name="avatar" type="file" accept="image/*" class="hidden"
@@ -97,7 +103,7 @@
                 <label for="username" class="text-sm font-medium block mb-2">Username</label>
                 <div class="relative">
                   <input type="text" id="username" name="username"
-                    class="w-full pl-10 pr-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
+                    class="w-full pl-10 pr-4 py-2.5 bg-dark-700/60 border border-gray-600/40 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
                     placeholder="Choose a username" required>
                   <i class="ti ti-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                 </div>
@@ -107,7 +113,7 @@
                 <label for="password" class="text-sm font-medium block mb-2">Password</label>
                 <div class="relative">
                   <input type="password" id="password" name="password"
-                    class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
+                    class="w-full pl-10 pr-12 py-2.5 bg-dark-700/60 border border-gray-600/40 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
                     placeholder="Create a password" required minlength="6" onkeyup="checkPasswordStrength()">
                   <i class="ti ti-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                   <button type="button" onclick="togglePasswordVisibility('password', 'passwordToggle')"
@@ -130,7 +136,7 @@
                 <label for="confirmPassword" class="text-sm font-medium block mb-2">Confirm Password</label>
                 <div class="relative">
                   <input type="password" id="confirmPassword" name="confirmPassword"
-                    class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
+                    class="w-full pl-10 pr-12 py-2.5 bg-dark-700/60 border border-gray-600/40 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
                     placeholder="Confirm your password" required onkeyup="checkPasswordMatch()">
                   <i class="ti ti-lock-check absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                   <button type="button" onclick="togglePasswordVisibility('confirmPassword', 'confirmPasswordToggle')"
@@ -150,7 +156,7 @@
               <% } %>
               
               <button type="submit" id="submitBtn"
-                class="w-full bg-primary hover:bg-blue-600 text-white py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                class="w-full bg-primary hover:bg-rose-600 text-white py-2.5 rounded-lg font-medium transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
                 Create Account
               </button>
             </form>
@@ -158,7 +164,7 @@
             <div class="text-center mt-6">
               <p class="text-gray-400 text-sm">
                 Already have an account? 
-                <a href="/login" class="text-primary hover:text-blue-400 transition-colors">Sign in</a>
+                <a href="/login" class="text-primary hover:text-rose-400 transition-colors font-medium">Sign in</a>
               </p>
             </div>
       </div>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome - StreamFlow</title>
+  <title>Welcome - LIVORA</title>
   <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
   <link rel="preload" href="/images/logo.svg" as="image" type="image/svg+xml">
   <link rel="alternate icon" href="/images/favicon.ico" type="image/x-icon">
@@ -23,13 +23,13 @@
         },
         extend: {
           colors: {
-            'primary': '#0055FF',
-            'secondary': '#0043CA',
+            'primary': '#E11D48',
+            'secondary': '#BE123C',
             'dark': {
-              '900': '#121212',
-              '800': '#252525',
-              '700': '#2D2D2D',
-              '600': '#3D3D3D',
+              '900': '#0B0B0F',
+              '800': '#161622',
+              '700': '#222235',
+              '600': '#33334d',
               '500': '#6E6E6E',
               '400': '#8F8F8F',
               '100': '#E5E5E5',
@@ -39,92 +39,33 @@
       }
     }
   </script>
-  <style>
-    .donate-button {
-      background: linear-gradient(45deg, #01935d, #01e304);
-      transition: filter 0.2s ease;
-    }
-    .donate-button:hover {
-      filter: brightness(0.85);
-    }
-    .donators-container {
-      overflow: hidden;
-      mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-      -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-    }
-    .donators-track {
-      display: flex;
-      gap: 1rem;
-    }
-    .donators-track.animate {
-      animation: scroll var(--scroll-duration, 20s) linear infinite;
-    }
-    @keyframes scroll {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(var(--scroll-distance, -50%)); }
-    }
-    .donator-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.25rem 0;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .donator-avatar {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-    .donator-initial {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 8px;
-      font-weight: 600;
-      color: white;
-    }
-  </style>
 </head>
-<body class="bg-dark-900 text-white font-inter">
-  <div class="min-h-screen flex flex-col items-center justify-center px-6 py-10">
+<body class="bg-dark-900 text-white font-inter relative overflow-x-hidden">
+  <!-- Premium ambient background glows -->
+  <div class="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[120px] pointer-events-none"></div>
+  <div class="absolute bottom-[-10%] right-[-10%] w-[300px] h-[300px] rounded-full bg-secondary/10 blur-[80px] pointer-events-none"></div>
+
+  <div class="min-h-screen flex flex-col items-center justify-center px-6 py-10 relative z-10">
     <div class="w-full max-w-md text-center">
       <div class="mb-8">
-        <img src="/images/logo_mobile.svg" alt="StreamFlow Logo" class="h-9 mx-auto mb-6">
-        <h1 class="text-3xl font-bold mb-3">Welcome to StreamFlow</h1>
+        <img src="/images/logo_mobile.svg" alt="LIVORA Logo" class="h-14 mx-auto mb-6 hover:scale-105 transition-transform duration-300">
+        <p class="text-xs text-primary font-medium tracking-widest uppercase mt-2">PREMIUM LIVE STREAMING</p>
+        <h1 class="text-3xl font-bold mt-4">Welcome to LIVORA</h1>
       </div>
-      <div class="bg-dark-800 rounded-xl p-6 mb-6">
-        <p class="text-gray-400 text-sm mb-4">
-          Terima kasih sudah menggunakan StreamFlow
+      <div class="bg-dark-800/80 backdrop-blur-md border border-dark-600/30 rounded-xl p-8 mb-6 shadow-2xl">
+        <p class="text-gray-300 text-sm mb-6 leading-relaxed">
+          Terima kasih sudah memilih LIVORA sebagai platform live streaming andalan Anda. Akun Anda berhasil dikonfigurasi dan siap digunakan.
         </p>
-        <p class="text-gray-400 text-sm mb-6">
-          Kamu bisa bantu support admin biar makin semangat ngembangin aplikasi ini 🥹<span id="pray-emoji" class="inline-block opacity-0 transition-opacity duration-300">🙏</span>
-        </p>
-        <a id="donate-btn" href="https://donate.youtube101.id/" target="_blank" rel="noopener noreferrer"
-          class="donate-button inline-flex items-center justify-center w-full text-white py-3 px-4 rounded-lg font-medium">
-          <i class="ti ti-heart mr-2"></i>
-          Donate
-        </a>
-        <div class="mt-8 pt-4 border-t border-gray-700/50">
-          <p class="text-gray-500 text-xs mb-3">Supporter:</p>
-          <div class="donators-container">
-            <div class="donators-track" id="donators-track"></div>
-          </div>
+        <div class="mb-6">
+          <p id="countdown-text" class="text-gray-400 text-sm">
+            Redirecting to dashboard in <span id="countdown" class="font-bold text-primary">15</span> seconds...
+          </p>
         </div>
+        <a href="/welcome/continue" class="inline-flex items-center justify-center w-full bg-primary hover:bg-rose-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg shadow-primary/20">
+          Go to Dashboard
+          <i class="ti ti-arrow-right ml-2"></i>
+        </a>
       </div>
-      <div class="mb-4">
-        <p id="countdown-text" class="text-gray-500 text-sm">
-          Redirecting to dashboard in <span id="countdown">10</span> seconds...
-        </p>
-      </div>
-      <a href="/welcome/continue" class="inline-flex items-center justify-center text-primary hover:text-blue-400 font-medium transition-colors">
-        Go to Dashboard
-        <i class="ti ti-arrow-right ml-2"></i>
-      </a>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
