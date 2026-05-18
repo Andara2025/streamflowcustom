@@ -543,7 +543,12 @@
                       <input type="hidden" id="ytSelectedVideoId" name="ytVideoId" value="">
 
                       <div>
-                        <label class="text-sm font-medium text-white block mb-2">Stream Title</label>
+                        <div class="flex items-center justify-between mb-2">
+                          <label class="text-sm font-medium text-white block">Stream Title</label>
+                          <button type="button" class="btn-ai-enhance text-primary hover:text-blue-500 text-xs flex items-center gap-1 font-semibold" data-mode="create">
+                            <i class="ti ti-sparkles animate-pulse"></i> Enhance with Gemini AI
+                          </button>
+                        </div>
                         <input type="text" id="ytStreamTitle" name="ytStreamTitle"
                           class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
                           placeholder="Enter stream title...">
@@ -1125,7 +1130,12 @@
                   <input type="hidden" id="editYtSelectedVideoId" name="ytVideoId" value="">
 
                   <div>
-                    <label class="text-sm font-medium text-white block mb-2">Stream Title</label>
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="text-sm font-medium text-white block">Stream Title</label>
+                      <button type="button" class="btn-ai-enhance text-primary hover:text-blue-500 text-xs flex items-center gap-1 font-semibold" data-mode="edit">
+                        <i class="ti ti-sparkles animate-pulse"></i> Enhance with Gemini AI
+                      </button>
+                    </div>
                     <input type="text" id="editYtStreamTitle" name="ytStreamTitle"
                       class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
                       placeholder="Enter stream title...">
@@ -4880,4 +4890,230 @@
       }
       window._tipsPrevModal = null;
     }
+
+    let currentAiMode = 'create';
+
+    window.openAiEnhanceModal = function(mode) {
+      currentAiMode = mode;
+      const titleInput = document.getElementById(mode === 'create' ? 'ytStreamTitle' : 'editYtStreamTitle');
+      const descInput = document.getElementById(mode === 'create' ? 'ytDescription' : 'editYtDescription');
+      
+      const currentTitle = titleInput ? titleInput.value.trim() : '';
+      const currentDesc = descInput ? descInput.value.trim() : '';
+      
+      const promptInput = document.getElementById('aiPrompt');
+      promptInput.value = '';
+      
+      const notice = document.getElementById('aiStatusNotice');
+      const resultArea = document.getElementById('aiResultArea');
+      const loadingArea = document.getElementById('aiLoadingArea');
+      const applyBtn = document.getElementById('aiApplyBtn');
+      const submitBtn = document.getElementById('aiEnhanceSubmitBtn');
+      
+      resultArea.classList.add('hidden');
+      loadingArea.classList.add('hidden');
+      applyBtn.classList.add('hidden');
+      submitBtn.classList.remove('hidden');
+      
+      if (currentTitle || currentDesc) {
+        notice.innerHTML = `<div class="flex items-center gap-2"><i class="ti ti-info-circle text-base"></i><span>Kita akan mengoptimalkan (Enhance) judul & deskripsi yang sudah Anda ketik saat ini agar lebih kuat SEO-nya!</span></div>`;
+      } else {
+        notice.innerHTML = `<div class="flex items-center gap-2"><i class="ti ti-bulb text-base"></i><span>Kolom input masih kosong. Masukkan topik/tema siaran di bawah, Gemini AI akan membuatkannya dari awal secara otomatis!</span></div>`;
+      }
+      
+      const modal = document.getElementById('aiEnhanceModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => modal.classList.add('active'));
+        document.body.style.overflow = 'hidden';
+      }
+    };
+
+    window.closeAiEnhanceModal = function() {
+      const modal = document.getElementById('aiEnhanceModal');
+      if (modal) {
+        modal.classList.remove('active');
+        setTimeout(() => modal.classList.add('hidden'), 200);
+        document.body.style.overflow = '';
+      }
+    };
+
+    window.runAiEnhancement = async function() {
+      const prompt = document.getElementById('aiPrompt').value.trim();
+      const mode = currentAiMode;
+      
+      const titleInput = document.getElementById(mode === 'create' ? 'ytStreamTitle' : 'editYtStreamTitle');
+      const descInput = document.getElementById(mode === 'create' ? 'ytDescription' : 'editYtDescription');
+      const tagsStore = document.getElementById(mode === 'create' ? 'ytTags' : 'editYtTags');
+      
+      const currentTitle = titleInput ? titleInput.value.trim() : '';
+      const currentDesc = descInput ? descInput.value.trim() : '';
+      const currentTags = tagsStore ? tagsStore.value.trim() : '';
+      
+      if (!currentTitle && !currentDesc && !prompt) {
+        alert('Silakan masukkan topik/tema siaran terlebih dahulu!');
+        return;
+      }
+      
+      const loadingArea = document.getElementById('aiLoadingArea');
+      const resultArea = document.getElementById('aiResultArea');
+      const applyBtn = document.getElementById('aiApplyBtn');
+      const submitBtn = document.getElementById('aiEnhanceSubmitBtn');
+      
+      loadingArea.classList.remove('hidden');
+      resultArea.classList.add('hidden');
+      applyBtn.classList.add('hidden');
+      submitBtn.classList.add('hidden');
+      
+      try {
+        const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
+        const response = await fetch('/api/ai/enhance', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken || ''
+          },
+          body: JSON.stringify({
+            prompt,
+            title: currentTitle,
+            description: currentDesc,
+            tags: currentTags
+          })
+        });
+        
+        const resData = await response.json();
+        
+        if (resData.success && resData.data) {
+          const data = resData.data;
+          document.getElementById('aiResultTitle').textContent = data.title || '';
+          document.getElementById('aiResultDesc').textContent = data.description || '';
+          document.getElementById('aiResultTags').textContent = data.tags || '';
+          
+          window._lastAiResult = data;
+          
+          resultArea.classList.remove('hidden');
+          applyBtn.classList.remove('hidden');
+        } else {
+          alert(resData.error || 'Gagal mengoptimalkan metadata dengan AI.');
+          submitBtn.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Terjadi kesalahan koneksi ke server.');
+        submitBtn.classList.remove('hidden');
+      } finally {
+        loadingArea.classList.add('hidden');
+      }
+    };
+
+    window.applyAiMetadata = function() {
+      if (!window._lastAiResult) return;
+      const data = window._lastAiResult;
+      const mode = currentAiMode;
+      
+      const titleInput = document.getElementById(mode === 'create' ? 'ytStreamTitle' : 'editYtStreamTitle');
+      const descInput = document.getElementById(mode === 'create' ? 'ytDescription' : 'editYtDescription');
+      
+      if (titleInput) titleInput.value = data.title || '';
+      if (descInput) descInput.value = data.description || '';
+      
+      if (data.tags) {
+        if (mode === 'create') {
+          if (typeof clearYtTags === 'function') clearYtTags();
+          if (typeof addYtTags === 'function') {
+            addYtTags(data.tags);
+          }
+        } else {
+          if (typeof clearEditYtTags === 'function') clearEditYtTags();
+          if (typeof addEditYtTags === 'function') {
+            addEditYtTags(data.tags);
+          }
+        }
+      }
+      
+      closeAiEnhanceModal();
+      if (typeof showToast === 'function') {
+        showToast('success', 'Metadata berhasil dioptimalkan oleh Gemini AI!');
+      } else {
+        alert('Metadata berhasil dioptimalkan oleh Gemini AI!');
+      }
+    };
+
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('.btn-ai-enhance');
+      if (btn) {
+        const mode = btn.getAttribute('data-mode');
+        openAiEnhanceModal(mode);
+      }
+    });
   </script>
+
+  <!-- AI Enhance Modal -->
+  <div id="aiEnhanceModal" class="fixed inset-0 bg-black/60 z-[100] hidden modal-overlay overflow-y-auto">
+    <div class="flex min-h-screen items-center justify-center p-4">
+      <div class="bg-dark-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-xl modal-container p-6">
+        <div class="flex items-center justify-between pb-4 border-b border-gray-700">
+          <div class="flex items-center gap-2 text-primary">
+            <i class="ti ti-sparkles text-xl text-blue-500"></i>
+            <h3 class="text-lg font-semibold text-white">Gemini AI SEO Assistant</h3>
+          </div>
+          <button onclick="closeAiEnhanceModal()" class="text-gray-400 hover:text-white">
+            <i class="ti ti-x text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="mt-4 space-y-4">
+          <div id="aiStatusNotice" class="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3 text-xs text-blue-300">
+            <!-- Dynamically updated -->
+          </div>
+
+          <div class="space-y-2">
+            <label for="aiPrompt" class="block text-sm font-medium text-gray-300">Topic / Focus Prompt (Optional)</label>
+            <input type="text" id="aiPrompt" 
+              class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm placeholder-gray-500" 
+              placeholder="e.g. relaxing study music, funny moments compilation, SEO optimization...">
+          </div>
+
+          <div id="aiLoadingArea" class="hidden py-8 text-center space-y-3">
+            <i class="ti ti-loader animate-spin text-3xl text-primary block mx-auto text-blue-500"></i>
+            <p class="text-sm text-gray-400">Gemini is analyzing and optimizing your metadata...</p>
+          </div>
+
+          <div id="aiResultArea" class="hidden space-y-4 pt-2 border-t border-gray-700">
+            <h4 class="text-sm font-semibold text-white flex items-center gap-1">
+              <i class="ti ti-circle-check text-green-400"></i> Optimized Metadata Generated
+            </h4>
+            
+            <div class="space-y-3 max-h-60 overflow-y-auto pr-1 text-xs">
+              <div class="space-y-1">
+                <span class="font-medium text-gray-400">Title:</span>
+                <div id="aiResultTitle" class="bg-dark-900 p-2 rounded border border-gray-700 text-white font-medium"></div>
+              </div>
+              <div class="space-y-1">
+                <span class="font-medium text-gray-400">Description:</span>
+                <pre id="aiResultDesc" class="bg-dark-900 p-2 rounded border border-gray-700 text-gray-300 whitespace-pre-wrap font-sans"></pre>
+              </div>
+              <div class="space-y-1">
+                <span class="font-medium text-gray-400">Tags:</span>
+                <div id="aiResultTags" class="bg-dark-900 p-2 rounded border border-gray-700 text-gray-300"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-gray-700">
+          <button onclick="closeAiEnhanceModal()" class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">
+            Cancel
+          </button>
+          <button id="aiEnhanceSubmitBtn" onclick="runAiEnhancement()" class="px-5 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2 text-sm">
+            <i class="ti ti-sparkles"></i>
+            <span>Generate & Enhance</span>
+          </button>
+          <button id="aiApplyBtn" onclick="applyAiMetadata()" class="hidden px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2 text-sm">
+            <i class="ti ti-circle-check"></i>
+            <span>Apply to Form</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>

@@ -971,6 +971,7 @@ app.get('/settings', isAuthenticated, async (req, res) => {
     const defaultChannel = youtubeChannels.find(c => c.is_default) || youtubeChannels[0];
 
     const recaptchaSettings = await AppSettings.getRecaptchaSettings();
+    const geminiApiKeys = await AppSettings.get('gemini_api_keys') || '';
 
     res.render('settings', {
       title: 'Settings',
@@ -989,6 +990,7 @@ app.get('/settings', isAuthenticated, async (req, res) => {
       recaptchaSecretKey: recaptchaSettings.secretKey ? '••••••••••••••••' : '',
       hasRecaptchaKeys: recaptchaSettings.hasKeys,
       recaptchaEnabled: recaptchaSettings.enabled,
+      geminiApiKeys: geminiApiKeys,
       success: req.query.success || null,
       error: req.query.error || null,
       activeTab: req.query.activeTab || null
@@ -2665,6 +2667,143 @@ app.post('/api/settings/recaptcha', isAuthenticated, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'An error occurred while saving reCAPTCHA settings'
+    });
+  }
+});
+
+app.post('/api/settings/gemini', isAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.session.userId);
+    if (user.user_role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only admin can manage Gemini AI settings'
+      });
+    }
+
+    const { geminiApiKeys } = req.body;
+    const AppSettings = require('./models/AppSettings');
+    await AppSettings.set('gemini_api_keys', geminiApiKeys || '');
+
+    return res.json({
+      success: true,
+      message: 'Gemini API Keys saved successfully!'
+    });
+  } catch (error) {
+    console.error('Error saving Gemini settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'An error occurred while saving Gemini settings'
+    });
+  }
+});
+
+app.post('/api/ai/enhance', isAuthenticated, async (req, res) => {
+  try {
+    const { prompt, title, description, tags } = req.body;
+    const AppSettings = require('./models/AppSettings');
+    const keysString = await AppSettings.get('gemini_api_keys') || '';
+    const keys = keysString.split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
+
+    if (keys.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No Gemini API keys found. Please configure them in Settings.'
+      });
+    }
+
+    let lastError = null;
+    let enhancedResult = null;
+
+    const systemPrompt = `You are a YouTube SEO expert. Generate optimized metadata for a live broadcast.
+Return the result strictly as a JSON object with three fields: "title" (max 100 chars, highly searchable, click-attractive), "description" (professionally structured, include keyword density, call-to-actions, timestamps placeholders, highly optimized), and "tags" (a comma-separated string of 10-15 high-volume YouTube keywords). Do not include any markdown wrapper or backticks like \\\`json or similar in your response, return ONLY the raw JSON string.`;
+
+    const userPrompt = `Base prompt / Focus topic: ${prompt || 'Optimize this stream metadata for SEO.'}
+Current Title: ${title || 'None'}
+Current Description: ${description || 'None'}
+Current Tags: ${tags || 'None'}
+
+Please enhance the metadata. If prompt is empty or just generic, optimize the current metadata. If the fields are empty and a prompt/topic is provided, generate high-quality optimized metadata from scratch based on that topic.
+
+CRITICAL LANGUAGE REQUIREMENT: You MUST automatically detect the language of the provided input (topic prompt, current title, or current description). The generated optimized title, description, and tags MUST be returned in that SAME language (e.g., if the inputs are in English, the output must be in English; if in Indonesian, the output must be in Indonesian). Do not translate English inputs to Indonesian, nor Indonesian to English.`;
+
+    const axios = require('axios');
+    const modelCandidates = [
+      'gemini-3.0-flash-preview',
+      'gemini-3.0-flash',
+      'gemini-3-flash-preview',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash'
+    ];
+
+    for (let i = 0; i < keys.length; i++) {
+      const currentKey = keys[i];
+      
+      for (const modelName of modelCandidates) {
+        try {
+          console.log(`[GeminiAI] Attempting enhancement with key ${i + 1}/${keys.length} using model ${modelName}`);
+          const apiResponse = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${currentKey}`,
+            {
+              contents: [
+                {
+                  role: 'user',
+                  parts: [
+                    { text: systemPrompt },
+                    { text: userPrompt }
+                  ]
+                }
+              ],
+              generationConfig: {
+                responseMimeType: 'application/json'
+              }
+            },
+            {
+              timeout: 15000,
+              headers: { 'Content-Type': 'application/json' }
+            }
+          );
+
+          if (apiResponse.data && apiResponse.data.candidates && apiResponse.data.candidates[0].content.parts[0].text) {
+            const rawText = apiResponse.data.candidates[0].content.parts[0].text.trim();
+            try {
+              const cleanedText = rawText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
+              enhancedResult = JSON.parse(cleanedText);
+              break; // Success! Exit model loop.
+            } catch (jsonErr) {
+              console.error('[GeminiAI] Failed to parse JSON response:', rawText);
+              lastError = new Error('AI response was not valid JSON');
+            }
+          }
+        } catch (err) {
+          const errMsg = err.response?.data?.error?.message || err.message;
+          console.warn(`[GeminiAI] Key ${i + 1} with model ${modelName} failed:`, errMsg);
+          lastError = err;
+        }
+      }
+      
+      if (enhancedResult) {
+        break; // Success! Exit keys loop.
+      }
+    }
+
+    if (enhancedResult) {
+      return res.json({
+        success: true,
+        data: enhancedResult
+      });
+    } else {
+      return res.status(502).json({
+        success: false,
+        error: lastError ? `AI generation failed: ${lastError.response?.data?.error?.message || lastError.message}` : 'All configured Gemini API keys failed or exceeded quota.'
+      });
+    }
+  } catch (error) {
+    console.error('AI Enhance error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'An error occurred during metadata enhancement.'
     });
   }
 });

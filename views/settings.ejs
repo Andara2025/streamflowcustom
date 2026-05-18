@@ -23,6 +23,13 @@
         data-tab="integration">
         <i class="ti ti-plug mr-2"></i>Integration
       </button>
+      <% if (user.user_role === 'admin') { %>
+      <button
+        class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
+        data-tab="gemini">
+        <i class="ti ti-sparkles mr-2"></i>Gemini AI
+      </button>
+      <% } %>
       <button
         class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
         data-tab="backup">
@@ -468,6 +475,50 @@
       </div>
     </div>
 
+    <% if (user.user_role === 'admin') { %>
+    <div id="gemini-tab" class="settings-content hidden">
+      <div class="bg-gray-800 rounded-lg p-6 max-w-2xl">
+        <h3 class="text-lg font-semibold mb-2">Gemini AI Configuration</h3>
+        <p class="text-gray-400 text-sm mb-6">Configure multiple Google Gemini API Keys for SEO metadata enhancement. Keys are rotated automatically on failure or rate-limits.</p>
+        
+        <div class="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mb-6">
+          <div class="flex items-start gap-3">
+            <i class="ti ti-info-circle text-blue-400 text-xl flex-shrink-0 mt-0.5"></i>
+            <div class="text-sm">
+              <p class="text-blue-400 font-medium mb-1">Get Gemini API Keys for Free!</p>
+              <p class="text-gray-300 mb-2">You can generate API Keys for free using Google AI Studio. Input multiple keys (one per line) to enable automated quota rotation.</p>
+              <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" 
+                class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs font-semibold">
+                <i class="ti ti-external-link"></i>
+                Get Gemini API Key
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <form id="gemini-form" class="space-y-6">
+          <div class="space-y-2">
+            <label for="gemini-api-keys" class="block text-sm font-medium text-gray-300">
+              <i class="ti ti-key mr-1"></i>Gemini API Keys (One key per line)
+            </label>
+            <textarea id="gemini-api-keys" name="geminiApiKeys" rows="6"
+              class="bg-dark-900 text-white px-4 py-3 rounded-lg block w-full focus:outline-none focus:ring-1 focus:ring-primary border border-gray-700 font-mono text-sm placeholder-gray-600"
+              placeholder="AIzaSy...&#10;AIzaSy..."><%= typeof geminiApiKeys !== 'undefined' ? geminiApiKeys : '' %></textarea>
+            <p class="text-xs text-gray-500">Provide one API Key per line. If a key runs out of quota, Streamflow will automatically rotate to the next key.</p>
+          </div>
+
+          <div class="pt-2">
+            <button type="submit"
+              class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2">
+              <i class="ti ti-device-floppy"></i>
+              <span>Save Gemini Keys</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <% } %>
+
     <div id="backup-tab" class="settings-content hidden">
       <div class="bg-gray-800 rounded-lg p-6 max-w-2xl">
         <h3 class="text-lg font-semibold mb-2">Backup & Restore</h3>
@@ -695,7 +746,7 @@
       });
       const settingsInitData = document.getElementById('settings-init-data').dataset;
       const hashTab = window.location.hash.replace('#', '');
-      const validTabs = ['profile', 'security', 'integration', 'backup', 'logs', 'about'];
+      const validTabs = ['profile', 'security', 'integration', 'gemini', 'backup', 'logs', 'about'];
       if (hashTab && validTabs.includes(hashTab)) {
         activateTab(hashTab);
       } else {
@@ -899,6 +950,42 @@
             saveRecaptchaBtn.disabled = false;
             saveRecaptchaBtn.innerHTML = originalBtnText;
             showToast('error', 'Failed to save reCAPTCHA settings');
+          }
+        });
+      }
+
+      const geminiForm = document.getElementById('gemini-form');
+      if (geminiForm) {
+        geminiForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const geminiApiKeys = document.getElementById('gemini-api-keys').value.trim();
+          const saveBtn = geminiForm.querySelector('button[type="submit"]');
+          const originalBtnText = saveBtn.innerHTML;
+          
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = '<i class="ti ti-loader animate-spin mr-2"></i>Saving...';
+          
+          try {
+            const response = await fetch('/api/settings/gemini', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': settingsInitData.csrfToken
+              },
+              body: JSON.stringify({ geminiApiKeys })
+            });
+            const data = await response.json();
+            if (data.success) {
+              showToast('success', data.message);
+            } else {
+              showToast('error', data.error || 'Failed to save Gemini settings.');
+            }
+          } catch (err) {
+            console.error('Gemini settings save error:', err);
+            showToast('error', 'An error occurred while saving Gemini settings.');
+          } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalBtnText;
           }
         });
       }
