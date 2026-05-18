@@ -207,7 +207,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     }
   }
 
-  if (tagsArray.length > 0 || stream.youtube_category) {
+  if (tagsArray.length > 0 || stream.youtube_category || stream.youtube_altered_content || stream.youtube_made_for_kids) {
     try {
       const videoResponse = await youtube.videos.list({
         part: 'snippet',

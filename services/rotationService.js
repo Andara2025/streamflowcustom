@@ -390,7 +390,7 @@ async function startRotationStream(rotation, item) {
     }
 
     const tags = item.tags ? item.tags.split(',').map(t => t.trim()).filter(t => t) : [];
-    if (tags.length > 0 || item.category) {
+    if (tags.length > 0 || item.category || item.youtube_altered_content || item.youtube_made_for_kids) {
       try {
         await youtube.videos.update({
           part: ['snippet', 'status', 'contentDetails'],
