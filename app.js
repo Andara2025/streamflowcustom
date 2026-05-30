@@ -3042,7 +3042,7 @@ app.get('/auth/youtube', isAuthenticated, async (req, res) => {
 
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const host = req.headers['x-forwarded-host'] || req.get('host');
-    const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
+    const redirectUri = process.env.BASE_URL ? `${process.env.BASE_URL.replace(/\/$/, '')}/auth/youtube/callback` : `${protocol}://${host}/auth/youtube/callback`;
 
     const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, redirectUri);
 
@@ -3092,7 +3092,7 @@ app.get('/auth/youtube/callback', isAuthenticated, async (req, res) => {
 
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const host = req.headers['x-forwarded-host'] || req.get('host');
-    const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
+    const redirectUri = process.env.BASE_URL ? `${process.env.BASE_URL.replace(/\/$/, '')}/auth/youtube/callback` : `${protocol}://${host}/auth/youtube/callback`;
 
     const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, redirectUri);
 

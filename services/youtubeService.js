@@ -19,6 +19,30 @@ function omitUndefined(value) {
   );
 }
 
+function sanitizeYouTubeTags(tagsString) {
+  if (!tagsString) return [];
+  const tagsArray = [];
+  let totalLength = 0;
+  const rawTags = tagsString
+    .split(',')
+    .map(t => t.trim().replace(/[<>]/g, ''))
+    .filter(t => t);
+
+  for (const tag of rawTags) {
+    const slicedTag = tag.slice(0, 90);
+    if (slicedTag.length > 0) {
+      if (totalLength + slicedTag.length + 1 < 450) {
+        tagsArray.push(slicedTag);
+        totalLength += slicedTag.length + 1;
+      } else {
+        break;
+      }
+    }
+  }
+  return tagsArray;
+}
+
+
 async function syncBroadcastMonetization(youtube, broadcastId, enabled) {
   const broadcastResponse = await youtube.liveBroadcasts.list({
     part: 'id,snippet,contentDetails,status,monetizationDetails',
@@ -163,7 +187,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
 
   const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
-  const tagsArray = stream.youtube_tags ? stream.youtube_tags.split(',').map(t => t.trim()).filter(t => t) : [];
+  const tagsArray = sanitizeYouTubeTags(stream.youtube_tags);
 
   const broadcastSnippet = {
     title: stream.title,
@@ -350,5 +374,6 @@ module.exports = {
   createYouTubeBroadcast,
   deleteYouTubeBroadcast,
   getYouTubeOAuth2Client,
-  syncBroadcastMonetization
+  syncBroadcastMonetization,
+  sanitizeYouTubeTags
 };

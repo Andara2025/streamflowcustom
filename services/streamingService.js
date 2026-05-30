@@ -228,7 +228,7 @@ function runFFprobe(filePath) {
       reject(error);
     });
 
-    ffprobeProcess.on('exit', (code) => {
+    ffprobeProcess.on('close', (code) => {
       if (code !== 0) {
         return reject(new Error(stderr.trim() || `ffprobe exited with code ${code}`));
       }
@@ -1351,5 +1351,6 @@ module.exports = {
   healthCheckStreams,
   saveStreamHistory,
   gracefulShutdown,
-  setSchedulerService
+  setSchedulerService,
+  resolvePublicFilePath
 };

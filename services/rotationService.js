@@ -6,7 +6,7 @@ const { google } = require('googleapis');
 const { decrypt } = require('../utils/encryption');
 const path = require('path');
 const fs = require('fs');
-const { syncBroadcastMonetization } = require('./youtubeService');
+const { syncBroadcastMonetization, sanitizeYouTubeTags } = require('./youtubeService');
 
 function getRedirectUri(user) {
   if (user && user.youtube_redirect_uri) {
@@ -389,7 +389,7 @@ async function startRotationStream(rotation, item) {
       }
     }
 
-    const tags = item.tags ? item.tags.split(',').map(t => t.trim()).filter(t => t) : [];
+    const tags = sanitizeYouTubeTags(item.tags);
     if (tags.length > 0 || item.category || item.youtube_altered_content || item.youtube_made_for_kids) {
       try {
         await youtube.videos.update({
@@ -459,7 +459,14 @@ async function startRotationStream(rotation, item) {
 
 async function stopRotationStream(rotation, item) {
   try {
-    const user = await User.findById(rotation.user_id);
+    let rotationData = rotation;
+    if (!rotation.user_id) {
+      const fetched = await Rotation.findById(rotation.id);
+      if (fetched) {
+        rotationData = fetched;
+      }
+    }
+    const user = await User.findById(rotationData.user_id);
     if (!user) return { success: false, error: 'User not found' };
 
     let actualVideoId = item.video_id;
@@ -467,13 +474,13 @@ async function stopRotationStream(rotation, item) {
       actualVideoId = item.video_id.substring(9);
     }
 
-    const streamKey = `${rotation.id}_${item.id}`;
+    const streamKey = `${rotationData.id}_${item.id}`;
     const streamInfo = activeRotationStreams.get(streamKey);
     let streamId = streamInfo ? streamInfo.streamId : null;
     
     if (!streamId) {
       // Fallback: search in DB if not in memory (legacy/safety)
-      const streams = await Stream.findAll(rotation.user_id);
+      const streams = await Stream.findAll(rotationData.user_id);
       const rotationStream = streams.find(s => 
         s.video_id === actualVideoId && 
         s.title === item.title && 
@@ -491,12 +498,12 @@ async function stopRotationStream(rotation, item) {
           const YoutubeChannel = require('../models/YoutubeChannel');
           let selectedChannel = null;
           
-          if (rotationStream.youtube_channel_id) {
-            selectedChannel = await YoutubeChannel.findById(rotationStream.youtube_channel_id);
+          if (stream.youtube_channel_id) {
+            selectedChannel = await YoutubeChannel.findById(stream.youtube_channel_id);
           }
           
           if (!selectedChannel || selectedChannel.user_id !== user.id) {
-            console.error(`[RotationService] [WARN] Cannot complete YouTube broadcast: Channel not found or unauthorized for stream ${rotationStream.id}`);
+            console.error(`[RotationService] [WARN] Cannot complete YouTube broadcast: Channel not found or unauthorized for stream ${stream.id}`);
             return { success: true }; // Still return success for the local stop operation
           }
 
