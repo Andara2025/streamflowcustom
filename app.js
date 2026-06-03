@@ -222,11 +222,33 @@ const csrfProtection = function (req, res, next) {
   }
   next();
 };
-const isAuthenticated = (req, res, next) => {
-  if (req.session.userId) {
-    return next();
+const isAuthenticated = async (req, res, next) => {
+  if (!req.session.userId) {
+    return res.redirect('/login');
   }
-  res.redirect('/login');
+  try {
+    const user = await User.findById(req.session.userId);
+    if (!user) {
+      req.session.destroy();
+      return res.redirect('/login');
+    }
+    if (user.status === 'trial') {
+      const trialDuration = 24 * 60 * 60 * 1000; // 24 hours
+      const createdAt = new Date(user.created_at || Date.now()).getTime();
+      if (Date.now() - createdAt > trialDuration) {
+        await User.updateStatus(user.id, 'expired');
+        req.session.destroy();
+        return res.redirect('/login?error=expired');
+      }
+    }
+    if (user.status === 'expired' || user.status === 'inactive') {
+      req.session.destroy();
+      return res.redirect('/login?error=expired');
+    }
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+  }
+  next();
 };
 
 const isAdmin = async (req, res, next) => {
@@ -304,9 +326,13 @@ app.get('/login', async (req, res) => {
     const AppSettings = require('./models/AppSettings');
     const recaptchaSettings = await AppSettings.getRecaptchaSettings();
 
+    let errorMessage = null;
+    if (req.query.error === 'expired') {
+      errorMessage = 'Masa Trial Anda (1 Hari) telah habis. Silakan hubungi admin atau Purchase.';
+    }
     res.render('login', {
       title: 'Login',
-      error: null,
+      error: errorMessage,
       recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
     });
   } catch (error) {
@@ -371,7 +397,24 @@ app.post('/login', loginDelayMiddleware, loginLimiter, async (req, res) => {
       });
     }
 
-    if (user.status !== 'active') {
+    if (user.status === 'trial') {
+      const trialDuration = 24 * 60 * 60 * 1000;
+      const createdAt = new Date(user.created_at || Date.now()).getTime();
+      if (Date.now() - createdAt > trialDuration) {
+        await User.updateStatus(user.id, 'expired');
+        user.status = 'expired';
+      }
+    }
+
+    if (user.status === 'expired') {
+      return res.render('login', {
+        title: 'Login',
+        error: 'Masa Trial Anda (1 Hari) telah habis. Silakan hubungi admin atau Purchase.',
+        recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
+      });
+    }
+
+    if (user.status !== 'active' && user.status !== 'trial') {
       return res.render('login', {
         title: 'Login',
         error: 'Your account is not active. Please contact administrator for activation.',
@@ -513,14 +556,15 @@ app.post('/signup', upload.single('avatar'), async (req, res) => {
       password,
       avatar_path: avatarPath,
       user_role: user_role || 'member',
-      status: status || 'inactive'
+      status: 'trial',
+      disk_limit: 2147483648
     });
 
     if (newUser) {
       return res.render('signup', {
         title: 'Sign Up',
         error: null,
-        success: 'Account created successfully! Please wait for admin approval to activate your account.',
+        success: 'Account created successfully! Masa Trial 24 Jam Anda telah dimulai. Silakan Login.',
         recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
       });
     } else {
