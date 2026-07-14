@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="icon" href="/images/logopejuang.png" type="image/png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/tabler-icons.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        fontFamily: {
+          'inter': ['Inter', 'sans-serif'],
+        },
+        extend: {
+          colors: {
+            'primary': '#E11D48',
+            'dark': {
+              '900': '#0B0B0F',
+              '800': '#161622',
+              '700': '#222235',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-dark-900 text-white font-inter min-h-screen flex items-center justify-center p-4">
+
+  <div class="max-w-xl w-full bg-dark-800 rounded-3xl border border-gray-700 shadow-2xl overflow-hidden">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-rose-900 to-dark-800 p-8 border-b border-gray-700 relative overflow-hidden">
+      <div class="absolute -right-10 -top-10 text-rose-500/10">
+        <i class="ti ti-broadcast" style="font-size: 150px;"></i>
+      </div>
+      <a href="/" class="inline-flex items-center text-rose-400 hover:text-rose-300 text-sm mb-6 transition-colors relative z-10">
+        <i class="ti ti-arrow-left mr-2"></i> Kembali ke Beranda
+      </a>
+      <h1 class="text-3xl font-bold text-white relative z-10">Formulir Pesanan</h1>
+      <p class="text-rose-200 mt-2 relative z-10">Silakan lengkapi data di bawah untuk melanjutkan pembayaran.</p>
+    </div>
+
+    <!-- Content -->
+    <div class="p-8">
+      <!-- Order Summary -->
+      <div class="bg-dark-700 rounded-2xl p-6 border border-gray-600 mb-8 flex justify-between items-center">
+        <div>
+          <h3 class="text-lg font-bold text-white mb-1"><%= package.name %></h3>
+          <ul class="text-sm text-gray-400 flex flex-wrap gap-4">
+            <li class="flex items-center"><i class="ti ti-video mr-1 text-primary"></i> <%= package.live %></li>
+            <li class="flex items-center"><i class="ti ti-database mr-1 text-primary"></i> <%= package.storage %></li>
+          </ul>
+        </div>
+        <div class="text-right">
+          <div class="text-xs text-gray-400 mb-1">Total Tagihan:</div>
+          <div class="text-2xl font-black text-rose-400"><%= package.price %></div>
+        </div>
+      </div>
+
+      <!-- Form -->
+      <form id="orderForm" class="space-y-6">
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-300 mb-2">Nama Lengkap <span class="text-primary">*</span></label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="ti ti-user text-gray-500"></i>
+            </div>
+            <input type="text" id="name" required
+              class="w-full bg-dark-900 border border-gray-600 text-white pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              placeholder="Masukkan nama Anda">
+          </div>
+        </div>
+
+        <div>
+          <label for="whatsapp" class="block text-sm font-medium text-gray-300 mb-2">No. WhatsApp <span class="text-primary">*</span></label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="ti ti-brand-whatsapp text-gray-500"></i>
+            </div>
+            <input type="tel" id="whatsapp" required
+              class="w-full bg-dark-900 border border-gray-600 text-white pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              placeholder="Contoh: 08123456789">
+          </div>
+          <p class="text-xs text-gray-500 mt-2">Nomor ini digunakan untuk mengirim detail login & panduan.</p>
+        </div>
+        
+        <div>
+          <label for="payment_method" class="block text-sm font-medium text-gray-300 mb-2">Metode Pembayaran <span class="text-primary">*</span></label>
+          <select id="payment_method" required
+            class="w-full bg-dark-900 border border-gray-600 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all appearance-none cursor-pointer">
+            <option value="" disabled selected>Pilih Bank/E-Wallet</option>
+            <option value="BCA">BCA (Bank Central Asia)</option>
+            <option value="MANDIRI">Bank Mandiri</option>
+            <option value="BRI">Bank BRI</option>
+            <option value="DANA">DANA / OVO / Gopay</option>
+            <option value="QRIS">QRIS (Semua Pembayaran)</option>
+          </select>
+        </div>
+
+        <button type="submit" 
+          class="w-full bg-primary hover:bg-rose-700 text-white font-bold py-4 px-6 rounded-xl transition-colors mt-8 flex items-center justify-center gap-2 shadow-lg shadow-rose-900/50">
+          <i class="ti ti-brand-whatsapp text-xl"></i>
+          Lanjutkan ke WhatsApp
+        </button>
+      </form>
+      
+      <div class="text-center mt-6">
+        <p class="text-xs text-gray-500">
+          <i class="ti ti-lock"></i> Pembayaran aman & diproses secara manual. Akun akan aktif maksimal 15 menit setelah konfirmasi transfer.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('orderForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const pkgName = "<%= package.name %>";
+      const pkgPrice = "<%= package.price %>";
+      const name = document.getElementById('name').value;
+      const whatsapp = document.getElementById('whatsapp').value;
+      const paymentMethod = document.getElementById('payment_method').value;
+      
+      let message = `Halo Admin PEJUANG MONET, saya ingin berlangganan:%0A%0A`;
+      message += `📦 *Paket:* ${pkgName}%0A`;
+      message += `💰 *Harga:* ${pkgPrice}/Bulan%0A`;
+      message += `👤 *Nama:* ${name}%0A`;
+      message += `📱 *No WA:* ${whatsapp}%0A`;
+      message += `💳 *Metode Pembayaran:* ${paymentMethod}%0A%0A`;
+      message += `Mohon info nomor rekening / QRIS nya ya min. Terima kasih!`;
+      
+      const adminWa = "6287884242420";
+      const waLink = `https://wa.me/${adminWa}?text=${message}`;
+      
+      window.open(waLink, '_blank');
+    });
+  </script>
+</body>
+</html>

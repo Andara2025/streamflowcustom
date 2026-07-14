@@ -1,0 +1,143 @@
+<% layout('layout') -%>
+
+<div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+  <div>
+    <h2 class="text-2xl font-bold">Reporting & Revenue</h2>
+    <p class="text-gray-400 text-sm mt-1">Pantau statistik pengguna dan estimasi pendapatan Anda</p>
+  </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+  <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-gray-400 font-medium">Total Omset Bulan Ini</h3>
+      <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+        <i class="ti ti-cash text-green-400 text-xl"></i>
+      </div>
+    </div>
+    <div class="text-3xl font-bold text-white mb-1">
+      Rp <%= new Intl.NumberFormat('id-ID').format(stats.totalRevenue) %>
+    </div>
+    <p class="text-xs text-gray-500">Estimasi dari pelanggan aktif & trial</p>
+  </div>
+
+  <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-gray-400 font-medium">User Aktif</h3>
+      <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+        <i class="ti ti-users text-blue-400 text-xl"></i>
+      </div>
+    </div>
+    <div class="text-3xl font-bold text-white mb-1">
+      <%= stats.totalActive %>
+    </div>
+    <p class="text-xs text-gray-500">Total User Aktif</p>
+  </div>
+
+  <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-gray-400 font-medium">User Trial (Uji Coba)</h3>
+      <div class="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+        <i class="ti ti-clock text-yellow-400 text-xl"></i>
+      </div>
+    </div>
+    <div class="text-3xl font-bold text-white mb-1">
+      <%= stats.totalTrial %>
+    </div>
+    <p class="text-xs text-gray-500">Masa aktif 24 jam</p>
+  </div>
+
+  <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-gray-400 font-medium">User Expired / Inactive</h3>
+      <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+        <i class="ti ti-user-off text-red-400 text-xl"></i>
+      </div>
+    </div>
+    <div class="text-3xl font-bold text-white mb-1">
+      <%= stats.totalExpired + stats.totalInactive %>
+    </div>
+    <p class="text-xs text-gray-500">Segera follow up via WA</p>
+  </div>
+</div>
+
+<!-- Users Subscriptions Table -->
+<div class="bg-gray-800 rounded-xl border border-gray-700 shadow-lg overflow-hidden">
+  <div class="p-6 border-b border-gray-700">
+    <h3 class="text-lg font-bold text-white">Daftar Langganan Pengguna</h3>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full">
+      <thead class="bg-dark-700">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Username</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Paket</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Estimasi Harga</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Storage Terpakai</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Tanggal Daftar</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-700">
+        <% 
+          const pkgPrices = { 'tester': 15000, 'pemula': 20000, 'mahir': 50000, 'expert': 100000, 'master': 190000 };
+          const pkgNames = { 'tester': 'Tester', 'pemula': 'Pemula', 'mahir': 'Mahir', 'expert': 'Expert', 'master': 'Master', 'custom': 'Custom' };
+          
+          if (users && users.length > 0) { 
+            users.forEach(function(u) { 
+              const harga = pkgPrices[u.package_name] || 0;
+              const formatHarga = harga > 0 ? 'Rp ' + new Intl.NumberFormat('id-ID').format(harga) : '-';
+              const sisaStorage = u.disk_limit > 0 ? (u.usedDisk / u.disk_limit * 100).toFixed(1) : 0;
+        %>
+          <tr class="hover:bg-dark-700/50 transition-colors">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="flex items-center">
+                <div class="h-8 w-8 rounded-full overflow-hidden mr-3">
+                  <img src="<%= u.avatar_path || '/images/default-avatar.jpg' %>" alt="avatar" class="w-full h-full object-cover">
+                </div>
+                <div>
+                  <div class="text-sm font-medium text-white"><%= u.username %></div>
+                  <div class="text-xs text-gray-400"><%= u.user_role %></div>
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-700 text-yellow-400">
+                <%= pkgNames[u.package_name] || u.package_name || 'Custom' %>
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-400 font-medium">
+              <%= formatHarga %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
+                <%= u.status === 'active' ? 'bg-green-100 text-green-800' : 
+                   (u.status === 'trial' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800') %>">
+                <%= u.status %>
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="w-full bg-gray-700 rounded-full h-2.5 mb-1 max-w-[100px]">
+                <div class="bg-primary h-2.5 rounded-full" style="width: <%= Math.min(sisaStorage, 100) %>%"></div>
+              </div>
+              <div class="text-xs text-gray-400">
+                <%= (u.usedDisk / (1024*1024*1024)).toFixed(2) %> GB / <%= u.disk_limit > 0 ? (u.disk_limit / (1024*1024*1024)).toFixed(0) + ' GB' : 'Unlimited' %>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+              <%= new Date(u.created_at).toLocaleDateString('id-ID') %>
+            </td>
+          </tr>
+        <% 
+            }); 
+          } else { 
+        %>
+          <tr>
+            <td colspan="6" class="px-6 py-8 text-center text-gray-400">Belum ada pengguna.</td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>

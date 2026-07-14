@@ -412,6 +412,18 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE users ADD COLUMN package_name TEXT DEFAULT 'custom'`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding package_name column to users:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE users ADD COLUMN stream_limit INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding stream_limit column to users:', err.message);
+        }
+      });
+
       db.run(`CREATE TABLE IF NOT EXISTS app_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         setting_key TEXT UNIQUE NOT NULL,

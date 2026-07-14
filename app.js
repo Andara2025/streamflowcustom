@@ -170,6 +170,39 @@ app.use(async (req, res, next) => {
   }
   res.locals.req = req;
   res.locals.appVersion = packageJson.version;
+  try {
+    const AppSettings = require('./models/AppSettings');
+    const licenseKey = await AppSettings.get('pro_license_key');
+    
+    // Verifikasi Lisensi Kriptografi
+    res.locals.isPro = false;
+    if (licenseKey && licenseKey.includes('.')) {
+      const crypto = require('crypto');
+      const publicKey = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuLhoLFIhl1BcayKHoMiM
+sJzJwjo/XUJojS3atJAVZe07JQBHJGGXhBt+0vHecaIRZR0Kb+MGMK0mZDfwRoh7
+hjTZJQoBxwAyNxd8QeuvOvLSraNtU3hFQ6wz6124Qkt+jL5NrQAJye31IUyMOmbI
+iW73ZNEBeuKI0N6a3WRFVYAFgZ4YV5WDS7vzqk991HmDH3ChemHMZffJwA9lbID/
+es0TOaa71bXU3yzwHlXi+PWMLda66+xuIJGdbWtOq6ZKmPCQ/Lqu7VM2AZmdhxko
+ELuVdBAaLdTymSqZdHk9BKWGY9+UwHT0HImM6+GIj9o7gvdNFg8eypiPlj2SzgIE
+vwIDAQAB
+-----END PUBLIC KEY-----`;
+      
+      const [payloadB64, signatureB64] = licenseKey.split('.');
+      const payload = Buffer.from(payloadB64, 'base64').toString('utf8');
+      
+      const verify = crypto.createVerify('SHA256');
+      verify.update(payload);
+      verify.end();
+      
+      if (verify.verify(publicKey, signatureB64, 'base64')) {
+        res.locals.isPro = true;
+        res.locals.licenseOwner = payload; // Nama pembeli (opsional)
+      }
+    }
+  } catch(e) {
+    res.locals.isPro = false;
+  }
   next();
 });
 app.use(function (req, res, next) {
@@ -269,6 +302,80 @@ const isAdmin = async (req, res, next) => {
     res.redirect('/dashboard');
   }
 };
+
+const isProAdmin = async (req, res, next) => {
+  await isAdmin(req, res, () => {
+    if (!res.locals.isPro) {
+      return res.redirect('/admin/activate');
+    }
+    next();
+  });
+};
+
+app.get('/admin/activate', isAuthenticated, isAdmin, (req, res) => {
+  res.render('activate', {
+    title: 'Activate Pro',
+    active: 'activate',
+    error: null,
+    success: null
+  });
+});
+
+app.post('/admin/activate', isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { license_key } = req.body;
+    let isValid = false;
+    
+    if (license_key && license_key.includes('.')) {
+      const crypto = require('crypto');
+      const publicKey = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuLhoLFIhl1BcayKHoMiM
+sJzJwjo/XUJojS3atJAVZe07JQBHJGGXhBt+0vHecaIRZR0Kb+MGMK0mZDfwRoh7
+hjTZJQoBxwAyNxd8QeuvOvLSraNtU3hFQ6wz6124Qkt+jL5NrQAJye31IUyMOmbI
+iW73ZNEBeuKI0N6a3WRFVYAFgZ4YV5WDS7vzqk991HmDH3ChemHMZffJwA9lbID/
+es0TOaa71bXU3yzwHlXi+PWMLda66+xuIJGdbWtOq6ZKmPCQ/Lqu7VM2AZmdhxko
+ELuVdBAaLdTymSqZdHk9BKWGY9+UwHT0HImM6+GIj9o7gvdNFg8eypiPlj2SzgIE
+vwIDAQAB
+-----END PUBLIC KEY-----`;
+      
+      try {
+        const [payloadB64, signatureB64] = license_key.split('.');
+        const payload = Buffer.from(payloadB64, 'base64').toString('utf8');
+        const verify = crypto.createVerify('SHA256');
+        verify.update(payload);
+        verify.end();
+        isValid = verify.verify(publicKey, signatureB64, 'base64');
+      } catch (err) {
+        isValid = false;
+      }
+    }
+
+    if (isValid) {
+      const AppSettings = require('./models/AppSettings');
+      await AppSettings.set('pro_license_key', license_key);
+      res.render('activate', {
+        title: 'Activate Pro',
+        active: 'activate',
+        error: null,
+        success: 'Lisensi valid! Fitur Pro berhasil diaktifkan.'
+      });
+    } else {
+      res.render('activate', {
+        title: 'Activate Pro',
+        active: 'activate',
+        error: 'Serial Number / License Key tidak valid!',
+        success: null
+      });
+    }
+  } catch (err) {
+    res.render('activate', {
+      title: 'Activate Pro',
+      active: 'activate',
+      error: 'Terjadi kesalahan sistem.',
+      success: null
+    });
+  }
+});
 app.use('/uploads', function (req, res, next) {
   res.header('Cache-Control', 'no-cache');
   res.header('Pragma', 'no-cache');
@@ -557,7 +664,9 @@ app.post('/signup', upload.single('avatar'), async (req, res) => {
       avatar_path: avatarPath,
       user_role: user_role || 'member',
       status: 'trial',
-      disk_limit: 2147483648
+      package_name: 'tester',
+      stream_limit: 1,
+      disk_limit: 1073741824 // 1GB
     });
 
     if (newUser) {
@@ -693,7 +802,10 @@ app.post('/setup-account', upload.single('avatar'), [
   }
 });
 app.get('/', (req, res) => {
-  res.redirect('/dashboard');
+  if (req.session.userId) {
+    return res.redirect('/dashboard');
+  }
+  res.render('landing', { layout: false, title: 'PEJUANG MONET - 24/7 Cloud Live Streaming' });
 });
 app.get('/welcome', isAuthenticated, async (req, res) => {
   try {
@@ -1160,7 +1272,7 @@ app.delete('/api/history/:id', isAuthenticated, async (req, res) => {
   }
 });
 
-app.get('/users', isAdmin, async (req, res) => {
+app.get('/users', isProAdmin, async (req, res) => {
   try {
     const users = await User.findAll();
 
@@ -1211,15 +1323,31 @@ app.get('/users', isAdmin, async (req, res) => {
         ...user,
         videoCount: videoStats.count,
         totalVideoSize: videoStats.totalSize > 0 ? formatFileSize(videoStats.totalSize) : null,
+        rawVideoSize: videoStats.totalSize || 0,
         streamCount: streamStats.count,
         activeStreamCount: activeStreamStats.count
       };
     }));
 
+    const totalUsers = usersWithStats.length;
+    const totalActiveStreams = usersWithStats.reduce((sum, u) => sum + (u.activeStreamCount || 0), 0);
+    const totalStorageBytes = usersWithStats.reduce((sum, u) => sum + (u.rawVideoSize || 0), 0);
+
+    const formatGlobalFileSize = (bytes) => {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
     res.render('users', {
       title: 'User Management',
       active: 'users',
       users: usersWithStats,
+      totalUsers,
+      totalActiveStreams,
+      totalStorageUsed: formatGlobalFileSize(totalStorageBytes),
       user: req.user
     });
   } catch (error) {
@@ -1977,6 +2105,47 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
             fps = parseInt(fpsRatio[0]) || null;
           }
         }
+        
+        // --- Validation Logic ---
+        const pkg = user.package_name || 'tester';
+        let maxFps = 30;
+        let maxBitrate = 2500;
+        let maxHeight = 720;
+        let maxResStr = '720p';
+        
+        if (pkg === 'mahir') {
+          maxHeight = 720;
+          maxResStr = '720p';
+          maxBitrate = 4000;
+          maxFps = 30;
+        } else if (pkg === 'expert') {
+          maxHeight = 1080;
+          maxResStr = '1080p';
+          maxBitrate = 6000;
+          maxFps = 30;
+        } else if (pkg === 'master') {
+          maxHeight = 1080;
+          maxResStr = '1080p';
+          maxBitrate = 6500;
+          maxFps = 30;
+        }
+        
+        let errorMsg = null;
+        const videoHeight = videoStream ? videoStream.height : 0;
+        if (videoHeight > maxHeight) {
+          errorMsg = `Resolusi video terlalu tinggi. Paket ${pkg} maksimal ${maxResStr}.`;
+        } else if (fps && fps > maxFps + 2) { // Add +2 tolerance
+          errorMsg = `FPS video terlalu tinggi (${fps}fps). Paket ${pkg} maksimal ${maxFps}fps.`;
+        } else if (bitrate && bitrate > maxBitrate) {
+          errorMsg = `Bitrate video terlalu tinggi (${bitrate}kbps). Paket ${pkg} maksimal ${maxBitrate}kbps.`;
+        }
+        
+        if (errorMsg) {
+          const fs = require('fs');
+          if (fs.existsSync(fullFilePath)) fs.unlinkSync(fullFilePath);
+          return res.status(400).json({ success: false, error: errorMsg });
+        }
+        // --- End Validation ---
         const thumbnailFilename = `thumb-${path.parse(req.file.filename).name}.jpg`;
         const thumbnailPath = `/uploads/thumbnails/${thumbnailFilename}`;
         const fullThumbnailPath = path.join(__dirname, 'public', thumbnailPath);
@@ -4968,8 +5137,8 @@ app.get('/api/server-time', (req, res) => {
 
 app.get('/api/backup/export', isAuthenticated, async (req, res) => {
   try {
-    const dbPath = path.join(__dirname, 'db', 'streamflow.db');
-    const filename = `streamflow-backup-${new Date().toISOString().split('T')[0]}.db`;
+    const dbPath = path.join(__dirname, 'db', 'PEJUANG MONET.db');
+    const filename = `PEJUANG MONET-backup-${new Date().toISOString().split('T')[0]}.db`;
     res.download(dbPath, filename);
   } catch (error) {
     console.error('Export error:', error);
@@ -4984,7 +5153,7 @@ app.post('/api/backup/restore', isAuthenticated, uploadBackup.single('backup'), 
     }
 
     const backupPath = req.file.path;
-    const dbPath = path.join(__dirname, 'db', 'streamflow.db');
+    const dbPath = path.join(__dirname, 'db', 'PEJUANG MONET.db');
 
     // Close DB connection before replacing
     const { db } = require('./db/database');
@@ -5497,6 +5666,78 @@ app.post('/api/rotations/:id/stop', isAuthenticated, async (req, res) => {
   }
 });
 
+app.get('/order', (req, res) => {
+  const pkg = req.query.pkg || 'pemula';
+  const packages = {
+    'tester': { name: 'Paket Tester', price: 'Rp 15.000', live: '1 Live', storage: '1 GB' },
+    'pemula': { name: 'Paket Pemula', price: 'Rp 20.000', live: '2 Live', storage: '2 GB' },
+    'mahir': { name: 'Paket Mahir', price: 'Rp 50.000', live: '5 Live', storage: '5 GB' },
+    'expert': { name: 'Paket Expert', price: 'Rp 100.000', live: '10 Live', storage: '10 GB' },
+    'master': { name: 'Paket Master', price: 'Rp 190.000', live: '20 Live', storage: '20 GB' }
+  };
+  
+  const selectedPackage = packages[pkg] || packages['pemula'];
+  
+  res.render('order', {
+    title: 'Order Layanan PEJUANG MONET',
+    package: selectedPackage,
+    pkgId: pkg
+  });
+});
+
+app.get('/admin/reporting', isProAdmin, async (req, res) => {
+  try {
+    const users = await User.findAll();
+    
+    let totalActive = 0;
+    let totalInactive = 0;
+    let totalTrial = 0;
+    let totalExpired = 0;
+    let totalRevenue = 0;
+    
+    const prices = {
+      'tester': 15000,
+      'pemula': 20000,
+      'mahir': 50000,
+      'expert': 100000,
+      'master': 190000
+    };
+    
+    for (const user of users) {
+      if (user.status === 'active') totalActive++;
+      else if (user.status === 'inactive') totalInactive++;
+      else if (user.status === 'trial') totalTrial++;
+      else if (user.status === 'expired') totalExpired++;
+      
+      // Calculate revenue based on active users with known packages
+      if ((user.status === 'active' || user.status === 'trial') && user.package_name && prices[user.package_name]) {
+        totalRevenue += prices[user.package_name];
+      }
+      
+      // Add disk usage info to user object for the table
+      user.usedDisk = await User.getDiskUsage(user.id);
+    }
+
+    res.render('reporting', {
+      title: 'Reporting & Revenue',
+      active: 'reporting',
+      user: req.user,
+      stats: {
+        totalActive,
+        totalInactive,
+        totalTrial,
+        totalExpired,
+        totalRevenue,
+        totalUsers: users.length
+      },
+      users: users
+    });
+  } catch (error) {
+    console.error('Error loading reporting page:', error);
+    res.redirect('/dashboard');
+  }
+});
+
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
     await initializeDatabase();
@@ -5520,7 +5761,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
   }
 
   const ipAddresses = getLocalIpAddresses();
-  console.log(`StreamFlow running at:`);
+  console.log(`PEJUANG MONET running at:`);
   if (ipAddresses && ipAddresses.length > 0) {
     ipAddresses.forEach(ip => {
       console.log(`  http://${ip}:${port}`);

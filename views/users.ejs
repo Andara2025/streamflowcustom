@@ -14,6 +14,38 @@
   </div>
 </div>
 
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+  <div class="bg-gray-800 rounded-lg p-5 flex items-center justify-between">
+    <div>
+      <p class="text-sm text-gray-400 mb-1">Total Users</p>
+      <h3 class="text-2xl font-bold text-white"><%= typeof totalUsers !== 'undefined' ? totalUsers : 0 %></h3>
+    </div>
+    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
+      <i class="ti ti-users text-2xl"></i>
+    </div>
+  </div>
+  
+  <div class="bg-gray-800 rounded-lg p-5 flex items-center justify-between">
+    <div>
+      <p class="text-sm text-gray-400 mb-1">Total Storage Terpakai</p>
+      <h3 class="text-2xl font-bold text-white"><%= typeof totalStorageUsed !== 'undefined' ? totalStorageUsed : '0 B' %></h3>
+    </div>
+    <div class="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-500">
+      <i class="ti ti-database text-2xl"></i>
+    </div>
+  </div>
+
+  <div class="bg-gray-800 rounded-lg p-5 flex items-center justify-between">
+    <div>
+      <p class="text-sm text-gray-400 mb-1">Live Aktif</p>
+      <h3 class="text-2xl font-bold text-white"><%= typeof totalActiveStreams !== 'undefined' ? totalActiveStreams : 0 %></h3>
+    </div>
+    <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
+      <i class="ti ti-broadcast text-2xl"></i>
+    </div>
+  </div>
+</div>
+
 <div class="bg-gray-800 rounded-lg p-4 mb-6">
   <div class="flex flex-row items-center gap-3">
     <div class="relative w-full sm:w-80 md:w-96">
@@ -48,6 +80,7 @@
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">User</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Role</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Paket</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Video</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Streaming</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Created</th>
@@ -92,6 +125,11 @@
                   <%= user.status %>
                 </span>
               </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 uppercase">
+                  <%= user.package_name || 'custom' %>
+                </span>
+              </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 cursor-pointer hover:bg-gray-700/30 transition-colors" data-user-id="<%= user.id %>" data-username="<%= user.username %>" onclick="showVideoModal(this)">
                 <div class="flex flex-col">
                   <div class="flex items-center mb-1">
@@ -127,7 +165,7 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div class="flex space-x-2">
-                  <button onclick="editUser('<%= user.id %>', '<%= user.username %>', '<%= user.user_role %>', '<%= user.status %>', '<%= user.avatar_path || '' %>', '<%= user.disk_limit || 0 %>')" 
+                  <button onclick="editUser('<%= user.id %>', '<%= user.username %>', '<%= user.user_role %>', '<%= user.status %>', '<%= user.avatar_path || '' %>', '<%= user.disk_limit || 0 %>', '<%= user.package_name || 'custom' %>', '<%= user.stream_limit || 0 %>')" 
                     class="text-blue-400 hover:text-blue-300 transition-colors" title="Edit User">
                     <i class="ti ti-edit"></i>
                   </button>
@@ -219,6 +257,26 @@
           </div>
 
           <div class="mb-4">
+            <label for="editPackage" class="block text-sm font-medium text-gray-300 mb-2">Pilih Paket</label>
+            <select id="editPackage" name="package_name" onchange="autoFillLimits('edit')"
+              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+              <option value="custom">Custom (Atur Manual)</option>
+              <option value="tester">Tester (15k - 1 Live - 1GB)</option>
+              <option value="pemula">Pemula (20k - 2 Live - 2GB)</option>
+              <option value="mahir">Mahir (50k - 5 Live - 5GB)</option>
+              <option value="expert">Expert (100k - 10 Live - 10GB)</option>
+              <option value="master">Master (190k - 20 Live - 20GB)</option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label for="editStreamLimit" class="block text-sm font-medium text-gray-300 mb-2">Batas Live Streaming (Limit)</label>
+            <input type="number" id="editStreamLimit" name="stream_limit" min="0" step="1" placeholder="0"
+              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+            <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited.</p>
+          </div>
+
+          <div class="mb-4">
             <label for="editDiskLimit" class="block text-sm font-medium text-gray-300 mb-2">Disk Limit</label>
             <div class="flex gap-2">
               <input type="number" id="editDiskLimitValue" min="0" step="1" placeholder="0"
@@ -307,6 +365,26 @@
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+          </div>
+
+          <div class="mb-4">
+            <label for="createPackage" class="block text-sm font-medium text-gray-300 mb-2">Pilih Paket</label>
+            <select id="createPackage" name="package_name" onchange="autoFillLimits('create')"
+              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+              <option value="custom">Custom (Atur Manual)</option>
+              <option value="tester">Tester (15k - 1 Live - 1GB)</option>
+              <option value="pemula">Pemula (20k - 2 Live - 2GB)</option>
+              <option value="mahir">Mahir (50k - 5 Live - 5GB)</option>
+              <option value="expert">Expert (100k - 10 Live - 10GB)</option>
+              <option value="master">Master (190k - 20 Live - 20GB)</option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label for="createStreamLimit" class="block text-sm font-medium text-gray-300 mb-2">Batas Live Streaming (Limit)</label>
+            <input type="number" id="createStreamLimit" name="stream_limit" min="0" step="1" placeholder="0"
+              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+            <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited.</p>
           </div>
 
           <div class="mb-4">
@@ -494,11 +572,13 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
-function openEditModal(userId, username, role, status, avatar, diskLimit) {
+function openEditModal(userId, username, role, status, avatar, diskLimit, packageName, streamLimit) {
   document.getElementById('editUserId').value = userId;
   document.getElementById('editUsername').value = username;
   document.getElementById('editRole').value = role;
   document.getElementById('editStatus').value = status;
+  document.getElementById('editPackage').value = packageName || 'custom';
+  document.getElementById('editStreamLimit').value = streamLimit || 0;
   document.getElementById('editPassword').value = '';
   
   const diskLimitBytes = parseInt(diskLimit) || 0;
@@ -575,8 +655,45 @@ function closeCreateModal() {
   }, 200);
 }
 
-function editUser(userId, username, role, status, avatarPath, diskLimit) {
-  openEditModal(userId, username, role, status, avatarPath, diskLimit);
+function editUser(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit) {
+  openEditModal(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit);
+}
+
+function autoFillLimits(prefix) {
+  const packageSelect = document.getElementById(prefix + 'Package');
+  const streamInput = document.getElementById(prefix + 'StreamLimit');
+  const diskValue = document.getElementById(prefix + 'DiskLimitValue');
+  const diskUnit = document.getElementById(prefix + 'DiskLimitUnit');
+  const diskHidden = document.getElementById(prefix + 'DiskLimit');
+  
+  const pkg = packageSelect.value;
+  const GB = 1073741824;
+  
+  if (pkg === 'tester') {
+    streamInput.value = 1;
+    diskValue.value = 1;
+    diskUnit.value = GB.toString();
+  } else if (pkg === 'pemula') {
+    streamInput.value = 2;
+    diskValue.value = 2;
+    diskUnit.value = GB.toString();
+  } else if (pkg === 'mahir') {
+    streamInput.value = 5;
+    diskValue.value = 5;
+    diskUnit.value = GB.toString();
+  } else if (pkg === 'expert') {
+    streamInput.value = 10;
+    diskValue.value = 10;
+    diskUnit.value = GB.toString();
+  } else if (pkg === 'master') {
+    streamInput.value = 20;
+    diskValue.value = 20;
+    diskUnit.value = GB.toString();
+  }
+  
+  if (pkg !== 'custom') {
+    diskHidden.value = Math.round(parseFloat(diskValue.value) * parseInt(diskUnit.value));
+  }
 }
 
 function closeEditModal() {

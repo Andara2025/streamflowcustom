@@ -12,7 +12,7 @@ const STATIC_RESOURCES = [
   '/css/styles.css',
   '/js/stream-modal.js',
   
-  '/images/logo.svg'
+  '/images/logopejuang.png'
 ];
 
 self.addEventListener('install', (event) => {
