@@ -29,6 +29,11 @@
         data-tab="gemini">
         <i class="ti ti-sparkles mr-2"></i>Gemini AI
       </button>
+      <button
+        class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
+        data-tab="pricing">
+        <i class="ti ti-currency-dollar mr-2"></i>Pricing
+      </button>
       <% } %>
       <button
         class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
@@ -512,6 +517,71 @@
               class="px-4 py-2 bg-primary hover:bg-rose-600 text-white rounded-lg transition-colors flex items-center gap-2">
               <i class="ti ti-device-floppy"></i>
               <span>Save Gemini Keys</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <% } %>
+
+    <% if (user.user_role === 'admin') { %>
+    <div id="pricing-tab" class="settings-content hidden">
+      <div class="bg-gray-800 rounded-lg p-6 max-w-4xl">
+        <h3 class="text-lg font-semibold mb-2">Pricing & Landing Page Settings</h3>
+        <p class="text-gray-400 text-sm mb-6">Configure the package prices, limits, and WhatsApp contact number.</p>
+        
+        <form action="/settings/pricing" method="POST" class="space-y-6">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          
+          <div class="bg-dark-900 rounded-lg p-4 border border-gray-700">
+            <h4 class="font-medium mb-4">Contact Information</h4>
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-gray-300">Admin WhatsApp Number</label>
+              <input type="text" name="adminWa" class="bg-gray-800 text-white px-4 py-2 rounded-lg block w-full border border-gray-600 focus:ring-1 focus:ring-primary" value="<%= typeof pricingSettings !== 'undefined' && pricingSettings.adminWa ? pricingSettings.adminWa : '6285262882706' %>">
+              <p class="text-xs text-gray-500">Format: 628xxx (Without +)</p>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <h4 class="font-medium text-lg">Packages Configuration</h4>
+            <% 
+              const pkgs = ['tester', 'pemula', 'mahir', 'expert', 'master'];
+              const defaults = {
+                tester: { price: '15000', live: '1', storage: '1', label: '15.000' },
+                pemula: { price: '25000', live: '2', storage: '2', label: '25.000' },
+                mahir: { price: '55000', live: '5', storage: '5', label: '55.000' },
+                expert: { price: '100000', live: '10', storage: '10', label: '100.000' },
+                master: { price: '190000', live: '20', storage: '20', label: '190.000' }
+              };
+              pkgs.forEach(pkg => { 
+                const p = (typeof pricingSettings !== 'undefined' && pricingSettings.packages && pricingSettings.packages[pkg]) ? pricingSettings.packages[pkg] : defaults[pkg];
+            %>
+            <div class="bg-dark-900 rounded-lg p-4 border border-gray-700 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+              <div>
+                <label class="block text-sm font-medium text-gray-300 capitalize">Paket <%= pkg %></label>
+                <div class="text-xs text-gray-500 mt-1">Numerical Price</div>
+                <input type="number" name="<%= pkg %>_price" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg w-full border border-gray-600" value="<%= p.price %>">
+              </div>
+              <div>
+                <div class="text-xs text-gray-500 mb-1 mt-6">Display Label</div>
+                <input type="text" name="<%= pkg %>_label" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg w-full border border-gray-600" value="<%= p.label %>">
+              </div>
+              <div>
+                <div class="text-xs text-gray-500 mb-1 mt-6">Max Live</div>
+                <input type="number" name="<%= pkg %>_live" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg w-full border border-gray-600" value="<%= p.live %>">
+              </div>
+              <div>
+                <div class="text-xs text-gray-500 mb-1 mt-6">Storage (GB)</div>
+                <input type="number" name="<%= pkg %>_storage" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg w-full border border-gray-600" value="<%= p.storage %>">
+              </div>
+            </div>
+            <% }); %>
+          </div>
+
+          <div class="pt-2">
+            <button type="submit" class="px-4 py-2 bg-primary hover:bg-rose-600 text-white rounded-lg transition-colors flex items-center gap-2">
+              <i class="ti ti-device-floppy"></i>
+              <span>Save Pricing Settings</span>
             </button>
           </div>
         </form>

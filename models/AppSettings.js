@@ -67,6 +67,31 @@ class AppSettings {
     await this.delete('recaptcha_secret_key');
     await this.delete('recaptcha_enabled');
   }
+
+  static async getPricingSettings() {
+    try {
+      const settingsStr = await this.get('pricing_settings');
+      if (settingsStr) {
+        return JSON.parse(settingsStr);
+      }
+    } catch (e) {
+      console.error('Error parsing pricing settings:', e);
+    }
+    return {
+      adminWa: '6285262882706',
+      packages: {
+        tester: { name: 'Paket Tester', price: '15000', live: '1', storage: '1', label: '15.000', recommended: false },
+        pemula: { name: 'Paket Pemula', price: '25000', live: '2', storage: '2', label: '25.000', recommended: false },
+        mahir: { name: 'Paket Mahir', price: '55000', live: '5', storage: '5', label: '55.000', recommended: true },
+        expert: { name: 'Paket Expert', price: '100000', live: '10', storage: '10', label: '100.000', recommended: false },
+        master: { name: 'Paket Master', price: '190000', live: '20', storage: '20', label: '190.000', recommended: false }
+      }
+    };
+  }
+
+  static async setPricingSettings(settings) {
+    await this.set('pricing_settings', JSON.stringify(settings));
+  }
 }
 
 module.exports = AppSettings;

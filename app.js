@@ -801,11 +801,13 @@ app.post('/setup-account', upload.single('avatar'), [
     });
   }
 });
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
   if (req.session.userId) {
     return res.redirect('/dashboard');
   }
-  res.render('landing', { layout: false, title: 'PEJUANG MONET - 24/7 Cloud Live Streaming' });
+  const AppSettings = require('./models/AppSettings');
+  const pricingSettings = await AppSettings.getPricingSettings();
+  res.render('landing', { layout: false, title: 'PEJUANG MONET - 24/7 Cloud Live Streaming', pricingSettings });
 });
 app.get('/welcome', isAuthenticated, async (req, res) => {
   try {
@@ -1128,6 +1130,7 @@ app.get('/settings', isAuthenticated, async (req, res) => {
 
     const recaptchaSettings = await AppSettings.getRecaptchaSettings();
     const geminiApiKeys = await AppSettings.get('gemini_api_keys') || '';
+    const pricingSettings = await AppSettings.getPricingSettings();
 
     res.render('settings', {
       title: 'Settings',
@@ -1147,6 +1150,7 @@ app.get('/settings', isAuthenticated, async (req, res) => {
       hasRecaptchaKeys: recaptchaSettings.hasKeys,
       recaptchaEnabled: recaptchaSettings.enabled,
       geminiApiKeys: geminiApiKeys,
+      pricingSettings: pricingSettings,
       success: req.query.success || null,
       error: req.query.error || null,
       activeTab: req.query.activeTab || null
@@ -2883,7 +2887,28 @@ app.post('/api/settings/recaptcha', isAuthenticated, async (req, res) => {
     });
   }
 });
-
+app.post('/settings/pricing', isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const AppSettings = require('./models/AppSettings');
+    const packages = {
+      tester: { name: 'Paket Tester', price: req.body.tester_price, live: req.body.tester_live, storage: req.body.tester_storage, label: req.body.tester_label, recommended: false },
+      pemula: { name: 'Paket Pemula', price: req.body.pemula_price, live: req.body.pemula_live, storage: req.body.pemula_storage, label: req.body.pemula_label, recommended: false },
+      mahir: { name: 'Paket Mahir', price: req.body.mahir_price, live: req.body.mahir_live, storage: req.body.mahir_storage, label: req.body.mahir_label, recommended: true },
+      expert: { name: 'Paket Expert', price: req.body.expert_price, live: req.body.expert_live, storage: req.body.expert_storage, label: req.body.expert_label, recommended: false },
+      master: { name: 'Paket Master', price: req.body.master_price, live: req.body.master_live, storage: req.body.master_storage, label: req.body.master_label, recommended: false }
+    };
+    
+    await AppSettings.setPricingSettings({
+      adminWa: req.body.adminWa || '6285262882706',
+      packages: packages
+    });
+    
+    res.redirect('/settings?success=Pricing+settings+updated+successfully&activeTab=pricing');
+  } catch (error) {
+    console.error('Error saving pricing settings:', error);
+    res.redirect('/settings?error=Failed+to+save+pricing+settings&activeTab=pricing');
+  }
+});
 app.post('/api/settings/gemini', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
@@ -5185,7 +5210,7 @@ app.post('/api/backup/restore', isAuthenticated, uploadBackup.single('backup'), 
 });
 
 const Rotation = require('./models/Rotation');
-const rotationService = require('./services/rotationService');
+const rotationService = require('./services/RotationService');
 
 app.get('/rotations', isAuthenticated, async (req, res) => {
   try {
@@ -5666,22 +5691,19 @@ app.post('/api/rotations/:id/stop', isAuthenticated, async (req, res) => {
   }
 });
 
-app.get('/order', (req, res) => {
+app.get('/order', async (req, res) => {
   const pkg = req.query.pkg || 'pemula';
-  const packages = {
-    'tester': { name: 'Paket Tester', price: 'Rp 15.000', live: '1 Live', storage: '1 GB' },
-    'pemula': { name: 'Paket Pemula', price: 'Rp 20.000', live: '2 Live', storage: '2 GB' },
-    'mahir': { name: 'Paket Mahir', price: 'Rp 50.000', live: '5 Live', storage: '5 GB' },
-    'expert': { name: 'Paket Expert', price: 'Rp 100.000', live: '10 Live', storage: '10 GB' },
-    'master': { name: 'Paket Master', price: 'Rp 190.000', live: '20 Live', storage: '20 GB' }
-  };
+  const AppSettings = require('./models/AppSettings');
+  const pricingSettings = await AppSettings.getPricingSettings();
+  const packages = pricingSettings.packages;
   
   const selectedPackage = packages[pkg] || packages['pemula'];
   
   res.render('order', {
     title: 'Order Layanan PEJUANG MONET',
     package: selectedPackage,
-    pkgId: pkg
+    pkgId: pkg,
+    adminWa: pricingSettings.adminWa
   });
 });
 

@@ -289,7 +289,7 @@
     <div class="max-h-80 overflow-y-auto" id="mobile-notification-list">
     </div>
   </div>
-  <div id="PEJUANG MONETUpdateModal"
+  <div id="PEJUANGMONETUpdateModal"
     class="fixed inset-0 bg-black/60 z-[60] hidden items-center justify-center p-4 overflow-y-auto">
     <div
       class="bg-dark-800 rounded-xl shadow-xl w-full max-w-2xl m-auto flex flex-col max-h-[90vh] border border-gray-700/50">
@@ -297,7 +297,7 @@
         <h3 class="text-lg font-medium text-white flex items-center gap-2">
           <span class="text-base">🎉 Update PEJUANG MONET v2</span>
         </h3>
-        <button onclick="closePEJUANG MONETUpdateModal()"
+        <button onclick="closePEJUANGMONETUpdateModal()"
           class="text-gray-400 hover:text-white hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-colors">
           <i class="ti ti-x text-lg"></i>
         </button>
@@ -872,8 +872,8 @@
     if (mobileClockEl) mobileClockEl.textContent = timeStr;
   }
 
-  function openPEJUANG MONETUpdateModal() {
-    const modal = document.getElementById('PEJUANG MONETUpdateModal');
+  function openPEJUANGMONETUpdateModal() {
+    const modal = document.getElementById('PEJUANGMONETUpdateModal');
     if (modal) {
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -881,8 +881,8 @@
     }
   }
 
-  function closePEJUANG MONETUpdateModal() {
-    const modal = document.getElementById('PEJUANG MONETUpdateModal');
+  function closePEJUANGMONETUpdateModal() {
+    const modal = document.getElementById('PEJUANGMONETUpdateModal');
     if (modal) {
       modal.classList.add('hidden');
       modal.classList.remove('flex');
@@ -891,16 +891,16 @@
   }
 
   document.addEventListener('keydown', (e) => {
-    const updateModal = document.getElementById('PEJUANG MONETUpdateModal');
+    const updateModal = document.getElementById('PEJUANGMONETUpdateModal');
     if (e.key === 'Escape' && updateModal && !updateModal.classList.contains('hidden')) {
-      closePEJUANG MONETUpdateModal();
+      closePEJUANGMONETUpdateModal();
     }
   });
 
   document.addEventListener('click', (e) => {
-    const updateModal = document.getElementById('PEJUANG MONETUpdateModal');
+    const updateModal = document.getElementById('PEJUANGMONETUpdateModal');
     if (updateModal && e.target === updateModal) {
-      closePEJUANG MONETUpdateModal();
+      closePEJUANGMONETUpdateModal();
     }
   });
 </script>

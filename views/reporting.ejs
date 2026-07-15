@@ -119,7 +119,7 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="w-full bg-gray-700 rounded-full h-2.5 mb-1 max-w-[100px]">
-                <div class="bg-primary h-2.5 rounded-full" style="width: <%= Math.min(sisaStorage, 100) %>%"></div>
+                <div class="bg-primary h-2.5 rounded-full storage-bar" data-width="<%= Math.min(sisaStorage, 100) %>"></div>
               </div>
               <div class="text-xs text-gray-400">
                 <%= (u.usedDisk / (1024*1024*1024)).toFixed(2) %> GB / <%= u.disk_limit > 0 ? (u.disk_limit / (1024*1024*1024)).toFixed(0) + ' GB' : 'Unlimited' %>
@@ -141,3 +141,9 @@
     </table>
   </div>
 </div>
+
+<script>
+  document.querySelectorAll('.storage-bar').forEach(bar => {
+    bar.style.width = bar.dataset.width + '%';
+  });
+</script>

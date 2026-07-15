@@ -165,13 +165,23 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div class="flex space-x-2">
-                  <button onclick="editUser('<%= user.id %>', '<%= user.username %>', '<%= user.user_role %>', '<%= user.status %>', '<%= user.avatar_path || '' %>', '<%= user.disk_limit || 0 %>', '<%= user.package_name || 'custom' %>', '<%= user.stream_limit || 0 %>')" 
+                  <button onclick="editUser(this.dataset.id, this.dataset.username, this.dataset.role, this.dataset.status, this.dataset.avatar, this.dataset.disk, this.dataset.pkg, this.dataset.stream)" 
+                    data-id="<%= user.id %>"
+                    data-username="<%= user.username %>"
+                    data-role="<%= user.user_role %>"
+                    data-status="<%= user.status %>"
+                    data-avatar="<%= user.avatar_path || '' %>"
+                    data-disk="<%= user.disk_limit || 0 %>"
+                    data-pkg="<%= user.package_name || 'custom' %>"
+                    data-stream="<%= user.stream_limit || 0 %>"
                     class="text-blue-400 hover:text-blue-300 transition-colors" title="Edit User">
                     <i class="ti ti-edit"></i>
                   </button>
                   
                   <% if (user.id !== req.session.userId) { %>
-                    <button onclick="deleteUser('<%= user.id %>', '<%= user.username %>')" 
+                    <button onclick="deleteUser(this.dataset.id, this.dataset.username)" 
+                      data-id="<%= user.id %>"
+                      data-username="<%= user.username %>"
                       class="text-red-400 hover:text-red-300 transition-colors" title="Delete User">
                       <i class="ti ti-trash"></i>
                     </button>

@@ -354,12 +354,14 @@
   </div>
 </div>
 
+<script id="videos-data" type="application/json"><%- JSON.stringify(videos || []) %></script>
+<script id="audios-data" type="application/json"><%- JSON.stringify(audios || []) %></script>
 <script>
 let selectedVideos = [];
 let selectedAudios = [];
 let currentPlaylistId = null;
-let allVideos = <%- JSON.stringify(videos || []) %>;
-let allAudios = <%- JSON.stringify(audios || []) %>;
+let allVideos = JSON.parse(document.getElementById('videos-data').textContent);
+let allAudios = JSON.parse(document.getElementById('audios-data').textContent);
 let currentTab = 'videos';
 
 function switchTab(tab) {
