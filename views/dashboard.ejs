@@ -66,9 +66,9 @@
         </div>
         <% } else { %>
         <% 
-          var expDateMobile = user.expired_at ? new Date(user.expired_at) : new Date(0);
+          var expDateMobile = user.expired_at ? new Date(user.expired_at) : null;
           var nowMobile = new Date();
-          var daysLeftMobile = Math.ceil((expDateMobile - nowMobile) / (1000*60*60*24));
+          var daysLeftMobile = expDateMobile ? Math.ceil((expDateMobile - nowMobile) / (1000*60*60*24)) : 0;
         %>
         <div class="w-px h-4 bg-gray-700 flex-shrink-0"></div>
         <div class="flex items-center gap-1.5 flex-shrink-0">
@@ -132,9 +132,9 @@
     </div>
     <% } else { %>
     <% 
-      var expDateGrid = user.expired_at ? new Date(user.expired_at) : new Date(0);
+      var expDateGrid = user.expired_at ? new Date(user.expired_at) : null;
       var nowGrid = new Date();
-      var daysLeftGrid = Math.ceil((expDateGrid - nowGrid) / (1000*60*60*24));
+      var daysLeftGrid = expDateGrid ? Math.ceil((expDateGrid - nowGrid) / (1000*60*60*24)) : 0;
     %>
     <div class="bg-gray-800 rounded-lg p-6 shadow-md">
       <div class="flex items-center justify-between">
@@ -144,7 +144,7 @@
         </div>
       </div>
       <p class="text-3xl font-bold mt-2"><%= daysLeftGrid > 0 ? daysLeftGrid : 0 %> <span class="text-sm font-normal text-gray-400">Hari</span></p>
-      <p class="text-xs text-gray-400 mt-2">Sampai <%= expDateGrid.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) %></p>
+      <p class="text-xs text-gray-400 mt-2"><%= expDateGrid ? 'Sampai ' + expDateGrid.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Belum Ada Paket' %></p>
     </div>
     <div class="bg-gray-800 rounded-lg p-6 shadow-md">
       <div class="flex items-center justify-between">
@@ -154,7 +154,10 @@
         </div>
       </div>
       <div class="mt-4 flex items-center gap-3">
-        <% if (daysLeftGrid <= 7 && daysLeftGrid >= 0) { %>
+        <% if (!expDateGrid) { %>
+          <i class="ti ti-alert-circle text-red-500 text-2xl"></i>
+          <p class="text-sm text-red-400 font-medium leading-tight">Belum ada paket aktif</p>
+        <% } else if (daysLeftGrid <= 7 && daysLeftGrid >= 0) { %>
           <i class="ti ti-alert-triangle text-yellow-500 text-2xl"></i>
           <p class="text-sm text-yellow-400 font-medium leading-tight">Paket segera berakhir</p>
         <% } else if (daysLeftGrid < 0) { %>
