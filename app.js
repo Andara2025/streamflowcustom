@@ -1521,7 +1521,7 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
       status: status || user.status,
       avatar_path: avatarPath,
       disk_limit: diskLimit !== undefined && diskLimit !== '' ? parseInt(diskLimit) : user.disk_limit,
-      expired_at: expiredAt !== undefined && expiredAt !== '' ? expiredAt : (user.expired_at || null)
+      expired_at: expiredAt !== undefined ? (expiredAt === '' ? null : expiredAt) : user.expired_at
     };
 
     if (password && password.trim() !== '') {
@@ -4269,6 +4269,13 @@ app.post('/api/streams', isAuthenticated, [
 app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbnail'), async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
+    if (user.expired_at) {
+      const expDate = new Date(user.expired_at);
+      const now = new Date();
+      if (expDate < now) {
+        return res.status(403).json({ success: false, error: 'Masa aktif paket Anda telah habis. Silakan perpanjang untuk membuat stream baru.' });
+      }
+    }
     const YoutubeChannel = require('./models/YoutubeChannel');
 
     if (!user.youtube_client_id || !user.youtube_client_secret) {
@@ -4770,7 +4777,17 @@ app.post('/api/streams/:id/status', isAuthenticated, [
       return res.status(403).json({ success: false, error: 'Not authorized' });
     }
     const newStatus = req.body.status;
+    
     if (newStatus === 'live') {
+      const user = await User.findById(req.session.userId);
+      if (user.expired_at) {
+        const expDate = new Date(user.expired_at);
+        const now = new Date();
+        if (expDate < now) {
+          return res.status(403).json({ success: false, error: 'Masa aktif paket Anda telah habis. Silakan perpanjang untuk memulai live streaming.' });
+        }
+      }
+      
       if (stream.status === 'live') {
         return res.json({
           success: false,

@@ -234,7 +234,7 @@
 
 <div id="editModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden transition-opacity">
   <div class="flex items-center justify-center min-h-screen p-4">
-    <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-md border border-gray-600/50 transform transition-all opacity-0 scale-95" id="editModalContent">
+    <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl border border-gray-600/50 transform transition-all opacity-0 scale-95" id="editModalContent">
       <div class="flex items-center justify-between p-4 border-b border-gray-600/50">
         <div class="flex items-center">
           <h3 class="text-lg font-medium">Edit User</h3>
@@ -248,8 +248,8 @@
         <form id="editUserForm" enctype="multipart/form-data">
           <input type="hidden" id="editUserId" name="userId">
           
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-300 mb-2">Profile Picture</label>
+          <div class="mb-4 flex flex-col md:flex-row items-center md:items-start gap-4">
+            <label class="block text-sm font-medium text-gray-300 w-full md:w-auto">Profile Picture</label>
             <div class="flex items-center space-x-4">
               <div class="h-16 w-16 rounded-full overflow-hidden ring-2 ring-gray-600">
                 <img id="editUserAvatar" src="/images/default-avatar.jpg" alt="User avatar" class="w-full h-full object-cover">
@@ -263,77 +263,77 @@
               </div>
             </div>
           </div>
-
-          <div class="mb-4">
-            <label for="editUsername" class="block text-sm font-medium text-gray-300 mb-2">Username</label>
-            <input type="text" id="editUsername" name="username" required placeholder="Enter username"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-          </div>
-
-          <div class="mb-4">
-            <label for="editRole" class="block text-sm font-medium text-gray-300 mb-2">Role</label>
-            <select id="editRole" name="role" 
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-
-          <div class="mb-4">
-            <label for="editStatus" class="block text-sm font-medium text-gray-300 mb-2">Status</label>
-            <select id="editStatus" name="status" 
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-
-          <div class="mb-4">
-            <label for="editPackage" class="block text-sm font-medium text-gray-300 mb-2">Pilih Paket</label>
-            <select id="editPackage" name="package_name" onchange="autoFillLimits('edit')"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <option value="custom">Custom (Atur Manual)</option>
-              <% Object.keys(pricingSettings.packages).forEach(key => { 
-                let p = pricingSettings.packages[key];
-              %>
-                <option value="<%= key %>"><%= p.name %> (<%= p.label %> - <%= p.live %> Live - <%= p.storage %>GB)</option>
-              <% }); %>
-            </select>
-          </div>
-
-          <div class="mb-4">
-            <label for="editStreamLimit" class="block text-sm font-medium text-gray-300 mb-2">Batas Live Streaming (Limit)</label>
-            <input type="number" id="editStreamLimit" name="stream_limit" min="0" step="1" placeholder="0"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-            <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited.</p>
-          </div>
-
-          <div class="mb-4">
-            <label for="editDiskLimit" class="block text-sm font-medium text-gray-300 mb-2">Disk Limit</label>
-            <div class="flex gap-2">
-              <input type="number" id="editDiskLimitValue" min="0" step="1" placeholder="0"
-                class="flex-1 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <select id="editDiskLimitUnit" class="w-24 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-                <option value="1048576">MB</option>
-                <option value="1073741824">GB</option>
-                <option value="1099511627776">TB</option>
-              </select>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-4">
+              <div>
+                <label for="editUsername" class="block text-sm font-medium text-gray-300 mb-2">Username</label>
+                <input type="text" id="editUsername" name="username" required placeholder="Enter username"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+              </div>
+              <div>
+                <label for="editRole" class="block text-sm font-medium text-gray-300 mb-2">Role</label>
+                <select id="editRole" name="role" 
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div>
+                <label for="editStatus" class="block text-sm font-medium text-gray-300 mb-2">Status</label>
+                <select id="editStatus" name="status" 
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div>
+                <label for="editPassword" class="block text-sm font-medium text-gray-300 mb-2">New Password (optional)</label>
+                <input type="password" id="editPassword" name="password" placeholder="Leave empty to keep current password"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+              </div>
             </div>
-            <input type="hidden" id="editDiskLimit" name="diskLimit" value="0">
-            <p class="text-xs text-gray-500 mt-1">Set to 0 or leave empty for unlimited storage</p>
-          </div>
-
-          <div class="mb-6">
-            <label for="editExpiredAt" class="block text-sm font-medium text-gray-300 mb-2">Tanggal Expired</label>
-            <input type="date" id="editExpiredAt" name="expiredAt"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:dark]">
-            <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada batas waktu.</p>
-          </div>
-
-          <div class="mb-6">
-            <label for="editPassword" class="block text-sm font-medium text-gray-300 mb-2">New Password (optional)</label>
-            <input type="password" id="editPassword" name="password" placeholder="Leave empty to keep current password"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+            
+            <div class="space-y-4">
+              <div>
+                <label for="editPackage" class="block text-sm font-medium text-gray-300 mb-2">Pilih Paket</label>
+                <select id="editPackage" name="package_name" onchange="autoFillLimits('edit')"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                  <option value="custom">Custom (Atur Manual)</option>
+                  <% Object.keys(pricingSettings.packages).forEach(key => { 
+                    let p = pricingSettings.packages[key];
+                  %>
+                    <option value="<%= key %>"><%= p.name %> (<%= p.label %>)</option>
+                  <% }); %>
+                </select>
+              </div>
+              <div>
+                <label for="editStreamLimit" class="block text-sm font-medium text-gray-300 mb-2">Batas Live Streaming</label>
+                <input type="number" id="editStreamLimit" name="stream_limit" min="0" step="1" placeholder="0"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited.</p>
+              </div>
+              <div>
+                <label for="editDiskLimit" class="block text-sm font-medium text-gray-300 mb-2">Disk Limit</label>
+                <div class="flex gap-2">
+                  <input type="number" id="editDiskLimitValue" min="0" step="1" placeholder="0"
+                    class="flex-1 w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                  <select id="editDiskLimitUnit" class="w-24 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                    <option value="1048576">MB</option>
+                    <option value="1073741824">GB</option>
+                    <option value="1099511627776">TB</option>
+                  </select>
+                </div>
+                <input type="hidden" id="editDiskLimit" name="diskLimit" value="0">
+                <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited</p>
+              </div>
+              <div>
+                <label for="editExpiredAt" class="block text-sm font-medium text-gray-300 mb-2">Tanggal Expired</label>
+                <input type="date" id="editExpiredAt" name="expiredAt"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:dark]">
+                <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada batas waktu.</p>
+              </div>
+            </div>
           </div>
         </form>
       </div>
@@ -354,7 +354,7 @@
 
 <div id="createModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden transition-opacity">
   <div class="flex items-center justify-center min-h-screen p-4">
-    <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-md border border-gray-600/50 transform transition-all opacity-0 scale-95" id="createModalContent">
+    <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl border border-gray-600/50 transform transition-all opacity-0 scale-95" id="createModalContent">
       <div class="flex items-center justify-between p-4 border-b border-gray-600/50">
         <div class="flex items-center">
           <h3 class="text-lg font-medium">Create New User</h3>
@@ -366,8 +366,9 @@
       
       <div class="p-6">
         <form id="createUserForm" enctype="multipart/form-data">
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-300 mb-2">Profile Picture</label>
+          
+          <div class="mb-4 flex flex-col md:flex-row items-center md:items-start gap-4">
+            <label class="block text-sm font-medium text-gray-300 w-full md:w-auto">Profile Picture</label>
             <div class="flex items-center space-x-4">
               <div class="h-16 w-16 rounded-full overflow-hidden ring-2 ring-gray-600">
                 <img id="createUserAvatar" src="/images/default-avatar.jpg" alt="User avatar" class="w-full h-full object-cover">
@@ -382,76 +383,76 @@
             </div>
           </div>
 
-          <div class="mb-4">
-            <label for="createUsername" class="block text-sm font-medium text-gray-300 mb-2">Username</label>
-            <input type="text" id="createUsername" name="username" required placeholder="Enter username"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-          </div>
-
-          <div class="mb-4">
-            <label for="createRole" class="block text-sm font-medium text-gray-300 mb-2">Role</label>
-            <select id="createRole" name="role" 
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-
-          <div class="mb-4">
-            <label for="createStatus" class="block text-sm font-medium text-gray-300 mb-2">Status</label>
-            <select id="createStatus" name="status" 
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-
-          <div class="mb-4">
-            <label for="createPackage" class="block text-sm font-medium text-gray-300 mb-2">Pilih Paket</label>
-            <select id="createPackage" name="package_name" onchange="autoFillLimits('create')"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <option value="custom">Custom (Atur Manual)</option>
-              <% Object.keys(pricingSettings.packages).forEach(key => { 
-                let p = pricingSettings.packages[key];
-              %>
-                <option value="<%= key %>"><%= p.name %> (<%= p.label %> - <%= p.live %> Live - <%= p.storage %>GB)</option>
-              <% }); %>
-            </select>
-          </div>
-
-          <div class="mb-4">
-            <label for="createStreamLimit" class="block text-sm font-medium text-gray-300 mb-2">Batas Live Streaming (Limit)</label>
-            <input type="number" id="createStreamLimit" name="stream_limit" min="0" step="1" placeholder="0"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-            <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited.</p>
-          </div>
-
-          <div class="mb-4">
-            <label for="createDiskLimit" class="block text-sm font-medium text-gray-300 mb-2">Disk Limit</label>
-            <div class="flex gap-2">
-              <input type="number" id="createDiskLimitValue" min="0" step="1" placeholder="0"
-                class="flex-1 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <select id="createDiskLimitUnit" class="w-24 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-                <option value="1048576">MB</option>
-                <option value="1073741824">GB</option>
-                <option value="1099511627776">TB</option>
-              </select>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-4">
+              <div>
+                <label for="createUsername" class="block text-sm font-medium text-gray-300 mb-2">Username</label>
+                <input type="text" id="createUsername" name="username" required placeholder="Enter username"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+              </div>
+              <div>
+                <label for="createRole" class="block text-sm font-medium text-gray-300 mb-2">Role</label>
+                <select id="createRole" name="role" 
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div>
+                <label for="createStatus" class="block text-sm font-medium text-gray-300 mb-2">Status</label>
+                <select id="createStatus" name="status" 
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div>
+                <label for="createPassword" class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+                <input type="password" id="createPassword" name="password" required placeholder="Enter password"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+              </div>
             </div>
-            <input type="hidden" id="createDiskLimit" name="diskLimit" value="0">
-            <p class="text-xs text-gray-500 mt-1">Set to 0 or leave empty for unlimited storage</p>
-          </div>
 
-          <div class="mb-4">
-            <label for="createExpiredAt" class="block text-sm font-medium text-gray-300 mb-2">Tanggal Expired</label>
-            <input type="date" id="createExpiredAt" name="expiredAt"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:dark]">
-            <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada batas waktu.</p>
-          </div>
-
-          <div class="mb-6">
-            <label for="createPassword" class="block text-sm font-medium text-gray-300 mb-2">Password</label>
-            <input type="password" id="createPassword" name="password" required placeholder="Enter password"
-              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+            <div class="space-y-4">
+              <div>
+                <label for="createPackage" class="block text-sm font-medium text-gray-300 mb-2">Pilih Paket</label>
+                <select id="createPackage" name="package_name" onchange="autoFillLimits('create')"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                  <option value="custom">Custom (Atur Manual)</option>
+                  <% Object.keys(pricingSettings.packages).forEach(key => { 
+                    let p = pricingSettings.packages[key];
+                  %>
+                    <option value="<%= key %>"><%= p.name %> (<%= p.label %>)</option>
+                  <% }); %>
+                </select>
+              </div>
+              <div>
+                <label for="createStreamLimit" class="block text-sm font-medium text-gray-300 mb-2">Batas Live Streaming</label>
+                <input type="number" id="createStreamLimit" name="stream_limit" min="0" step="1" placeholder="0"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited.</p>
+              </div>
+              <div>
+                <label for="createDiskLimit" class="block text-sm font-medium text-gray-300 mb-2">Disk Limit</label>
+                <div class="flex gap-2">
+                  <input type="number" id="createDiskLimitValue" min="0" step="1" placeholder="0"
+                    class="flex-1 w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                  <select id="createDiskLimitUnit" class="w-24 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                    <option value="1048576">MB</option>
+                    <option value="1073741824">GB</option>
+                    <option value="1099511627776">TB</option>
+                  </select>
+                </div>
+                <input type="hidden" id="createDiskLimit" name="diskLimit" value="0">
+                <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited</p>
+              </div>
+              <div>
+                <label for="createExpiredAt" class="block text-sm font-medium text-gray-300 mb-2">Tanggal Expired</label>
+                <input type="date" id="createExpiredAt" name="expiredAt"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:dark]">
+                <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada batas waktu.</p>
+              </div>
+            </div>
           </div>
         </form>
       </div>

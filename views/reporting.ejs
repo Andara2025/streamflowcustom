@@ -81,7 +81,7 @@
       </thead>
       <tbody class="divide-y divide-gray-700">
         <% 
-          const pkgData = <%- JSON.stringify(pricingSettings.packages) %>;
+          const pkgData = pricingSettings.packages;
           const pkgPrices = {};
           const pkgNames = { 'custom': 'Custom' };
           
