@@ -1493,7 +1493,7 @@ app.post('/api/users/delete', isAdmin, async (req, res) => {
 
 app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res) => {
   try {
-    const { userId, username, role, status, password, diskLimit, expiredAt } = req.body;
+    const { userId, username, role, status, password, diskLimit, expiredAt, package_name, stream_limit } = req.body;
 
     if (!userId) {
       return res.status(400).json({
@@ -1521,7 +1521,9 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
       status: status || user.status,
       avatar_path: avatarPath,
       disk_limit: diskLimit !== undefined && diskLimit !== '' ? parseInt(diskLimit) : user.disk_limit,
-      expired_at: expiredAt !== undefined ? (expiredAt === '' ? null : expiredAt) : user.expired_at
+      expired_at: expiredAt !== undefined ? (expiredAt === '' ? null : expiredAt) : user.expired_at,
+      package_name: package_name !== undefined ? package_name : user.package_name,
+      stream_limit: stream_limit !== undefined && stream_limit !== '' ? parseInt(stream_limit) : user.stream_limit
     };
 
     if (password && password.trim() !== '') {
@@ -1546,7 +1548,7 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
 
 app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res) => {
   try {
-    const { username, role, status, password, diskLimit, expiredAt } = req.body;
+    const { username, role, status, password, diskLimit, expiredAt, package_name, stream_limit } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({
@@ -1575,7 +1577,9 @@ app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res)
       status: status || 'active',
       avatar_path: avatarPath,
       disk_limit: diskLimit ? parseInt(diskLimit) : 0,
-      expired_at: expiredAt || null
+      expired_at: expiredAt || null,
+      package_name: package_name || 'custom',
+      stream_limit: stream_limit ? parseInt(stream_limit) : 0
     };
 
     const result = await User.create(userData);
