@@ -662,18 +662,18 @@ app.post('/signup', upload.single('avatar'), async (req, res) => {
       username,
       password,
       avatar_path: avatarPath,
-      user_role: user_role || 'member',
-      status: 'trial',
+      user_role: 'member',
+      status: 'inactive',
       package_name: 'tester',
-      stream_limit: 1,
-      disk_limit: 1073741824 // 1GB
+      stream_limit: 0,
+      disk_limit: 0
     });
 
     if (newUser) {
       return res.render('signup', {
         title: 'Sign Up',
         error: null,
-        success: 'Account created successfully! Masa Trial 24 Jam Anda telah dimulai. Silakan Login.',
+        success: 'Account created successfully! Silakan hubungi admin untuk mengaktifkan akun Anda.',
         recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
       });
     } else {
