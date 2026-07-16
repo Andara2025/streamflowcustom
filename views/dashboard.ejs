@@ -51,6 +51,7 @@
           <span class="text-xs font-bold text-white">0</span>
           <span class="text-[10px] text-gray-400">live</span>
         </div>
+        <% if (user.user_role === 'admin') { %>
         <div class="w-px h-4 bg-gray-700 flex-shrink-0"></div>
         <div class="flex items-center gap-1.5 flex-shrink-0">
           <i class="ti ti-cpu text-blue-400 text-sm font-loaded"></i>
@@ -63,6 +64,19 @@
           <span id="memory-usage-mobile" class="text-xs font-bold text-white">0</span>
           <span id="memory-total-mobile" class="text-[10px] text-gray-400">/ 0</span>
         </div>
+        <% } else if (user.expired_at) { %>
+        <% 
+          var expDateMobile = new Date(user.expired_at);
+          var nowMobile = new Date();
+          var daysLeftMobile = Math.ceil((expDateMobile - nowMobile) / (1000*60*60*24));
+        %>
+        <div class="w-px h-4 bg-gray-700 flex-shrink-0"></div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <i class="ti ti-calendar-check text-blue-400 text-sm font-loaded"></i>
+          <span class="text-xs font-bold text-white"><%= daysLeftMobile > 0 ? daysLeftMobile : 0 %></span>
+          <span class="text-[10px] text-gray-400">hari aktif</span>
+        </div>
+        <% } %>
         <div class="w-px h-4 bg-gray-700 flex-shrink-0"></div>
         <div class="flex items-center gap-1.5 flex-shrink-0 cursor-pointer"
           onclick="toggleNetworkDiskDisplay('mobile')">
@@ -89,6 +103,7 @@
       </div>
       <p class="text-3xl font-bold mt-2">0</p>
     </div>
+    <% if (user.user_role === 'admin') { %>
     <div class="bg-gray-800 rounded-lg p-6 shadow-md">
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-semibold">CPU Usage</h3>
@@ -115,6 +130,43 @@
         <div id="memory-bar" class="bg-primary h-2.5 rounded-full" style="width: 0%"></div>
       </div>
     </div>
+    <% } else if (user.expired_at) { %>
+    <% 
+      var expDateGrid = new Date(user.expired_at);
+      var nowGrid = new Date();
+      var daysLeftGrid = Math.ceil((expDateGrid - nowGrid) / (1000*60*60*24));
+    %>
+    <div class="bg-gray-800 rounded-lg p-6 shadow-md">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Masa Aktif</h3>
+        <div class="w-10 h-10 bg-dark-700 rounded-lg flex items-center justify-center">
+          <i class="ti ti-calendar-check text-xl text-white font-loaded"></i>
+        </div>
+      </div>
+      <p class="text-3xl font-bold mt-2"><%= daysLeftGrid > 0 ? daysLeftGrid : 0 %> <span class="text-sm font-normal text-gray-400">Hari</span></p>
+      <p class="text-xs text-gray-400 mt-2">Sampai <%= expDateGrid.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) %></p>
+    </div>
+    <div class="bg-gray-800 rounded-lg p-6 shadow-md">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Notifikasi</h3>
+        <div class="w-10 h-10 bg-dark-700 rounded-lg flex items-center justify-center">
+          <i class="ti ti-bell text-xl text-white font-loaded"></i>
+        </div>
+      </div>
+      <div class="mt-4 flex items-center gap-3">
+        <% if (daysLeftGrid <= 7 && daysLeftGrid >= 0) { %>
+          <i class="ti ti-alert-triangle text-yellow-500 text-2xl"></i>
+          <p class="text-sm text-yellow-400 font-medium leading-tight">Paket segera berakhir</p>
+        <% } else if (daysLeftGrid < 0) { %>
+          <i class="ti ti-alert-circle text-red-500 text-2xl"></i>
+          <p class="text-sm text-red-400 font-medium leading-tight">Paket telah expired</p>
+        <% } else { %>
+          <i class="ti ti-check text-green-500 text-2xl"></i>
+          <p class="text-sm text-green-400 font-medium leading-tight">Semua sistem normal</p>
+        <% } %>
+      </div>
+    </div>
+    <% } %>
     <div class="bg-gray-800 rounded-lg p-6 shadow-md hidden 3xl:block">
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-semibold"><%= user.user_role === 'admin' ? 'Disk Usage (VPS)' : 'Storage Quota' %></h3>
@@ -1847,11 +1899,16 @@
       fetch('/api/system-stats')
         .then(response => response.json())
         .then(data => {
-          document.getElementById('cpu-usage').textContent = data.cpu.usage;
-          document.getElementById('cpu-bar').style.width = data.cpu.usage + '%';
-          document.getElementById('memory-usage').textContent = formatMemory(data.memory.used);
-          document.getElementById('memory-total').textContent = ' / ' + formatMemory(data.memory.total);
-          document.getElementById('memory-bar').style.width = data.memory.usagePercent + '%';
+          const cpuUsage = document.getElementById('cpu-usage');
+          if (cpuUsage) cpuUsage.textContent = data.cpu.usage;
+          const cpuBar = document.getElementById('cpu-bar');
+          if (cpuBar) cpuBar.style.width = data.cpu.usage + '%';
+          const memUsage = document.getElementById('memory-usage');
+          if (memUsage) memUsage.textContent = formatMemory(data.memory.used);
+          const memTotal = document.getElementById('memory-total');
+          if (memTotal) memTotal.textContent = ' / ' + formatMemory(data.memory.total);
+          const memBar = document.getElementById('memory-bar');
+          if (memBar) memBar.style.width = data.memory.usagePercent + '%';
 
           const cpuMobile = document.getElementById('cpu-usage-mobile');
           if (cpuMobile) cpuMobile.textContent = data.cpu.usage;
