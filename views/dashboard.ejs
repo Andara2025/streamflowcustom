@@ -1,4 +1,48 @@
 <% layout('layout') -%>
+  <% if (user.user_role !== 'admin' && user.expired_at) { %>
+    <%
+      var expDate = new Date(user.expired_at);
+      var now = new Date();
+      var daysLeft = Math.ceil((expDate - now) / (1000*60*60*24));
+    %>
+    <% if (daysLeft < 0) { %>
+      <div class="bg-red-500/10 border border-red-500/50 rounded-lg p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="flex items-start gap-3">
+          <i class="ti ti-alert-circle text-red-500 text-2xl mt-0.5"></i>
+          <div>
+            <h4 class="font-bold text-red-500 text-lg">Paket Anda Telah Expired!</h4>
+            <p class="text-sm text-red-400 mt-1">Masa aktif paket Anda telah habis pada <b><%= expDate.toLocaleDateString('id-ID') %></b>. Fitur mungkin akan dibatasi.</p>
+          </div>
+        </div>
+        <a href="https://chat.whatsapp.com/FfgvEREd1ZtKJPNh8WD4If?s=cl&p=a&ilr=0&amv=0" target="_blank" rel="noopener noreferrer" class="shrink-0 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors text-sm w-full sm:w-auto text-center">
+          Perpanjang Sekarang
+        </a>
+      </div>
+    <% } else if (daysLeft <= 7) { %>
+      <div class="bg-yellow-500/10 border border-yellow-500/50 rounded-lg p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="flex items-start gap-3">
+          <i class="ti ti-clock-hour-4 text-yellow-500 text-2xl mt-0.5"></i>
+          <div>
+            <h4 class="font-bold text-yellow-500 text-lg">Masa Aktif Segera Berakhir</h4>
+            <p class="text-sm text-yellow-400 mt-1">Paket Anda akan berakhir dalam <b><%= daysLeft %> hari</b> (<%= expDate.toLocaleDateString('id-ID') %>). Segera perpanjang agar live streaming tidak terputus.</p>
+          </div>
+        </div>
+        <a href="https://chat.whatsapp.com/FfgvEREd1ZtKJPNh8WD4If?s=cl&p=a&ilr=0&amv=0" target="_blank" rel="noopener noreferrer" class="shrink-0 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg font-medium transition-colors text-sm w-full sm:w-auto text-center">
+          Perpanjang Sekarang
+        </a>
+      </div>
+    <% } else { %>
+      <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <i class="ti ti-calendar-check text-blue-400 text-xl"></i>
+          <div>
+            <p class="text-xs text-gray-400">Masa Aktif Paket:</p>
+            <p class="text-sm font-semibold text-blue-400"><%= expDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) %> (<%= daysLeft %> hari lagi)</p>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  <% } %>
   <div class="md:hidden mb-4" style="margin-top: -10px;">
     <div class="bg-gray-800 rounded-lg px-3 py-2 shadow-md">
       <div class="flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
