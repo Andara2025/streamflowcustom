@@ -101,10 +101,17 @@
           </select>
         </div>
 
+        <!-- Tempat Gambar QRIS Muncul -->
+        <div id="qrisContainer" class="hidden flex-col items-center justify-center p-4 bg-dark-900 border border-gray-600 rounded-xl mt-4 transition-all">
+          <p class="text-sm text-gray-400 mb-3 text-center">Silakan scan QRIS di bawah ini untuk melakukan pembayaran.</p>
+          <img src="/images/Qrisbaru.jpg" alt="QRIS PEJUANG MONET" class="w-full max-w-[250px] rounded-lg shadow-md mb-2">
+          <p class="text-xs text-rose-400 text-center">Setelah scan, jangan lupa screenshot bukti transfer ya!</p>
+        </div>
+
         <button type="submit" 
           class="w-full bg-primary hover:bg-rose-700 text-white font-bold py-4 px-6 rounded-xl transition-colors mt-8 flex items-center justify-center gap-2 shadow-lg shadow-rose-900/50">
           <i class="ti ti-brand-whatsapp text-xl"></i>
-          Lanjutkan ke WhatsApp
+          Konfirmasi via WhatsApp
         </button>
       </form>
       
@@ -117,6 +124,17 @@
   </div>
 
   <script>
+    document.getElementById('payment_method').addEventListener('change', function(e) {
+      const qrisContainer = document.getElementById('qrisContainer');
+      if (this.value === 'QRIS') {
+        qrisContainer.classList.remove('hidden');
+        qrisContainer.classList.add('flex');
+      } else {
+        qrisContainer.classList.add('hidden');
+        qrisContainer.classList.remove('flex');
+      }
+    });
+
     document.getElementById('orderForm').addEventListener('submit', function(e) {
       e.preventDefault();
       
@@ -126,15 +144,15 @@
       const whatsapp = document.getElementById('whatsapp').value;
       const paymentMethod = document.getElementById('payment_method').value;
       
-      let message = `Halo Admin PEJUANG MONET, saya ingin berlangganan:%0A%0A`;
+      let message = `Halo Admin PEJUANG MONET, saya sudah melakukan pembayaran:%0A%0A`;
       message += `📦 *Paket:* ${pkgName}%0A`;
       message += `💰 *Harga:* ${pkgPrice}/Bulan%0A`;
       message += `👤 *Nama:* ${name}%0A`;
       message += `📱 *No WA:* ${whatsapp}%0A`;
       message += `💳 *Metode Pembayaran:* ${paymentMethod}%0A%0A`;
-      message += `Mohon info nomor rekening / QRIS nya ya min. Terima kasih!`;
+      message += `Ini bukti transfer saya (mohon dilampirkan). Terima kasih!`;
       
-      const adminWa = "6285262882706";
+      const adminWa = "<%= adminWa %>";
       const waLink = `https://wa.me/${adminWa}?text=${message}`;
       
       window.open(waLink, '_blank');
