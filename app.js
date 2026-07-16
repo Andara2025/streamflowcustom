@@ -4788,6 +4788,18 @@ app.post('/api/streams/:id/status', isAuthenticated, [
         }
       }
       
+      if (user.user_role !== 'admin') {
+        const liveStreams = await Stream.findAll(req.session.userId, 'live');
+        const maxStreams = user.stream_limit || 0;
+        
+        if (liveStreams.length >= maxStreams) {
+          return res.status(403).json({ 
+            success: false, 
+            error: `Batas live streaming tercapai. Anda hanya dapat menjalankan ${maxStreams} stream bersamaan.` 
+          });
+        }
+      }
+      
       if (stream.status === 'live') {
         return res.json({
           success: false,

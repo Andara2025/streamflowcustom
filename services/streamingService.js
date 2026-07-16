@@ -759,6 +759,21 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
       return { success: false, error: 'Stream not found' };
     }
 
+    if (!isRetry) {
+      const User = require('../models/User');
+      const user = await User.findById(stream.user_id);
+      if (user && user.user_role !== 'admin') {
+        const liveStreams = await Stream.findAll(stream.user_id, 'live');
+        const maxStreams = user.stream_limit || 0;
+        
+        const activeLiveCount = liveStreams.filter(s => s.id !== streamId).length;
+        if (activeLiveCount >= maxStreams) {
+          startingStreams.delete(streamId);
+          return { success: false, error: `Batas live streaming tercapai. Anda hanya dapat menjalankan ${maxStreams} stream bersamaan.` };
+        }
+      }
+    }
+
     const originalStartTime = stream.start_time;
     const originalEndTime = stream.end_time;
 
