@@ -108,7 +108,7 @@
       </div>
     </div>
   </div>
-  <div class="hidden md:grid md:grid-cols-2 lg:grid-cols-4 3xl:grid-cols-5 gap-6 mb-6">
+  <div class="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-6">
     <div class="bg-gray-800 rounded-lg p-6 shadow-md">
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-semibold">Active Streams</h3>
@@ -194,7 +194,7 @@
       </div>
     </div>
     <% } %>
-    <div class="bg-gray-800 rounded-lg p-6 shadow-md hidden 3xl:block">
+    <div class="bg-gray-800 rounded-lg p-6 shadow-md">
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-semibold"><%= user.user_role === 'admin' ? 'Disk Usage (VPS)' : 'Storage Quota' %></h3>
         <div class="w-10 h-10 bg-dark-700 rounded-lg flex items-center justify-center">
@@ -211,43 +211,14 @@
         </div>
       </div>
     </div>
-    <div class="bg-gray-800 rounded-lg p-6 shadow-md 3xl:hidden">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold" id="network-disk-title">Internet Speed</h3>
-        <div
-          class="w-10 h-10 bg-dark-700 hover:bg-dark-600 rounded-lg flex items-center justify-center cursor-pointer transition-colors duration-200"
-          onclick="toggleNetworkDiskDisplay('desktop')" title="Click to switch between Internet Speed and Disk Usage">
-          <i class="ti ti-wifi text-xl text-white font-loaded" id="toggle-icon-desktop"></i>
-        </div>
-      </div>
-      <div id="network-content-desktop" class="mt-2 space-y-2">
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-gray-400">↑ Upload</span>
-          <span id="upload-speed" class="text-lg font-bold text-blue-400">0 Mbps</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-gray-400">↓ Download</span>
-          <span id="download-speed" class="text-lg font-bold text-green-400">0 Mbps</span>
-        </div>
-      </div>
-      <div id="disk-content-desktop" class="mt-2" style="display: none;">
-        <p class="text-3xl font-bold">
-          <span id="disk-used">0 GB</span><span id="disk-total" class="text-sm text-gray-400"> / 0 GB</span>
-        </p>
-        <div class="w-full bg-gray-700 rounded-full h-2.5 mt-2">
-          <div id="disk-bar" class="bg-primary h-2.5 rounded-full transition-colors duration-300" style="width: 0%">
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="bg-gray-800 rounded-lg p-6 shadow-md hidden 3xl:block">
+    <div class="bg-gray-800 rounded-lg p-6 shadow-md">
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-semibold">Internet Speed</h3>
         <div class="w-10 h-10 bg-dark-700 rounded-lg flex items-center justify-center">
           <i class="ti ti-wifi text-xl text-white font-loaded"></i>
         </div>
       </div>
-      <div id="network-content-desktop-wide" class="mt-2 space-y-2">
+      <div class="mt-2 space-y-2">
         <div class="flex justify-between items-center">
           <span class="text-sm text-gray-400">↑ Upload</span>
           <span id="upload-speed-wide" class="text-lg font-bold text-blue-400">0 Mbps</span>
