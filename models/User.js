@@ -212,6 +212,11 @@ class User {
         values.push(updateData.stream_limit);
       }
       
+      if (updateData.expired_at !== undefined) {
+        fields.push('expired_at = ?');
+        values.push(updateData.expired_at);
+      }
+      
       if (fields.length === 0) {
         return resolve({ id: userId, message: 'No fields to update' });
       }
