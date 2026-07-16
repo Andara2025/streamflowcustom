@@ -81,8 +81,14 @@
       </thead>
       <tbody class="divide-y divide-gray-700">
         <% 
-          const pkgPrices = { 'tester': 15000, 'pemula': 20000, 'mahir': 50000, 'expert': 100000, 'master': 190000 };
-          const pkgNames = { 'tester': 'Tester', 'pemula': 'Pemula', 'mahir': 'Mahir', 'expert': 'Expert', 'master': 'Master', 'custom': 'Custom' };
+          const pkgData = <%- JSON.stringify(pricingSettings.packages) %>;
+          const pkgPrices = {};
+          const pkgNames = { 'custom': 'Custom' };
+          
+          Object.keys(pkgData).forEach(key => {
+            pkgPrices[key] = parseInt(pkgData[key].price);
+            pkgNames[key] = pkgData[key].name;
+          });
           
           if (users && users.length > 0) { 
             users.forEach(function(u) { 

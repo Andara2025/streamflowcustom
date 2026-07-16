@@ -293,11 +293,11 @@
             <select id="editPackage" name="package_name" onchange="autoFillLimits('edit')"
               class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
               <option value="custom">Custom (Atur Manual)</option>
-              <option value="tester">Tester (15k - 1 Live - 1GB)</option>
-              <option value="pemula">Pemula (20k - 2 Live - 2GB)</option>
-              <option value="mahir">Mahir (50k - 5 Live - 5GB)</option>
-              <option value="expert">Expert (100k - 10 Live - 10GB)</option>
-              <option value="master">Master (190k - 20 Live - 20GB)</option>
+              <% Object.keys(pricingSettings.packages).forEach(key => { 
+                let p = pricingSettings.packages[key];
+              %>
+                <option value="<%= key %>"><%= p.name %> (<%= p.label %> - <%= p.live %> Live - <%= p.storage %>GB)</option>
+              <% }); %>
             </select>
           </div>
 
@@ -411,11 +411,11 @@
             <select id="createPackage" name="package_name" onchange="autoFillLimits('create')"
               class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
               <option value="custom">Custom (Atur Manual)</option>
-              <option value="tester">Tester (15k - 1 Live - 1GB)</option>
-              <option value="pemula">Pemula (20k - 2 Live - 2GB)</option>
-              <option value="mahir">Mahir (50k - 5 Live - 5GB)</option>
-              <option value="expert">Expert (100k - 10 Live - 10GB)</option>
-              <option value="master">Master (190k - 20 Live - 20GB)</option>
+              <% Object.keys(pricingSettings.packages).forEach(key => { 
+                let p = pricingSettings.packages[key];
+              %>
+                <option value="<%= key %>"><%= p.name %> (<%= p.label %> - <%= p.live %> Live - <%= p.storage %>GB)</option>
+              <% }); %>
             </select>
           </div>
 
@@ -706,6 +706,8 @@ function editUser(userId, username, role, status, avatarPath, diskLimit, package
   openEditModal(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit, expiredAt);
 }
 
+const packagesData = <%- JSON.stringify(pricingSettings.packages) %>;
+
 function autoFillLimits(prefix) {
   const packageSelect = document.getElementById(prefix + 'Package');
   const streamInput = document.getElementById(prefix + 'StreamLimit');
@@ -716,27 +718,13 @@ function autoFillLimits(prefix) {
   const pkg = packageSelect.value;
   const GB = 1073741824;
   
-  if (pkg === 'tester') {
-    streamInput.value = 1;
-    diskValue.value = 1;
-    diskUnit.value = GB.toString();
-  } else if (pkg === 'pemula') {
-    streamInput.value = 2;
-    diskValue.value = 2;
-    diskUnit.value = GB.toString();
-  } else if (pkg === 'mahir') {
-    streamInput.value = 5;
-    diskValue.value = 5;
-    diskUnit.value = GB.toString();
-  } else if (pkg === 'expert') {
-    streamInput.value = 10;
-    diskValue.value = 10;
-    diskUnit.value = GB.toString();
-  } else if (pkg === 'master') {
-    streamInput.value = 20;
-    diskValue.value = 20;
+  if (pkg !== 'custom' && packagesData[pkg]) {
+    const pkgData = packagesData[pkg];
+    streamInput.value = pkgData.live;
+    diskValue.value = pkgData.storage;
     diskUnit.value = GB.toString();
   }
+
   
   if (pkg !== 'custom') {
     diskHidden.value = Math.round(parseFloat(diskValue.value) * parseInt(diskUnit.value));

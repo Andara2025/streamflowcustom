@@ -213,11 +213,11 @@
           <h3 class="text-xl font-bold text-gray-300 mb-1">Paket Tester</h3>
           <p class="text-sm text-gray-500 mb-4">Untuk uji coba performa server.</p>
           <div class="mb-4">
-            <span class="text-3xl font-extrabold text-white">Rp 15.000</span><span class="text-gray-500 text-sm">/bln</span>
+            <span class="text-3xl font-extrabold text-white">Rp <%= pricingSettings.packages.tester.label %></span><span class="text-gray-500 text-sm">/bln</span>
           </div>
           <ul class="space-y-3 mb-6 flex-1 text-sm">
-            <li class="flex items-center"><i class="ti ti-check text-green-400 mr-2"></i> 1 Tugas Live Bersamaan</li>
-            <li class="flex items-center"><i class="ti ti-check text-green-400 mr-2"></i> 1 GB Penyimpanan</li>
+            <li class="flex items-center"><i class="ti ti-check text-green-400 mr-2"></i> <%= pricingSettings.packages.tester.live %> Tugas Live Bersamaan</li>
+            <li class="flex items-center"><i class="ti ti-check text-green-400 mr-2"></i> <%= pricingSettings.packages.tester.storage %> GB Penyimpanan</li>
             <li class="flex items-center"><i class="ti ti-check text-green-400 mr-2"></i> Resolusi Maks 720p (30fps)</li>
             <li class="flex items-center"><i class="ti ti-check text-green-400 mr-2"></i> Bitrate Maks 2500 kbps</li>
           </ul>
@@ -229,11 +229,11 @@
           <h3 class="text-xl font-bold text-blue-400 mb-1">Paket Pemula</h3>
           <p class="text-sm text-gray-500 mb-4">Ideal untuk pemula yang baru merintis.</p>
           <div class="mb-4">
-            <span class="text-3xl font-extrabold text-white">Rp 20.000</span><span class="text-gray-500 text-sm">/bln</span>
+            <span class="text-3xl font-extrabold text-white">Rp <%= pricingSettings.packages.pemula.label %></span><span class="text-gray-500 text-sm">/bln</span>
           </div>
           <ul class="space-y-3 mb-6 flex-1 text-sm">
-            <li class="flex items-center"><i class="ti ti-check text-blue-400 mr-2"></i> 2 Tugas Live Bersamaan</li>
-            <li class="flex items-center"><i class="ti ti-check text-blue-400 mr-2"></i> 2 GB Penyimpanan</li>
+            <li class="flex items-center"><i class="ti ti-check text-blue-400 mr-2"></i> <%= pricingSettings.packages.pemula.live %> Tugas Live Bersamaan</li>
+            <li class="flex items-center"><i class="ti ti-check text-blue-400 mr-2"></i> <%= pricingSettings.packages.pemula.storage %> GB Penyimpanan</li>
             <li class="flex items-center"><i class="ti ti-check text-blue-400 mr-2"></i> Resolusi Maks 720p (30fps)</li>
             <li class="flex items-center"><i class="ti ti-check text-blue-400 mr-2"></i> Bitrate Maks 2500 kbps</li>
             <li class="flex items-center"><i class="ti ti-check text-blue-400 mr-2"></i> Auto Looping & Scheduling</li>
@@ -249,11 +249,11 @@
           <h3 class="text-xl font-bold text-rose-400 mb-1 mt-2">Paket Mahir</h3>
           <p class="text-sm text-gray-400 mb-4">Untuk kreator menengah dengan beberapa channel.</p>
           <div class="mb-4">
-            <span class="text-3xl font-extrabold text-white">Rp 50.000</span><span class="text-rose-200 text-sm">/bln</span>
+            <span class="text-3xl font-extrabold text-white">Rp <%= pricingSettings.packages.mahir.label %></span><span class="text-rose-200 text-sm">/bln</span>
           </div>
           <ul class="space-y-3 mb-6 flex-1 text-sm">
-            <li class="flex items-center"><i class="ti ti-check text-rose-400 mr-2"></i> 5 Tugas Live Bersamaan</li>
-            <li class="flex items-center"><i class="ti ti-check text-rose-400 mr-2"></i> 5 GB Penyimpanan</li>
+            <li class="flex items-center"><i class="ti ti-check text-rose-400 mr-2"></i> <%= pricingSettings.packages.mahir.live %> Tugas Live Bersamaan</li>
+            <li class="flex items-center"><i class="ti ti-check text-rose-400 mr-2"></i> <%= pricingSettings.packages.mahir.storage %> GB Penyimpanan</li>
             <li class="flex items-center"><i class="ti ti-check text-rose-400 mr-2"></i> Resolusi Maks 720p (30fps)</li>
             <li class="flex items-center"><i class="ti ti-check text-rose-400 mr-2"></i> Bitrate Maks 4000 kbps</li>
             <li class="flex items-center"><i class="ti ti-check text-rose-400 mr-2"></i> Audio Remastering</li>
@@ -267,11 +267,11 @@
           <h3 class="text-xl font-bold text-yellow-500 mb-1">Paket Expert</h3>
           <p class="text-sm text-gray-500 mb-4">Kreator serius yang mengejar monetisasi ganda.</p>
           <div class="mb-4">
-            <span class="text-3xl font-extrabold text-white">Rp 100.000</span><span class="text-gray-500 text-sm">/bln</span>
+            <span class="text-3xl font-extrabold text-white">Rp <%= pricingSettings.packages.expert.label %></span><span class="text-gray-500 text-sm">/bln</span>
           </div>
           <ul class="space-y-3 mb-6 flex-1 text-sm">
-            <li class="flex items-center"><i class="ti ti-check text-yellow-500 mr-2"></i> 10 Tugas Live Bersamaan</li>
-            <li class="flex items-center"><i class="ti ti-check text-yellow-500 mr-2"></i> 10 GB Penyimpanan</li>
+            <li class="flex items-center"><i class="ti ti-check text-yellow-500 mr-2"></i> <%= pricingSettings.packages.expert.live %> Tugas Live Bersamaan</li>
+            <li class="flex items-center"><i class="ti ti-check text-yellow-500 mr-2"></i> <%= pricingSettings.packages.expert.storage %> GB Penyimpanan</li>
             <li class="flex items-center"><i class="ti ti-check text-yellow-500 mr-2"></i> Resolusi Maks 1080p (30fps)</li>
             <li class="flex items-center"><i class="ti ti-check text-yellow-500 mr-2"></i> Bitrate Maks 6000 kbps</li>
             <li class="flex items-center"><i class="ti ti-check text-yellow-500 mr-2"></i> Semua Fitur Mahir</li>
@@ -284,11 +284,11 @@
           <h3 class="text-xl font-bold text-purple-400 mb-1">Paket Master</h3>
           <p class="text-sm text-gray-500 mb-4">Solusi agensi atau jaringan channel besar.</p>
           <div class="mb-4">
-            <span class="text-3xl font-extrabold text-white">Rp 190.000</span><span class="text-gray-500 text-sm">/bln</span>
+            <span class="text-3xl font-extrabold text-white">Rp <%= pricingSettings.packages.master.label %></span><span class="text-gray-500 text-sm">/bln</span>
           </div>
           <ul class="space-y-3 mb-6 flex-1 text-sm">
-            <li class="flex items-center"><i class="ti ti-check text-purple-400 mr-2"></i> 20 Tugas Live Bersamaan</li>
-            <li class="flex items-center"><i class="ti ti-check text-purple-400 mr-2"></i> 20 GB Penyimpanan</li>
+            <li class="flex items-center"><i class="ti ti-check text-purple-400 mr-2"></i> <%= pricingSettings.packages.master.live %> Tugas Live Bersamaan</li>
+            <li class="flex items-center"><i class="ti ti-check text-purple-400 mr-2"></i> <%= pricingSettings.packages.master.storage %> GB Penyimpanan</li>
             <li class="flex items-center"><i class="ti ti-check text-purple-400 mr-2"></i> Resolusi Maks 1080p (30fps)</li>
             <li class="flex items-center"><i class="ti ti-check text-purple-400 mr-2"></i> Bitrate Maks 6500 kbps</li>
             <li class="flex items-center"><i class="ti ti-check text-purple-400 mr-2"></i> Bebas Audio Remastering</li>

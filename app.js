@@ -1344,6 +1344,9 @@ app.get('/users', isProAdmin, async (req, res) => {
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
+    
+    const AppSettings = require('./models/AppSettings');
+    const pricingSettings = await AppSettings.getPricingSettings();
 
     res.render('users', {
       title: 'User Management',
@@ -1352,7 +1355,8 @@ app.get('/users', isProAdmin, async (req, res) => {
       totalUsers,
       totalActiveStreams,
       totalStorageUsed: formatGlobalFileSize(totalStorageBytes),
-      user: req.user
+      user: req.user,
+      pricingSettings
     });
   } catch (error) {
     console.error('Users page error:', error);
@@ -5719,13 +5723,13 @@ app.get('/admin/reporting', isProAdmin, async (req, res) => {
     let totalExpired = 0;
     let totalRevenue = 0;
     
-    const prices = {
-      'tester': 15000,
-      'pemula': 20000,
-      'mahir': 50000,
-      'expert': 100000,
-      'master': 190000
-    };
+    const AppSettings = require('./models/AppSettings');
+    const pricingSettings = await AppSettings.getPricingSettings();
+    
+    const prices = {};
+    Object.keys(pricingSettings.packages).forEach(key => {
+      prices[key] = parseInt(pricingSettings.packages[key].price);
+    });
     
     for (const user of users) {
       if (user.status === 'active') totalActive++;
@@ -5754,7 +5758,8 @@ app.get('/admin/reporting', isProAdmin, async (req, res) => {
         totalRevenue,
         totalUsers: users.length
       },
-      users: users
+      users: users,
+      pricingSettings
     });
   } catch (error) {
     console.error('Error loading reporting page:', error);
