@@ -83,7 +83,7 @@
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Paket</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Video</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Streaming</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Created</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Expired</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
         </tr>
       </thead>
@@ -160,12 +160,33 @@
                   </div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                <%= new Date(user.created_at).toLocaleDateString() %>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <% if (user.expired_at) { %>
+                  <%
+                    var expDate = new Date(user.expired_at);
+                    var now = new Date();
+                    var daysLeft = Math.ceil((expDate - now) / (1000*60*60*24));
+                  %>
+                  <% if (daysLeft < 0) { %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-900/50 text-red-300">
+                      <i class="ti ti-alert-circle mr-1"></i>Expired
+                    </span>
+                  <% } else if (daysLeft <= 7) { %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-900/50 text-yellow-300">
+                      <i class="ti ti-clock mr-1"></i><%= daysLeft %>h lagi
+                    </span>
+                  <% } else { %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-900/50 text-green-300">
+                      <i class="ti ti-calendar mr-1"></i><%= new Date(user.expired_at).toLocaleDateString('id-ID') %>
+                    </span>
+                  <% } %>
+                <% } else { %>
+                  <span class="text-gray-600 text-xs">—</span>
+                <% } %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div class="flex space-x-2">
-                  <button onclick="editUser(this.dataset.id, this.dataset.username, this.dataset.role, this.dataset.status, this.dataset.avatar, this.dataset.disk, this.dataset.pkg, this.dataset.stream)" 
+                  <button onclick="editUser(this.dataset.id, this.dataset.username, this.dataset.role, this.dataset.status, this.dataset.avatar, this.dataset.disk, this.dataset.pkg, this.dataset.stream, this.dataset.expired)" 
                     data-id="<%= user.id %>"
                     data-username="<%= user.username %>"
                     data-role="<%= user.user_role %>"
@@ -174,6 +195,7 @@
                     data-disk="<%= user.disk_limit || 0 %>"
                     data-pkg="<%= user.package_name || 'custom' %>"
                     data-stream="<%= user.stream_limit || 0 %>"
+                    data-expired="<%= user.expired_at || '' %>"
                     class="text-blue-400 hover:text-blue-300 transition-colors" title="Edit User">
                     <i class="ti ti-edit"></i>
                   </button>
@@ -302,6 +324,13 @@
           </div>
 
           <div class="mb-6">
+            <label for="editExpiredAt" class="block text-sm font-medium text-gray-300 mb-2">Tanggal Expired</label>
+            <input type="date" id="editExpiredAt" name="expiredAt"
+              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:dark]">
+            <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada batas waktu.</p>
+          </div>
+
+          <div class="mb-6">
             <label for="editPassword" class="block text-sm font-medium text-gray-300 mb-2">New Password (optional)</label>
             <input type="password" id="editPassword" name="password" placeholder="Leave empty to keep current password"
               class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
@@ -410,6 +439,13 @@
             </div>
             <input type="hidden" id="createDiskLimit" name="diskLimit" value="0">
             <p class="text-xs text-gray-500 mt-1">Set to 0 or leave empty for unlimited storage</p>
+          </div>
+
+          <div class="mb-4">
+            <label for="createExpiredAt" class="block text-sm font-medium text-gray-300 mb-2">Tanggal Expired</label>
+            <input type="date" id="createExpiredAt" name="expiredAt"
+              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:dark]">
+            <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada batas waktu.</p>
           </div>
 
           <div class="mb-6">
@@ -582,7 +618,7 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
-function openEditModal(userId, username, role, status, avatar, diskLimit, packageName, streamLimit) {
+function openEditModal(userId, username, role, status, avatar, diskLimit, packageName, streamLimit, expiredAt) {
   document.getElementById('editUserId').value = userId;
   document.getElementById('editUsername').value = username;
   document.getElementById('editRole').value = role;
@@ -590,6 +626,7 @@ function openEditModal(userId, username, role, status, avatar, diskLimit, packag
   document.getElementById('editPackage').value = packageName || 'custom';
   document.getElementById('editStreamLimit').value = streamLimit || 0;
   document.getElementById('editPassword').value = '';
+  document.getElementById('editExpiredAt').value = expiredAt || '';
   
   const diskLimitBytes = parseInt(diskLimit) || 0;
   const TB = 1099511627776;
@@ -665,8 +702,8 @@ function closeCreateModal() {
   }, 200);
 }
 
-function editUser(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit) {
-  openEditModal(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit);
+function editUser(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit, expiredAt) {
+  openEditModal(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit, expiredAt);
 }
 
 function autoFillLimits(prefix) {
@@ -703,6 +740,17 @@ function autoFillLimits(prefix) {
   
   if (pkg !== 'custom') {
     diskHidden.value = Math.round(parseFloat(diskValue.value) * parseInt(diskUnit.value));
+    // Auto-set expired 30 hari dari sekarang
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const editExpired = document.getElementById('editExpiredAt');
+    const createExpired = document.getElementById('createExpiredAt');
+    if (editExpired && prefix === 'edit') editExpired.value = dateStr;
+    if (createExpired && prefix === 'create') createExpired.value = dateStr;
   }
 }
 

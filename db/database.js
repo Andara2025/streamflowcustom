@@ -424,6 +424,12 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE users ADD COLUMN expired_at TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding expired_at column to users:', err.message);
+        }
+      });
+
       db.run(`CREATE TABLE IF NOT EXISTS app_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         setting_key TEXT UNIQUE NOT NULL,

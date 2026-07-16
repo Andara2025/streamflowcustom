@@ -1489,7 +1489,7 @@ app.post('/api/users/delete', isAdmin, async (req, res) => {
 
 app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res) => {
   try {
-    const { userId, username, role, status, password, diskLimit } = req.body;
+    const { userId, username, role, status, password, diskLimit, expiredAt } = req.body;
 
     if (!userId) {
       return res.status(400).json({
@@ -1516,7 +1516,8 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
       user_role: role || user.user_role,
       status: status || user.status,
       avatar_path: avatarPath,
-      disk_limit: diskLimit !== undefined && diskLimit !== '' ? parseInt(diskLimit) : user.disk_limit
+      disk_limit: diskLimit !== undefined && diskLimit !== '' ? parseInt(diskLimit) : user.disk_limit,
+      expired_at: expiredAt !== undefined && expiredAt !== '' ? expiredAt : (user.expired_at || null)
     };
 
     if (password && password.trim() !== '') {
@@ -1541,7 +1542,7 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
 
 app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res) => {
   try {
-    const { username, role, status, password, diskLimit } = req.body;
+    const { username, role, status, password, diskLimit, expiredAt } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({
@@ -1569,7 +1570,8 @@ app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res)
       user_role: role || 'user',
       status: status || 'active',
       avatar_path: avatarPath,
-      disk_limit: diskLimit ? parseInt(diskLimit) : 0
+      disk_limit: diskLimit ? parseInt(diskLimit) : 0,
+      expired_at: expiredAt || null
     };
 
     const result = await User.create(userData);
