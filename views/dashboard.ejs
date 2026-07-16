@@ -64,9 +64,9 @@
           <span id="memory-usage-mobile" class="text-xs font-bold text-white">0</span>
           <span id="memory-total-mobile" class="text-[10px] text-gray-400">/ 0</span>
         </div>
-        <% } else if (user.expired_at) { %>
+        <% } else { %>
         <% 
-          var expDateMobile = new Date(user.expired_at);
+          var expDateMobile = user.expired_at ? new Date(user.expired_at) : new Date(0);
           var nowMobile = new Date();
           var daysLeftMobile = Math.ceil((expDateMobile - nowMobile) / (1000*60*60*24));
         %>
@@ -130,9 +130,9 @@
         <div id="memory-bar" class="bg-primary h-2.5 rounded-full" style="width: 0%"></div>
       </div>
     </div>
-    <% } else if (user.expired_at) { %>
+    <% } else { %>
     <% 
-      var expDateGrid = new Date(user.expired_at);
+      var expDateGrid = user.expired_at ? new Date(user.expired_at) : new Date(0);
       var nowGrid = new Date();
       var daysLeftGrid = Math.ceil((expDateGrid - nowGrid) / (1000*60*60*24));
     %>
