@@ -156,13 +156,22 @@
       <div class="mt-4 flex items-center gap-3">
         <% if (!expDateGrid) { %>
           <i class="ti ti-alert-circle text-red-500 text-2xl"></i>
-          <p class="text-sm text-red-400 font-medium leading-tight">Belum ada paket aktif</p>
+          <div class="flex flex-col">
+            <p class="text-sm text-red-400 font-medium leading-tight">Belum ada paket aktif</p>
+            <a href="/" class="text-xs text-primary hover:text-white mt-1 underline transition-colors">Lihat Daftar Paket</a>
+          </div>
         <% } else if (daysLeftGrid <= 7 && daysLeftGrid >= 0) { %>
           <i class="ti ti-alert-triangle text-yellow-500 text-2xl"></i>
-          <p class="text-sm text-yellow-400 font-medium leading-tight">Paket segera berakhir</p>
+          <div class="flex flex-col">
+            <p class="text-sm text-yellow-400 font-medium leading-tight">Paket segera berakhir</p>
+            <a href="https://chat.whatsapp.com/FfgvEREd1ZtKJPNh8WD4If?s=cl&p=a&ilr=0&amv=0" target="_blank" class="text-xs text-primary hover:text-white mt-1 underline transition-colors">Perpanjang Sekarang</a>
+          </div>
         <% } else if (daysLeftGrid < 0) { %>
           <i class="ti ti-alert-circle text-red-500 text-2xl"></i>
-          <p class="text-sm text-red-400 font-medium leading-tight">Paket telah expired</p>
+          <div class="flex flex-col">
+            <p class="text-sm text-red-400 font-medium leading-tight">Paket telah expired</p>
+            <a href="https://chat.whatsapp.com/FfgvEREd1ZtKJPNh8WD4If?s=cl&p=a&ilr=0&amv=0" target="_blank" class="text-xs text-primary hover:text-white mt-1 underline transition-colors">Perpanjang Sekarang</a>
+          </div>
         <% } else { %>
           <i class="ti ti-check text-green-500 text-2xl"></i>
           <p class="text-sm text-green-400 font-medium leading-tight">Semua sistem normal</p>
