@@ -862,6 +862,9 @@ app.get('/dashboard', isAuthenticated, async (req, res) => {
       search: ''
     });
 
+    const AppSettings = require('./models/AppSettings');
+    const pricingSettings = await AppSettings.getPricingSettings();
+
     res.render('dashboard', {
       title: 'Dashboard',
       active: 'dashboard',
@@ -873,7 +876,8 @@ app.get('/dashboard', isAuthenticated, async (req, res) => {
       youtubeSubscriberCount: defaultChannel?.subscriber_count || '0',
       hasYoutubeCredentials: hasYoutubeCredentials,
       initialStreams: JSON.stringify(initialStreamsData.streams),
-      initialPagination: JSON.stringify(initialStreamsData.pagination)
+      initialPagination: JSON.stringify(initialStreamsData.pagination),
+      pricingSettings: pricingSettings
     });
   } catch (error) {
     console.error('Dashboard error:', error);
