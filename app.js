@@ -401,21 +401,7 @@ app.use('/uploads/avatars', (req, res, next) => {
     next();
   }
 });
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    res.status(429).render('login', {
-      title: 'Login',
-      error: 'Too many login attempts. Please try again in 15 minutes.'
-    });
-  },
-  requestWasSuccessful: (request, response) => {
-    return response.statusCode < 400;
-  }
-});
+const adminLoginAttempts = new Map();
 const loginDelayMiddleware = async (req, res, next) => {
   await new Promise(resolve => setTimeout(resolve, 1000));
   next();
@@ -451,7 +437,7 @@ app.get('/login', async (req, res) => {
     });
   }
 });
-app.post('/login', loginDelayMiddleware, loginLimiter, async (req, res) => {
+app.post('/login', loginDelayMiddleware, async (req, res) => {
   const { username, password } = req.body;
   const recaptchaResponse = req.body['g-recaptcha-response'];
 
@@ -495,13 +481,38 @@ app.post('/login', loginDelayMiddleware, loginLimiter, async (req, res) => {
         recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
       });
     }
+
+    if (user.user_role === 'admin') {
+      const attempts = adminLoginAttempts.get(username) || { count: 0, lockUntil: 0 };
+      if (attempts.lockUntil > Date.now()) {
+        return res.render('login', {
+          title: 'Login',
+          error: 'Terlalu banyak percobaan. Silakan coba lagi dalam 1 menit.',
+          recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
+        });
+      }
+    }
+
     const passwordMatch = await User.verifyPassword(password, user.password);
     if (!passwordMatch) {
+      if (user.user_role === 'admin') {
+        const attempts = adminLoginAttempts.get(username) || { count: 0, lockUntil: 0 };
+        attempts.count += 1;
+        if (attempts.count >= 5) {
+          attempts.lockUntil = Date.now() + 60 * 1000;
+          attempts.count = 0;
+        }
+        adminLoginAttempts.set(username, attempts);
+      }
       return res.render('login', {
         title: 'Login',
         error: 'Invalid username or password',
         recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
       });
+    }
+
+    if (user.user_role === 'admin') {
+      adminLoginAttempts.delete(username);
     }
 
     if (user.status === 'trial') {
@@ -540,6 +551,191 @@ app.post('/login', loginDelayMiddleware, loginLimiter, async (req, res) => {
       title: 'Login',
       error: 'An error occurred during login. Please try again.',
       recaptchaSiteKey: null
+    });
+  }
+});
+
+const nodemailer = require('nodemailer');
+
+app.get('/forgot-password', (req, res) => {
+  res.render('forgot-password', {
+    title: 'Forgot Password',
+    error: null,
+    success: null
+  });
+});
+
+app.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE email = ?', [email], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (!user) {
+      return res.render('forgot-password', {
+        title: 'Forgot Password',
+        error: 'Email not found in our database.',
+        success: null
+      });
+    }
+
+    const token = require('crypto').randomBytes(20).toString('hex');
+    const expires = Date.now() + 3600000; // 1 hour
+
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE users SET reset_password_token = ?, reset_password_expires = ? WHERE id = ?', 
+        [token, expires, user.id], 
+        (err) => {
+          if (err) reject(err);
+          resolve();
+        });
+    });
+
+    const AppSettings = require('./models/AppSettings');
+    const smtpSettingsStr = await AppSettings.get('smtp_settings');
+    let transporter;
+    
+    if (smtpSettingsStr) {
+      const smtpSettings = JSON.parse(smtpSettingsStr);
+      transporter = nodemailer.createTransport({
+        host: smtpSettings.host,
+        port: smtpSettings.port,
+        secure: smtpSettings.secure,
+        auth: {
+          user: smtpSettings.user,
+          pass: smtpSettings.pass
+        }
+      });
+    } else {
+      // Dummy transporter for demonstration if SMTP is not set
+      console.warn("SMTP is not configured. The email will just be logged.");
+      transporter = {
+        sendMail: async (opts) => {
+          console.log(`[DEV MODE] Password reset email would be sent to ${opts.to} with content: ${opts.text}`);
+        }
+      };
+    }
+
+    const resetUrl = `http://${req.headers.host}/reset-password/${token}`;
+    
+    const mailOptions = {
+      from: '"PEJUANG MONET" <noreply@pejuangmonet.com>',
+      to: user.email,
+      subject: 'Password Reset Request - PEJUANG MONET',
+      text: `Anda menerima email ini karena Anda (atau orang lain) meminta pengaturan ulang kata sandi untuk akun Anda.\n\n` +
+            `Silakan klik tautan berikut, atau tempel di browser Anda untuk menyelesaikan proses:\n\n` +
+            `${resetUrl}\n\n` +
+            `Jika Anda tidak meminta ini, abaikan email ini dan kata sandi Anda tidak akan berubah.\n`
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (mailErr) {
+      console.error('Error sending email:', mailErr);
+      return res.render('forgot-password', {
+        title: 'Forgot Password',
+        error: 'Error sending email. Please check SMTP settings.',
+        success: null
+      });
+    }
+
+    res.render('forgot-password', {
+      title: 'Forgot Password',
+      error: null,
+      success: 'An email has been sent with further instructions.'
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.render('forgot-password', {
+      title: 'Forgot Password',
+      error: 'An error occurred. Please try again.',
+      success: null
+    });
+  }
+});
+
+app.get('/reset-password/:token', async (req, res) => {
+  try {
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE reset_password_token = ? AND reset_password_expires > ?', 
+        [req.params.token, Date.now()], 
+        (err, row) => {
+          if (err) reject(err);
+          resolve(row);
+        });
+    });
+
+    if (!user) {
+      return res.render('forgot-password', {
+        title: 'Forgot Password',
+        error: 'Password reset token is invalid or has expired.',
+        success: null
+      });
+    }
+
+    res.render('reset-password', {
+      title: 'Reset Password',
+      token: req.params.token,
+      error: null
+    });
+  } catch (error) {
+    console.error('Reset password form error:', error);
+    res.redirect('/login');
+  }
+});
+
+app.post('/reset-password/:token', async (req, res) => {
+  try {
+    const { password, confirmPassword } = req.body;
+    
+    if (password !== confirmPassword) {
+      return res.render('reset-password', {
+        title: 'Reset Password',
+        token: req.params.token,
+        error: 'Passwords do not match.'
+      });
+    }
+
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE reset_password_token = ? AND reset_password_expires > ?', 
+        [req.params.token, Date.now()], 
+        (err, row) => {
+          if (err) reject(err);
+          resolve(row);
+        });
+    });
+
+    if (!user) {
+      return res.render('forgot-password', {
+        title: 'Forgot Password',
+        error: 'Password reset token is invalid or has expired.',
+        success: null
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE users SET password = ?, reset_password_token = NULL, reset_password_expires = NULL WHERE id = ?', 
+        [hashedPassword, user.id], 
+        (err) => {
+          if (err) reject(err);
+          resolve();
+        });
+    });
+
+    res.redirect('/login?reset=success');
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.render('reset-password', {
+      title: 'Reset Password',
+      token: req.params.token,
+      error: 'An error occurred. Please try again.'
     });
   }
 });
@@ -1351,6 +1547,7 @@ app.get('/users', isProAdmin, async (req, res) => {
     
     const AppSettings = require('./models/AppSettings');
     const pricingSettings = await AppSettings.getPricingSettings();
+    const sysStats = await systemMonitor.getSystemStats();
 
     res.render('users', {
       title: 'User Management',
@@ -1359,6 +1556,7 @@ app.get('/users', isProAdmin, async (req, res) => {
       totalUsers,
       totalActiveStreams,
       totalStorageUsed: formatGlobalFileSize(totalStorageBytes),
+      totalStorageFree: sysStats.disk ? sysStats.disk.free : '0 B',
       user: req.user,
       pricingSettings
     });

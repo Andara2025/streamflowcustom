@@ -430,6 +430,24 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE users ADD COLUMN reset_password_token TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding reset_password_token column to users:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE users ADD COLUMN reset_password_expires TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding reset_password_expires column to users:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE users ADD COLUMN email TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding email column to users:', err.message);
+        }
+      });
+
       db.run(`CREATE TABLE IF NOT EXISTS app_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         setting_key TEXT UNIQUE NOT NULL,
