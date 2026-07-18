@@ -893,8 +893,8 @@ app.get('/dashboard', isAuthenticated, async (req, res) => {
       youtubeChannelThumbnail: defaultChannel?.channel_thumbnail || '',
       youtubeSubscriberCount: defaultChannel?.subscriber_count || '0',
       hasYoutubeCredentials: hasYoutubeCredentials,
-      initialStreams: JSON.stringify(initialStreamsData.streams),
-      initialPagination: JSON.stringify(initialStreamsData.pagination),
+      initialStreams: initialStreamsData.streams,
+      initialPagination: initialStreamsData.pagination,
       pricingSettings: pricingSettings
     });
   } catch (error) {
