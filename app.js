@@ -554,6 +554,13 @@ app.post('/login', loginDelayMiddleware, async (req, res) => {
     });
   }
 });
+
+app.get('/forgot-password', (req, res) => {
+  res.render('forgot-password', {
+    title: 'Forgot Password'
+  });
+});
+
 app.get('/logout', (req, res) => {
   req.session.destroy();
   res.redirect('/login');
