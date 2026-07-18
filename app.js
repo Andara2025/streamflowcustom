@@ -551,12 +551,6 @@ app.post('/login', loginDelayMiddleware, async (req, res) => {
       title: 'Login',
       error: 'An error occurred during login. Please try again.',
       recaptchaSiteKey: null
-  } catch (error) {
-    console.error('Login error:', error);
-    res.render('login', {
-      title: 'Login',
-      error: 'An error occurred during login. Please try again.',
-      recaptchaSiteKey: null
     });
   }
 });
