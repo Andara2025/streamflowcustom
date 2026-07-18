@@ -3,7 +3,7 @@ const Stream = require('../models/Stream');
 const User = require('../models/User');
 const streamingService = require('./streamingService');
 const { google } = require('googleapis');
-const { decrypt } = require('../utils/encryption');
+const { encrypt, decrypt } = require('../utils/encryption');
 const path = require('path');
 const fs = require('fs');
 const { syncBroadcastMonetization, sanitizeYouTubeTags } = require('./youtubeService');
@@ -310,6 +310,19 @@ async function startRotationStream(rotation, item) {
       refresh_token: decrypt(selectedChannel.refresh_token)
     });
 
+    oauth2Client.on('tokens', async (tokens) => {
+      if (tokens.access_token) {
+        await YoutubeChannel.update(selectedChannel.id, {
+          access_token: encrypt(tokens.access_token)
+        });
+      }
+      if (tokens.refresh_token) {
+        await YoutubeChannel.update(selectedChannel.id, {
+          refresh_token: encrypt(tokens.refresh_token)
+        });
+      }
+    });
+
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
     const scheduledStartTime = new Date().toISOString();
@@ -517,6 +530,19 @@ async function stopRotationStream(rotation, item) {
             oauth2Client.setCredentials({
               access_token: decrypt(selectedChannel.access_token),
               refresh_token: decrypt(selectedChannel.refresh_token)
+            });
+
+            oauth2Client.on('tokens', async (tokens) => {
+              if (tokens.access_token) {
+                await YoutubeChannel.update(selectedChannel.id, {
+                  access_token: encrypt(tokens.access_token)
+                });
+              }
+              if (tokens.refresh_token) {
+                await YoutubeChannel.update(selectedChannel.id, {
+                  refresh_token: encrypt(tokens.refresh_token)
+                });
+              }
             });
 
             const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
