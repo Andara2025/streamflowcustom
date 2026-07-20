@@ -31,7 +31,7 @@ const multer = require('multer');
 const csrf = require('csrf');
 const { v4: uuidv4 } = require('uuid');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
+const FileStore = require('session-file-store')(session);
 const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
@@ -134,10 +134,10 @@ app.locals.helpers = {
   }
 };
 app.use(session({
-  store: new SQLiteStore({
-    db: 'sessions.db',
-    dir: path.join(__dirname, 'db'),
-    table: 'sessions'
+  store: new FileStore({
+    path: path.join(__dirname, 'db', 'sessions'),
+    ttl: 86400,
+    retries: 0
   }),
   secret: process.env.SESSION_SECRET,
   resave: false,
