@@ -139,7 +139,7 @@ app.use(session({
     ttl: 86400,
     retries: 0
   }),
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'streamflow-secret-key-2026',
   resave: false,
   saveUninitialized: false,
   rolling: true,
