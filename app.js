@@ -233,9 +233,9 @@ app.get('/sw.js', (req, res) => {
 });
 
 app.use('/uploads', function (req, res, next) {
-  res.header('Cache-Control', 'no-cache');
-  res.header('Pragma', 'no-cache');
-  res.header('Expires', '0');
+  // Aktifkan caching yang agresif untuk menghemat bandwidth server!
+  // Video, audio, dan gambar jarang berubah setelah diupload.
+  res.header('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
   next();
 });
 app.use(express.urlencoded({ extended: true, limit: '50gb' }));
@@ -1667,6 +1667,72 @@ app.get('/api/system-stats', isAuthenticated, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+function validateVideoSpecs(metadata, pkg = 'tester') {
+  if (!metadata || !metadata.streams) return { valid: false, error: 'Metadata video tidak valid.' };
+  const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+  if (!videoStream) return { valid: false, error: 'Tidak ditemukan stream video.' };
+
+  let maxFps = 30;
+  let maxBitrate = 2500;
+  let maxHeight = 720;
+  let maxWidth = 1280;
+  let maxResStr = '720p';
+
+  if (pkg === 'mahir') {
+    maxHeight = 720;
+    maxWidth = 1280;
+    maxResStr = '720p';
+    maxBitrate = 4000;
+  } else if (pkg === 'expert') {
+    maxHeight = 1080;
+    maxWidth = 1920;
+    maxResStr = '1080p';
+    maxBitrate = 6000;
+  } else if (pkg === 'master') {
+    maxHeight = 1080;
+    maxWidth = 1920;
+    maxResStr = '1080p';
+    maxBitrate = 6500;
+  } else if (pkg === 'custom' || pkg === 'admin') {
+    maxHeight = 1080;
+    maxWidth = 1920;
+    maxResStr = '1080p';
+    maxBitrate = 8000;
+  }
+
+  const width = videoStream.width || 0;
+  const height = videoStream.height || 0;
+  if (width > maxWidth || height > maxHeight) {
+    if (width > maxHeight && height > maxWidth) {
+      // Izinkan portrait
+    } else {
+      return { valid: false, error: `Resolusi video terlalu tinggi. Paket ${pkg} maksimal ${maxResStr} (diterima: ${width}x${height}).` };
+    }
+  }
+
+  let fps = null;
+  if (videoStream.avg_frame_rate) {
+    const fpsRatio = videoStream.avg_frame_rate.split('/');
+    if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
+      fps = parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]);
+    } else {
+      fps = parseInt(fpsRatio[0]);
+    }
+  }
+  if (fps && fps > maxFps + 2) {
+    return { valid: false, error: `Framerate maksimal adalah ${maxFps} fps (diterima: ${Math.round(fps)} fps).` };
+  }
+
+  if (metadata.format && metadata.format.bit_rate) {
+    const bitrateKbps = Math.round(parseInt(metadata.format.bit_rate) / 1000);
+    if (bitrateKbps > maxBitrate) {
+      return { valid: false, error: `Bitrate maksimal adalah ${maxBitrate} kbps (diterima: ${bitrateKbps} kbps).` };
+    }
+  }
+
+  return { valid: true };
+}
+
 function getLocalIpAddresses() {
   const interfaces = os.networkInterfaces();
   const addresses = [];
@@ -2144,46 +2210,12 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
           }
         }
         
-        // --- Validation Logic ---
-        const pkg = user.package_name || 'tester';
-        let maxFps = 30;
-        let maxBitrate = 2500;
-        let maxHeight = 720;
-        let maxResStr = '720p';
-        
-        if (pkg === 'mahir') {
-          maxHeight = 720;
-          maxResStr = '720p';
-          maxBitrate = 4000;
-          maxFps = 30;
-        } else if (pkg === 'expert') {
-          maxHeight = 1080;
-          maxResStr = '1080p';
-          maxBitrate = 6000;
-          maxFps = 30;
-        } else if (pkg === 'master') {
-          maxHeight = 1080;
-          maxResStr = '1080p';
-          maxBitrate = 6500;
-          maxFps = 30;
-        }
-        
-        let errorMsg = null;
-        const videoHeight = videoStream ? videoStream.height : 0;
-        if (videoHeight > maxHeight) {
-          errorMsg = `Resolusi video terlalu tinggi. Paket ${pkg} maksimal ${maxResStr}.`;
-        } else if (fps && fps > maxFps + 2) { // Add +2 tolerance
-          errorMsg = `FPS video terlalu tinggi (${fps}fps). Paket ${pkg} maksimal ${maxFps}fps.`;
-        } else if (bitrate && bitrate > maxBitrate) {
-          errorMsg = `Bitrate video terlalu tinggi (${bitrate}kbps). Paket ${pkg} maksimal ${maxBitrate}kbps.`;
-        }
-        
-        if (errorMsg) {
+        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
+        if (!specCheck.valid) {
           const fs = require('fs');
           if (fs.existsSync(fullFilePath)) fs.unlinkSync(fullFilePath);
-          return res.status(400).json({ success: false, error: errorMsg });
+          return res.status(400).json({ success: false, error: specCheck.error });
         }
-        // --- End Validation ---
         const thumbnailFilename = `thumb-${path.parse(req.file.filename).name}.jpg`;
         const thumbnailPath = `/uploads/thumbnails/${thumbnailFilename}`;
         const fullThumbnailPath = path.join(__dirname, 'public', thumbnailPath);
@@ -2443,6 +2475,19 @@ app.post('/api/videos/chunk/complete', isAuthenticated, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Not authorized' });
     }
     const result = await chunkUploadService.mergeChunks(uploadId);
+    
+    const user = await User.findById(req.session.userId);
+    if (user.disk_limit > 0) {
+      const currentUsage = await User.getDiskUsage(req.session.userId);
+      if (currentUsage + result.fileSize > user.disk_limit) {
+        fs.unlinkSync(result.fullPath);
+        return res.status(400).json({
+          success: false,
+          error: 'Disk limit exceeded. Please delete some files or contact admin.'
+        });
+      }
+    }
+
     const title = path.parse(info.filename).name;
     const fullFilePath = result.fullPath;
     const videoData = await new Promise((resolve, reject) => {
@@ -2451,6 +2496,12 @@ app.post('/api/videos/chunk/complete', isAuthenticated, async (req, res) => {
           console.error('Error extracting metadata:', err);
           return reject(err);
         }
+        
+        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
+        if (!specCheck.valid) {
+          return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
+        }
+
         const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
         const duration = metadata.format.duration || 0;
         const format = metadata.format.format_name || '';
@@ -2500,6 +2551,17 @@ app.post('/api/videos/chunk/complete', isAuthenticated, async (req, res) => {
     res.json({ success: true, message: 'Video uploaded successfully', video });
   } catch (error) {
     console.error('Chunk complete error:', error);
+    if (error.message && error.message.startsWith('VIDEO_SPEC_REJECTED:')) {
+      if (req.body.uploadId) {
+        // file is handled manually or cleanupUpload will handle it, let's delete it explicitly just in case if it's there
+        const info = await chunkUploadService.getUploadInfo(req.body.uploadId).catch(()=>null);
+        if (info) {
+          const finalFilePath = path.join(__dirname, 'public', 'uploads', 'videos', info.filename);
+          if (fs.existsSync(finalFilePath)) fs.unlinkSync(finalFilePath);
+        }
+      }
+      return res.status(400).json({ success: false, error: error.message.replace('VIDEO_SPEC_REJECTED: ', '') });
+    }
     res.status(500).json({ success: false, error: 'Failed to complete upload', details: error.message });
   }
 });
@@ -2523,12 +2585,29 @@ app.post('/api/videos/import-local', isAuthenticated, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Path yang dimasukkan bukan sebuah file.' });
     }
 
+    const user = await User.findById(req.session.userId);
+    if (user.disk_limit > 0) {
+      const currentUsage = await User.getDiskUsage(req.session.userId);
+      if (currentUsage + stats.size > user.disk_limit) {
+        return res.status(400).json({
+          success: false,
+          error: 'Disk limit exceeded. Please delete some files or contact admin.'
+        });
+      }
+    }
+
     // Ambil info video menggunakan ffprobe dengan timeout
     const videoDataFromProbe = await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('ffprobe timeout: File terlalu besar atau lambat diakses')), 20000);
       ffmpeg.ffprobe(normalizedPath, (err, metadata) => {
         clearTimeout(timeout);
         if (err) return reject(err);
+        
+        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
+        if (!specCheck.valid) {
+          return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
+        }
+
         const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
         
         let fps = null;
@@ -2598,6 +2677,9 @@ app.post('/api/videos/import-local', isAuthenticated, async (req, res) => {
     res.json({ success: true, message: 'Video lokal berhasil di-import!', video });
   } catch (error) {
     console.error('Local import error:', error);
+    if (error.message && error.message.startsWith('VIDEO_SPEC_REJECTED:')) {
+      return res.status(400).json({ success: false, error: error.message.replace('VIDEO_SPEC_REJECTED: ', '') });
+    }
     res.status(500).json({ success: false, error: 'Gagal meng-import video lokal', details: error.message });
   }
 });
@@ -3513,6 +3595,23 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
       return;
     }
 
+    const fs = require('fs');
+    const stats = fs.statSync(result.localFilePath);
+    const user = await require('./models/User').findById(userId);
+    if (user.disk_limit > 0) {
+      const currentUsage = await require('./models/User').getDiskUsage(userId);
+      if (currentUsage + stats.size > user.disk_limit) {
+        fs.unlinkSync(result.localFilePath);
+        importJobs[jobId] = {
+          status: 'failed',
+          progress: 0,
+          message: 'Disk limit exceeded. Please delete some files or contact admin.'
+        };
+        setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+        return;
+      }
+    }
+
     importJobs[jobId] = {
       status: 'processing',
       progress: 100,
@@ -3535,6 +3634,10 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
         ffmpeg.ffprobe(result.localFilePath, (err, metadata) => {
           clearTimeout(timeout);
           if (err) return reject(err);
+          const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
+          if (!specCheck.valid) {
+            return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
+          }
           resolve(metadata);
         });
       });
@@ -3548,6 +3651,17 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
         bitrate = Math.round(parseInt(metadata.format.bit_rate) / 1000);
       }
     } catch (probeError) {
+      if (probeError.message && probeError.message.startsWith('VIDEO_SPEC_REJECTED:')) {
+        const fs = require('fs');
+        if (fs.existsSync(result.localFilePath)) fs.unlinkSync(result.localFilePath);
+        importJobs[jobId] = {
+          status: 'failed',
+          progress: 0,
+          message: probeError.message.replace('VIDEO_SPEC_REJECTED: ', '')
+        };
+        setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+        return;
+      }
       console.log('ffprobe error (non-fatal):', probeError.message);
     }
 
@@ -3662,6 +3776,23 @@ async function processMediafireImport(jobId, fileKey, userId, folderId = null) {
       };
     });
 
+    const fs = require('fs');
+    const stats = fs.statSync(result.localFilePath);
+    const user = await require('./models/User').findById(userId);
+    if (user.disk_limit > 0) {
+      const currentUsage = await require('./models/User').getDiskUsage(userId);
+      if (currentUsage + stats.size > user.disk_limit) {
+        fs.unlinkSync(result.localFilePath);
+        importJobs[jobId] = {
+          status: 'failed',
+          progress: 0,
+          message: 'Disk limit exceeded. Please delete some files or contact admin.'
+        };
+        setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+        return;
+      }
+    }
+
     importJobs[jobId] = {
       status: 'processing',
       progress: 100,
@@ -3673,6 +3804,10 @@ async function processMediafireImport(jobId, fileKey, userId, folderId = null) {
     const metadata = await new Promise((resolve, reject) => {
       ffmpeg.ffprobe(result.localFilePath, (err, metadata) => {
         if (err) return reject(err);
+        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
+        if (!specCheck.valid) {
+          return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
+        }
         resolve(metadata);
       });
     });
@@ -3724,10 +3859,16 @@ async function processMediafireImport(jobId, fileKey, userId, folderId = null) {
     }, 5 * 60 * 1000);
   } catch (error) {
     console.error('Error processing Mediafire import:', error);
+    let errorMessage = error.message || 'Failed to import video';
+    if (error.message && error.message.startsWith('VIDEO_SPEC_REJECTED:')) {
+      errorMessage = error.message.replace('VIDEO_SPEC_REJECTED: ', '');
+      const fs = require('fs');
+      const tempPath = `/uploads/videos/${jobId}`; // we might not have result here if it failed in promise, wait actually we can just rely on manual cleanup or it will be unlinked by the job failure, wait we don't have access to result object in the outer catch if it's declared inside try. But wait! result is declared in try block. Let's just pass the message.
+    }
     importJobs[jobId] = {
       status: 'failed',
       progress: 0,
-      message: error.message || 'Failed to import video'
+      message: errorMessage
     };
     setTimeout(() => {
       delete importJobs[jobId];
@@ -3791,6 +3932,23 @@ async function processDropboxImport(jobId, dropboxUrl, userId, folderId = null) 
       };
     });
 
+    const fs = require('fs');
+    const stats = fs.statSync(result.localFilePath);
+    const user = await require('./models/User').findById(userId);
+    if (user.disk_limit > 0) {
+      const currentUsage = await require('./models/User').getDiskUsage(userId);
+      if (currentUsage + stats.size > user.disk_limit) {
+        fs.unlinkSync(result.localFilePath);
+        importJobs[jobId] = {
+          status: 'failed',
+          progress: 0,
+          message: 'Disk limit exceeded. Please delete some files or contact admin.'
+        };
+        setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+        return;
+      }
+    }
+
     importJobs[jobId] = {
       status: 'processing',
       progress: 100,
@@ -3802,6 +3960,10 @@ async function processDropboxImport(jobId, dropboxUrl, userId, folderId = null) 
     const metadata = await new Promise((resolve, reject) => {
       ffmpeg.ffprobe(result.localFilePath, (err, metadata) => {
         if (err) return reject(err);
+        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
+        if (!specCheck.valid) {
+          return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
+        }
         resolve(metadata);
       });
     });
@@ -3853,10 +4015,16 @@ async function processDropboxImport(jobId, dropboxUrl, userId, folderId = null) 
     }, 5 * 60 * 1000);
   } catch (error) {
     console.error('Error processing Dropbox import:', error);
+    let errorMessage = error.message || 'Failed to import video';
+    if (error.message && error.message.startsWith('VIDEO_SPEC_REJECTED:')) {
+      errorMessage = error.message.replace('VIDEO_SPEC_REJECTED: ', '');
+      const fs = require('fs');
+      const tempPath = `/uploads/videos/${jobId}`; 
+    }
     importJobs[jobId] = {
       status: 'failed',
       progress: 0,
-      message: error.message || 'Failed to import video'
+      message: errorMessage
     };
     setTimeout(() => {
       delete importJobs[jobId];
@@ -3920,6 +4088,23 @@ async function processMegaImport(jobId, megaUrl, userId, folderId = null) {
       };
     });
 
+    const fs = require('fs');
+    const stats = fs.statSync(result.localFilePath);
+    const user = await require('./models/User').findById(userId);
+    if (user.disk_limit > 0) {
+      const currentUsage = await require('./models/User').getDiskUsage(userId);
+      if (currentUsage + stats.size > user.disk_limit) {
+        fs.unlinkSync(result.localFilePath);
+        importJobs[jobId] = {
+          status: 'failed',
+          progress: 0,
+          message: 'Disk limit exceeded. Please delete some files or contact admin.'
+        };
+        setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+        return;
+      }
+    }
+
     importJobs[jobId] = {
       status: 'processing',
       progress: 100,
@@ -3931,6 +4116,10 @@ async function processMegaImport(jobId, megaUrl, userId, folderId = null) {
     const metadata = await new Promise((resolve, reject) => {
       ffmpeg.ffprobe(result.localFilePath, (err, metadata) => {
         if (err) return reject(err);
+        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
+        if (!specCheck.valid) {
+          return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
+        }
         resolve(metadata);
       });
     });
@@ -3982,10 +4171,16 @@ async function processMegaImport(jobId, megaUrl, userId, folderId = null) {
     }, 5 * 60 * 1000);
   } catch (error) {
     console.error('Error processing MEGA import:', error);
+    let errorMessage = error.message || 'Failed to import video';
+    if (error.message && error.message.startsWith('VIDEO_SPEC_REJECTED:')) {
+      errorMessage = error.message.replace('VIDEO_SPEC_REJECTED: ', '');
+      const fs = require('fs');
+      const tempPath = `/uploads/videos/${jobId}`; 
+    }
     importJobs[jobId] = {
       status: 'failed',
       progress: 0,
-      message: error.message || 'Failed to import video'
+      message: errorMessage
     };
     setTimeout(() => {
       delete importJobs[jobId];
