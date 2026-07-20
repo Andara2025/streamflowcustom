@@ -5,7 +5,12 @@
     <h2 class="text-2xl font-bold">User Management</h2>
     <p class="text-gray-400 text-sm mt-1">Manage user accounts and permissions</p>
   </div>
-  <div>
+  <div class="flex items-center gap-2">
+    <a href="/admin/users/export" 
+      class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors flex items-center shadow-lg shadow-emerald-500/20">
+      <i class="ti ti-download mr-1.5"></i>
+      <span>Backup / Export</span>
+    </a>
     <button onclick="openCreateModal()" 
       class="px-4 py-2 bg-primary hover:bg-rose-600 text-white rounded-lg transition-colors flex items-center">
       <i class="ti ti-plus mr-1.5"></i>

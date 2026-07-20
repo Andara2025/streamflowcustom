@@ -1298,6 +1298,26 @@ app.delete('/api/history/:id', isAuthenticated, async (req, res) => {
   }
 });
 
+app.get('/admin/users/export', isProAdmin, async (req, res) => {
+  try {
+    const users = await User.findAll();
+    let csv = 'ID,Username,Email,Role,Status,Package,Stream Limit,Disk Limit,Expired At,Created At\n';
+    
+    users.forEach(user => {
+      const escapedUsername = user.username ? `"${user.username.replace(/"/g, '""')}"` : '';
+      const escapedEmail = user.email ? `"${user.email.replace(/"/g, '""')}"` : '';
+      csv += `${user.id},${escapedUsername},${escapedEmail},${user.user_role},${user.status},${user.package_name || 'custom'},${user.stream_limit || 0},${user.disk_limit || 0},${user.expired_at || ''},${user.created_at}\n`;
+    });
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=streamflow_users_backup.csv');
+    res.send(csv);
+  } catch (error) {
+    console.error('Export Error:', error);
+    res.status(500).send('Failed to export users');
+  }
+});
+
 app.get('/users', isProAdmin, async (req, res) => {
   try {
     const users = await User.findAll();
