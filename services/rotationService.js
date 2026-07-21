@@ -273,13 +273,44 @@ async function startRotationStream(rotation, item) {
     await streamingService.validateCopyModeCompatibilityForInput({
       videoId: actualVideoId,
       useAdvancedSettings: false,
-      isYouTubeApi: true
+      isYouTubeApi: !(rotation.rtmp_url && rotation.stream_key)
     });
 
     const user = await User.findById(rotation.user_id);
     if (!user) {
       console.error('[RotationService] User not found');
       return { success: false, error: 'User not found' };
+    }
+
+    if (rotation.rtmp_url && rotation.stream_key && !rotation.youtube_channel_id) {
+      console.log(`[RotationService] Using custom RTMP for rotation ${rotation.name}`);
+      
+      const stream = await Stream.create({
+        title: item.title,
+        video_id: actualVideoId,
+        rtmp_url: rotation.rtmp_url,
+        stream_key: rotation.stream_key,
+        platform: 'Custom RTMP',
+        platform_icon: 'broadcast',
+        loop_video: true,
+        use_advanced_settings: false,
+        status: 'scheduled',
+        user_id: rotation.user_id,
+        is_youtube_api: false,
+        schedule_time: rotation.start_time,
+        end_time: rotation.end_time
+      });
+
+      const startResult = await streamingService.startStream(stream.id);
+      if (!startResult.success) {
+        return {
+          success: false,
+          error: startResult.error,
+          code: startResult.code || null
+        };
+      }
+
+      return { success: true, streamId: stream.id, broadcastId: null };
     }
 
     const YoutubeChannel = require('../models/YoutubeChannel');

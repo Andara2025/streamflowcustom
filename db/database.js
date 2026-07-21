@@ -333,6 +333,18 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN rtmp_url TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding rtmp_url column to stream_rotations:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN stream_key TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding stream_key column to stream_rotations:', err.message);
+        }
+      });
+
       db.run(`ALTER TABLE users ADD COLUMN youtube_redirect_uri TEXT`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding youtube_redirect_uri column:', err.message);

@@ -1931,8 +1931,10 @@
           if (currentUserRole === 'admin' && data.disk) {
             const diskUsagePercent = data.disk.usagePercent;
 
-            document.getElementById('disk-used').textContent = data.disk.used;
-            document.getElementById('disk-total').textContent = ' / ' + data.disk.total;
+            const diskUsed = document.getElementById('disk-used');
+            const diskTotal = document.getElementById('disk-total');
+            if (diskUsed) diskUsed.textContent = data.disk.used;
+            if (diskTotal) diskTotal.textContent = ' / ' + data.disk.total;
             const diskUsedMobile = document.getElementById('disk-used-mobile');
             const diskTotalMobile = document.getElementById('disk-total-mobile');
             if (diskUsedMobile) diskUsedMobile.textContent = data.disk.used;
@@ -1956,15 +1958,18 @@
             }
             const colorClasses = ['bg-primary', 'bg-green-400', 'bg-yellow-500', 'bg-red-500'];
             colorClasses.forEach(cls => {
-              diskBar.classList.remove(cls);
+              if (diskBar) diskBar.classList.remove(cls);
               if (diskBarWide) diskBarWide.classList.remove(cls);
             });
 
-            diskBar.classList.add(barColor);
-            if (diskBarWide) diskBarWide.classList.add(barColor);
-
-            diskBar.style.width = diskUsagePercent + '%';
-            if (diskBarWide) diskBarWide.style.width = diskUsagePercent + '%';
+            if (diskBar) {
+              diskBar.classList.add(barColor);
+              diskBar.style.width = diskUsagePercent + '%';
+            }
+            if (diskBarWide) {
+              diskBarWide.classList.add(barColor);
+              diskBarWide.style.width = diskUsagePercent + '%';
+            }
           }
         })
         .catch(error => console.error('Error fetching system stats:', error));

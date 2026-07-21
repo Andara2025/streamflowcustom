@@ -5492,7 +5492,7 @@ app.post('/api/backup/restore', isAuthenticated, uploadBackup.single('backup'), 
 });
 
 const Rotation = require('./models/Rotation');
-const rotationService = require('./services/rotationService');
+const rotationService = require('./services/RotationService');
 
 app.get('/rotations', isAuthenticated, async (req, res) => {
   try {
@@ -5727,7 +5727,7 @@ app.get('/api/rotations/:id', isAuthenticated, async (req, res) => {
 
 app.post('/api/rotations', isAuthenticated, uploadThumbnail.any(), async (req, res) => {
   try {
-    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id, global_youtube_altered_content, global_youtube_made_for_kids } = req.body;
+    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id, global_youtube_altered_content, global_youtube_made_for_kids, rtmp_url, stream_key } = req.body;
 
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
 
@@ -5756,7 +5756,9 @@ app.post('/api/rotations', isAuthenticated, uploadThumbnail.any(), async (req, r
       repeat_mode: repeat_mode || 'daily',
       youtube_channel_id: youtube_channel_id || null,
       global_youtube_altered_content: global_youtube_altered_content === 'true' || global_youtube_altered_content === true,
-      global_youtube_made_for_kids: global_youtube_made_for_kids === 'true' || global_youtube_made_for_kids === true
+      global_youtube_made_for_kids: global_youtube_made_for_kids === 'true' || global_youtube_made_for_kids === true,
+      rtmp_url: rtmp_url || null,
+      stream_key: stream_key || null
     });
 
     const uploadedFiles = req.files || [];
@@ -5819,7 +5821,7 @@ app.put('/api/rotations/:id', isAuthenticated, uploadThumbnail.any(), async (req
       return res.status(403).json({ success: false, error: 'Not authorized' });
     }
 
-    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id, global_youtube_altered_content, global_youtube_made_for_kids } = req.body;
+    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id, global_youtube_altered_content, global_youtube_made_for_kids, rtmp_url, stream_key } = req.body;
 
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
 
@@ -5839,7 +5841,9 @@ app.put('/api/rotations/:id', isAuthenticated, uploadThumbnail.any(), async (req
       repeat_mode: repeat_mode || 'daily',
       youtube_channel_id: youtube_channel_id || null,
       global_youtube_altered_content: global_youtube_altered_content === 'true' || global_youtube_altered_content === true,
-      global_youtube_made_for_kids: global_youtube_made_for_kids === 'true' || global_youtube_made_for_kids === true
+      global_youtube_made_for_kids: global_youtube_made_for_kids === 'true' || global_youtube_made_for_kids === true,
+      rtmp_url: rtmp_url || null,
+      stream_key: stream_key || null
     }, req.session.userId);
 
     const existingItems = await Rotation.getItemsByRotationId(req.params.id);

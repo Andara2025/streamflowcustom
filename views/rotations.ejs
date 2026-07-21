@@ -353,31 +353,50 @@
               <input type="text" id="rotationName" name="rotationName" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary" placeholder="e.g., Lo-fi Jazz Stream" required>
             </div>
             <div>
-              <label class="text-sm font-medium text-white block mb-2">YouTube Channel</label>
-              <div class="relative" id="rotationChannelSelector">
-                <button type="button" onclick="toggleRotationChannelDropdown()" class="w-full flex items-center gap-3 px-3 py-2.5 bg-dark-700 border border-gray-600 rounded-lg hover:border-gray-500 focus:border-primary focus:ring-1 focus:ring-primary transition-colors text-left">
-                  <div class="w-6 h-6 rounded-full overflow-hidden bg-red-600 flex-shrink-0 flex items-center justify-center" id="rotationChannelThumbContainer">
-                    <img id="rotationChannelThumb" src="<%= typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0 ? (youtubeChannels.find(c => c.is_default) || youtubeChannels[0]).channel_thumbnail : '' %>" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.querySelector('.fallback-icon').classList.remove('hidden');">
-                    <i class="ti ti-brand-youtube text-white text-xs fallback-icon hidden"></i>
-                  </div>
-                  <span id="rotationChannelName" class="flex-1 text-sm text-white truncate"><%= typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0 ? (youtubeChannels.find(c => c.is_default) || youtubeChannels[0]).channel_name : 'Select Channel' %></span>
-                  <i class="ti ti-chevron-down text-gray-400 flex-shrink-0"></i>
-                </button>
-                <div id="rotationChannelDropdown" class="hidden absolute z-30 mt-1 w-full bg-dark-700 border border-gray-600 rounded-lg shadow-lg overflow-hidden">
-                  <% if (typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0) { %>
-                    <% youtubeChannels.forEach(function(channel) { %>
-                    <button type="button" onclick="selectRotationChannel('<%= channel.id %>', '<%= channel.channel_name %>', '<%= channel.channel_thumbnail %>')" class="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-600 text-left rotation-channel-option" data-channel-id="<%= channel.id %>">
-                      <div class="w-6 h-6 rounded-full overflow-hidden bg-red-600 flex-shrink-0 flex items-center justify-center">
-                        <img src="<%= channel.channel_thumbnail %>" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
-                        <i class="ti ti-brand-youtube text-white text-xs hidden"></i>
-                      </div>
-                      <span class="text-sm text-white truncate"><%= channel.channel_name %></span>
-                    </button>
-                    <% }); %>
-                  <% } %>
+              <label class="text-sm font-medium text-white block mb-2">Destination Type</label>
+              <select id="rotationDestinationType" onchange="toggleDestinationType()" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
+                <option value="youtube">YouTube Channel</option>
+                <option value="custom">Custom RTMP</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="youtubeChannelSection" class="mt-4">
+            <label class="text-sm font-medium text-white block mb-2">YouTube Channel</label>
+            <div class="relative" id="rotationChannelSelector">
+              <button type="button" onclick="toggleRotationChannelDropdown()" class="w-full flex items-center gap-3 px-3 py-2.5 bg-dark-700 border border-gray-600 rounded-lg hover:border-gray-500 focus:border-primary focus:ring-1 focus:ring-primary transition-colors text-left">
+                <div class="w-6 h-6 rounded-full overflow-hidden bg-red-600 flex-shrink-0 flex items-center justify-center" id="rotationChannelThumbContainer">
+                  <img id="rotationChannelThumb" src="<%= typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0 ? (youtubeChannels.find(c => c.is_default) || youtubeChannels[0]).channel_thumbnail : '' %>" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.querySelector('.fallback-icon').classList.remove('hidden');">
+                  <i class="ti ti-brand-youtube text-white text-xs fallback-icon hidden"></i>
                 </div>
-                <input type="hidden" id="rotationChannelId" name="rotationChannelId" value="<%= typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0 ? (youtubeChannels.find(c => c.is_default) || youtubeChannels[0]).id : '' %>">
+                <span id="rotationChannelName" class="flex-1 text-sm text-white truncate"><%= typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0 ? (youtubeChannels.find(c => c.is_default) || youtubeChannels[0]).channel_name : 'Select Channel' %></span>
+                <i class="ti ti-chevron-down text-gray-400 flex-shrink-0"></i>
+              </button>
+              <div id="rotationChannelDropdown" class="hidden absolute z-30 mt-1 w-full bg-dark-700 border border-gray-600 rounded-lg shadow-lg overflow-hidden">
+                <% if (typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0) { %>
+                  <% youtubeChannels.forEach(function(channel) { %>
+                  <button type="button" onclick="selectRotationChannel('<%= channel.id %>', '<%= channel.channel_name %>', '<%= channel.channel_thumbnail %>')" class="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-600 text-left rotation-channel-option" data-channel-id="<%= channel.id %>">
+                    <div class="w-6 h-6 rounded-full overflow-hidden bg-red-600 flex-shrink-0 flex items-center justify-center">
+                      <img src="<%= channel.channel_thumbnail %>" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
+                      <i class="ti ti-brand-youtube text-white text-xs hidden"></i>
+                    </div>
+                    <span class="text-sm text-white truncate"><%= channel.channel_name %></span>
+                  </button>
+                  <% }); %>
+                <% } %>
               </div>
+              <input type="hidden" id="rotationChannelId" name="rotationChannelId" value="<%= typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0 ? (youtubeChannels.find(c => c.is_default) || youtubeChannels[0]).id : '' %>">
+            </div>
+          </div>
+
+          <div id="customRtmpSection" class="mt-4 hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-sm font-medium text-white block mb-2">RTMP URL</label>
+              <input type="text" id="rotationRtmpUrl" name="rtmpUrl" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary" placeholder="rtmp://...">
+            </div>
+            <div>
+              <label class="text-sm font-medium text-white block mb-2">Stream Key</label>
+              <input type="text" id="rotationStreamKey" name="streamKey" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary" placeholder="xxxx-xxxx-xxxx-xxxx">
             </div>
           </div>
 
@@ -723,6 +742,13 @@ function openCreateRotationModal() {
   document.getElementById('rotationId').value = '';
   document.getElementById('rotationDurationBadge').textContent = 'Duration: 00:00';
   document.getElementById('globalMonetization').checked = false;
+  
+  if (document.getElementById('rotationDestinationType')) {
+    document.getElementById('rotationDestinationType').value = 'youtube';
+    document.getElementById('rotationRtmpUrl').value = '';
+    document.getElementById('rotationStreamKey').value = '';
+    if (typeof toggleDestinationType === 'function') toggleDestinationType();
+  }
   
   const now = new Date();
   const year = now.getFullYear();
@@ -1256,13 +1282,24 @@ async function saveRotation() {
     }
   }
   
-  const youtubeChannelId = document.getElementById('rotationChannelId').value;
+  const destinationType = document.getElementById('rotationDestinationType') ? document.getElementById('rotationDestinationType').value : 'youtube';
+  const youtubeChannelId = destinationType === 'youtube' ? document.getElementById('rotationChannelId').value : '';
+  const rtmpUrl = document.getElementById('rotationRtmpUrl') ? document.getElementById('rotationRtmpUrl').value : '';
+  const streamKey = document.getElementById('rotationStreamKey') ? document.getElementById('rotationStreamKey').value : '';
+  
+  if (destinationType === 'custom' && (!rtmpUrl || !streamKey)) {
+    showToast('error', 'Please fill in RTMP URL and Stream Key');
+    resetSaveBtn();
+    return;
+  }
   
   formData.append('name', name);
   formData.append('repeat_mode', repeatMode);
   formData.append('start_time', startDateTimeStr);
   formData.append('end_time', endDateTimeStr);
   formData.append('youtube_channel_id', youtubeChannelId);
+  formData.append('rtmp_url', destinationType === 'custom' ? rtmpUrl : '');
+  formData.append('stream_key', destinationType === 'custom' ? streamKey : '');
   formData.append('global_youtube_altered_content', globalAlteredContent);
   formData.append('global_youtube_made_for_kids', globalMadeForKids);
   formData.append('items', JSON.stringify(items));
@@ -1353,7 +1390,20 @@ async function editRotation(id) {
         document.querySelector('input[name="globalMadeForKids"][value="false"]').checked = true;
       }
       
-      if (rotation.youtube_channel_id) {
+      if (rotation.rtmp_url && rotation.stream_key && !rotation.youtube_channel_id) {
+        document.getElementById('rotationDestinationType').value = 'custom';
+        document.getElementById('rotationRtmpUrl').value = rotation.rtmp_url;
+        document.getElementById('rotationStreamKey').value = rotation.stream_key;
+        
+        document.getElementById('rotationChannelId').value = '';
+        document.getElementById('rotationChannelThumb').style.display = 'none';
+        const fallbackIcon = document.querySelector('#rotationChannelThumbContainer .fallback-icon');
+        if (fallbackIcon) fallbackIcon.classList.remove('hidden');
+        document.getElementById('rotationChannelName').textContent = 'Select Channel';
+      } else if (rotation.youtube_channel_id) {
+        document.getElementById('rotationDestinationType').value = 'youtube';
+        document.getElementById('rotationRtmpUrl').value = '';
+        document.getElementById('rotationStreamKey').value = '';
         document.getElementById('rotationChannelId').value = rotation.youtube_channel_id;
         if (rotation.youtube_channel_name) {
           document.getElementById('rotationChannelName').textContent = rotation.youtube_channel_name;
@@ -1365,13 +1415,17 @@ async function editRotation(id) {
           if (fallbackIcon) fallbackIcon.classList.add('hidden');
         }
       } else {
-        // Reset to "Select Channel" or placeholder if no channel ID in rotation
+        document.getElementById('rotationDestinationType').value = 'youtube';
+        document.getElementById('rotationRtmpUrl').value = '';
+        document.getElementById('rotationStreamKey').value = '';
         document.getElementById('rotationChannelId').value = '';
         document.getElementById('rotationChannelThumb').style.display = 'none';
         const fallbackIcon = document.querySelector('#rotationChannelThumbContainer .fallback-icon');
         if (fallbackIcon) fallbackIcon.classList.remove('hidden');
         document.getElementById('rotationChannelName').textContent = 'Select Channel';
       }
+      
+      if (typeof toggleDestinationType === 'function') toggleDestinationType();
       
       const channelSelectorBtn = document.querySelector('#rotationChannelSelector > button');
       if (rotation.status === 'active') {
@@ -1632,7 +1686,20 @@ async function duplicateRotation(id) {
         if (globalKidsRadio) globalKidsRadio.checked = true;
       }
       
-      if (rotation.youtube_channel_id) {
+      if (rotation.rtmp_url && rotation.stream_key && !rotation.youtube_channel_id) {
+        document.getElementById('rotationDestinationType').value = 'custom';
+        document.getElementById('rotationRtmpUrl').value = rotation.rtmp_url;
+        document.getElementById('rotationStreamKey').value = rotation.stream_key;
+        
+        document.getElementById('rotationChannelId').value = '';
+        document.getElementById('rotationChannelThumb').style.display = 'none';
+        const fallbackIcon = document.querySelector('#rotationChannelThumbContainer .fallback-icon');
+        if (fallbackIcon) fallbackIcon.classList.remove('hidden');
+        document.getElementById('rotationChannelName').textContent = 'Select Channel';
+      } else if (rotation.youtube_channel_id) {
+        document.getElementById('rotationDestinationType').value = 'youtube';
+        document.getElementById('rotationRtmpUrl').value = '';
+        document.getElementById('rotationStreamKey').value = '';
         document.getElementById('rotationChannelId').value = rotation.youtube_channel_id;
         if (rotation.youtube_channel_name) {
           document.getElementById('rotationChannelName').textContent = rotation.youtube_channel_name;
@@ -1643,7 +1710,13 @@ async function duplicateRotation(id) {
           const fallbackIcon = document.querySelector('#rotationChannelThumbContainer .fallback-icon');
           if (fallbackIcon) fallbackIcon.classList.add('hidden');
         }
+      } else {
+        document.getElementById('rotationDestinationType').value = 'youtube';
+        document.getElementById('rotationRtmpUrl').value = '';
+        document.getElementById('rotationStreamKey').value = '';
       }
+      
+      if (typeof toggleDestinationType === 'function') toggleDestinationType();
       
       // Populate items
       document.getElementById('rotationItemsContainer').innerHTML = '';
@@ -1876,6 +1949,22 @@ async function duplicateRotation(id) {
         openAiEnhanceModal(idx);
       }
     });
+    
+    window.toggleDestinationType = function() {
+      const type = document.getElementById('rotationDestinationType').value;
+      const ytSection = document.getElementById('youtubeChannelSection');
+      const customSection = document.getElementById('customRtmpSection');
+      
+      if (type === 'youtube') {
+        ytSection.classList.remove('hidden');
+        customSection.classList.add('hidden');
+        customSection.classList.remove('grid');
+      } else {
+        ytSection.classList.add('hidden');
+        customSection.classList.remove('hidden');
+        customSection.classList.add('grid');
+      }
+    };
   </script>
 
   <!-- AI Enhance Modal -->
