@@ -17,32 +17,12 @@
     </button>
     <input type="file" id="import-rotation-input" class="hidden" accept=".json" onchange="handleImportRotation(this)">
     
-    <% if (youtubeConnected) { %>
     <button onclick="openCreateRotationModal()" class="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary hover:bg-rose-600 text-white px-4 py-2 rounded-lg transition-colors">
       <i class="ti ti-plus"></i>
       <span>New Rotation</span>
     </button>
-    <% } %>
   </div>
 </div>
-
-<% if (!youtubeConnected) { %>
-<div class="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-6 mb-6">
-  <div class="flex items-start gap-4">
-    <div class="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-      <i class="ti ti-brand-youtube text-yellow-400 text-2xl"></i>
-    </div>
-    <div>
-      <h3 class="text-lg font-medium text-yellow-200">YouTube Connection Required</h3>
-      <p class="text-yellow-300/80 mt-1">To use Stream Rotations, you need to connect your YouTube account first.</p>
-      <a href="/settings?activeTab=integration" class="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg transition-colors">
-        <i class="ti ti-plug"></i>
-        <span>Connect YouTube</span>
-      </a>
-    </div>
-  </div>
-</div>
-<% } else { %>
 
 <% if (rotations && rotations.length > 0) { %>
 <div class="block md:hidden space-y-2">
@@ -328,7 +308,6 @@
   <h3 class="text-base md:text-lg font-medium text-gray-300 mb-1 md:mb-2">No Rotations Yet</h3>
   <p class="text-gray-500 text-sm md:text-base mb-4">Create your first rotation to auto-schedule YouTube streams</p>
 </div>
-<% } %>
 <% } %>
 
 <div id="createRotationModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay overflow-y-auto">
