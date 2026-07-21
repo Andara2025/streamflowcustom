@@ -411,7 +411,7 @@
             </div>
           </div>
 
-          <div>
+          <div id="youtubeMetadataSection">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
                 <label class="text-sm font-medium text-white block mb-2">Privacy</label>
@@ -1933,13 +1933,16 @@ async function duplicateRotation(id) {
       const type = document.getElementById('rotationDestinationType').value;
       const ytSection = document.getElementById('youtubeChannelSection');
       const customSection = document.getElementById('customRtmpSection');
+      const ytMetaSection = document.getElementById('youtubeMetadataSection');
       
       if (type === 'youtube') {
         ytSection.classList.remove('hidden');
+        if (ytMetaSection) ytMetaSection.classList.remove('hidden');
         customSection.classList.add('hidden');
         customSection.classList.remove('grid');
       } else {
         ytSection.classList.add('hidden');
+        if (ytMetaSection) ytMetaSection.classList.add('hidden');
         customSection.classList.remove('hidden');
         customSection.classList.add('grid');
       }
