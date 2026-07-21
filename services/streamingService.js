@@ -9,18 +9,28 @@ const Stream = require('../models/Stream');
 const Playlist = require('../models/Playlist');
 const Video = require('../models/Video');
 
-let ffmpegPath;
-if (fs.existsSync('/usr/bin/ffmpeg')) {
-  ffmpegPath = '/usr/bin/ffmpeg';
-} else {
-  ffmpegPath = ffmpegInstaller.path;
+const { execSync } = require('child_process');
+
+let ffmpegPath = ffmpegInstaller.path;
+try {
+  const cmd = process.platform === 'win32' ? 'where ffmpeg' : 'which ffmpeg';
+  const systemFfmpeg = execSync(cmd, { stdio: 'pipe' }).toString().split('\n')[0].trim();
+  if (systemFfmpeg) ffmpegPath = systemFfmpeg;
+} catch (e) {
+  if (fs.existsSync('/usr/bin/ffmpeg')) {
+    ffmpegPath = '/usr/bin/ffmpeg';
+  }
 }
 
-let ffprobePath;
-if (fs.existsSync('/usr/bin/ffprobe')) {
-  ffprobePath = '/usr/bin/ffprobe';
-} else {
-  ffprobePath = ffprobeInstaller.path;
+let ffprobePath = ffprobeInstaller.path;
+try {
+  const cmd = process.platform === 'win32' ? 'where ffprobe' : 'which ffprobe';
+  const systemFfprobe = execSync(cmd, { stdio: 'pipe' }).toString().split('\n')[0].trim();
+  if (systemFfprobe) ffprobePath = systemFfprobe;
+} catch (e) {
+  if (fs.existsSync('/usr/bin/ffprobe')) {
+    ffprobePath = '/usr/bin/ffprobe';
+  }
 }
 
 function shuffleArray(array) {

@@ -1,11 +1,20 @@
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-const { getVideoDurationInSeconds } = require('get-video-duration');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { getVideoDurationInSeconds } = require('get-video-duration');
 const { getUniqueFilename, paths } = require('./storage');
+
+let ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+try {
+  ffmpegPath = execSync(process.platform === 'win32' ? 'where ffmpeg' : 'which ffmpeg', { stdio: 'pipe' }).toString().split('\n')[0].trim() || ffmpegPath;
+} catch(e) {}
 ffmpeg.setFfmpegPath(ffmpegPath);
-const ffprobePath = require('@ffprobe-installer/ffprobe').path;
+
+let ffprobePath = require('@ffprobe-installer/ffprobe').path;
+try {
+  ffprobePath = execSync(process.platform === 'win32' ? 'where ffprobe' : 'which ffprobe', { stdio: 'pipe' }).toString().split('\n')[0].trim() || ffprobePath;
+} catch(e) {}
 ffmpeg.setFfprobePath(ffprobePath);
 
 const getVideoInfo = (filepath) => {

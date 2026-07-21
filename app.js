@@ -52,7 +52,13 @@ const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const streamingService = require('./services/streamingService');
 const schedulerService = require('./services/schedulerService');
 const packageJson = require('./package.json');
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+
+const { execSync } = require('child_process');
+let globalFfmpegPath = ffmpegInstaller.path;
+try {
+  globalFfmpegPath = execSync(process.platform === 'win32' ? 'where ffmpeg' : 'which ffmpeg', { stdio: 'pipe' }).toString().split('\n')[0].trim() || globalFfmpegPath;
+} catch (e) {}
+ffmpeg.setFfmpegPath(globalFfmpegPath);
 process.on('unhandledRejection', (reason, promise) => {
   console.error('-----------------------------------');
   console.error('UNHANDLED REJECTION AT:', promise);
@@ -4460,7 +4466,7 @@ app.post('/api/streams', isAuthenticated, [
       fps: parseInt(req.body.fps) || 30,
       orientation: req.body.orientation || 'horizontal',
       loop_video: req.body.loopVideo === 'true' || req.body.loopVideo === true,
-      use_advanced_settings: req.body.useAdvancedSettings === 'true' || req.body.useAdvancedSettings === true,
+      use_advanced_settings: false,
       user_id: req.session.userId
     };
     const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -4925,9 +4931,7 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
     if (req.body.loopVideo !== undefined) {
       updateData.loop_video = req.body.loopVideo === 'true' || req.body.loopVideo === true;
     }
-    if (req.body.useAdvancedSettings !== undefined) {
-      updateData.use_advanced_settings = req.body.useAdvancedSettings === 'true' || req.body.useAdvancedSettings === true;
-    }
+    updateData.use_advanced_settings = false;
     const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     function parseLocalDateTime(dateTimeString) {

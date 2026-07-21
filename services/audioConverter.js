@@ -1,10 +1,18 @@
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-const ffprobePath = require('@ffprobe-installer/ffprobe').path;
 const path = require('path');
 const fs = require('fs-extra');
+const { execSync } = require('child_process');
 
+let ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+try {
+  ffmpegPath = execSync(process.platform === 'win32' ? 'where ffmpeg' : 'which ffmpeg', { stdio: 'pipe' }).toString().split('\n')[0].trim() || ffmpegPath;
+} catch(e) {}
 ffmpeg.setFfmpegPath(ffmpegPath);
+
+let ffprobePath = require('@ffprobe-installer/ffprobe').path;
+try {
+  ffprobePath = execSync(process.platform === 'win32' ? 'where ffprobe' : 'which ffprobe', { stdio: 'pipe' }).toString().split('\n')[0].trim() || ffprobePath;
+} catch(e) {}
 ffmpeg.setFfprobePath(ffprobePath);
 
 const getAudioInfo = (filepath) => {
