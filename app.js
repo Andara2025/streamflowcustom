@@ -1728,12 +1728,12 @@ function validateVideoSpecs(metadata, pkg = 'tester') {
 
   const width = videoStream.width || 0;
   const height = videoStream.height || 0;
-  if (width > maxWidth || height > maxHeight) {
-    if (width > maxHeight && height > maxWidth) {
-      // Izinkan portrait
-    } else {
-      return { valid: false, error: `Resolusi video terlalu tinggi. Paket ${pkg} maksimal ${maxResStr} (diterima: ${width}x${height}).` };
-    }
+  
+  const isLandscapeValid = width <= maxWidth && height <= maxHeight;
+  const isPortraitValid = width <= maxHeight && height <= maxWidth;
+  
+  if (!isLandscapeValid && !isPortraitValid) {
+    return { valid: false, error: `Resolusi video terlalu tinggi. Paket ${pkg} maksimal ${maxResStr} (diterima: ${width}x${height}).` };
   }
 
   let fps = null;
@@ -1751,8 +1751,9 @@ function validateVideoSpecs(metadata, pkg = 'tester') {
 
   if (metadata.format && metadata.format.bit_rate) {
     const bitrateKbps = Math.round(parseInt(metadata.format.bit_rate) / 1000);
-    if (bitrateKbps > maxBitrate) {
-      return { valid: false, error: `Bitrate maksimal adalah ${maxBitrate} kbps (diterima: ${bitrateKbps} kbps).` };
+    const maxBitrateWithTolerance = Math.round(maxBitrate * 1.30); // 30% tolerance
+    if (bitrateKbps > maxBitrateWithTolerance) {
+      return { valid: false, error: `Bitrate maksimal adalah ${maxBitrate} kbps. Dengan toleransi 30%, batas akhir adalah ${maxBitrateWithTolerance} kbps (video Anda: ${bitrateKbps} kbps).` };
     }
   }
 
@@ -5492,7 +5493,7 @@ app.post('/api/backup/restore', isAuthenticated, uploadBackup.single('backup'), 
 });
 
 const Rotation = require('./models/Rotation');
-const rotationService = require('./services/rotationService');
+const rotationService = require('./services/RotationService');
 
 app.get('/rotations', isAuthenticated, async (req, res) => {
   try {

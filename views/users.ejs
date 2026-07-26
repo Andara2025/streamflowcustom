@@ -713,7 +713,7 @@ function editUser(userId, username, role, status, avatarPath, diskLimit, package
   openEditModal(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit, expiredAt);
 }
 
-const packagesData = <%- JSON.stringify(pricingSettings.packages) %>;
+const packagesData = JSON.parse(`<%- JSON.stringify(pricingSettings.packages) %>`);
 
 function autoFillLimits(prefix) {
   const packageSelect = document.getElementById(prefix + 'Package');
