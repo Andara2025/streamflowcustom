@@ -1699,7 +1699,7 @@ function validateVideoSpecs(metadata, pkg = 'tester') {
   if (!videoStream) return { valid: false, error: 'Tidak ditemukan stream video.' };
 
   let maxFps = 30;
-  let maxBitrate = 2500;
+  let maxBitrate = 5000;
   let maxHeight = 720;
   let maxWidth = 1280;
   let maxResStr = '720p';
@@ -1708,7 +1708,7 @@ function validateVideoSpecs(metadata, pkg = 'tester') {
     maxHeight = 720;
     maxWidth = 1280;
     maxResStr = '720p';
-    maxBitrate = 4000;
+    maxBitrate = 5000;
   } else if (pkg === 'expert') {
     maxHeight = 1080;
     maxWidth = 1920;
@@ -1723,7 +1723,7 @@ function validateVideoSpecs(metadata, pkg = 'tester') {
     maxHeight = 1080;
     maxWidth = 1920;
     maxResStr = '1080p';
-    maxBitrate = 8000;
+    maxBitrate = 6500;
   }
 
   const width = videoStream.width || 0;
