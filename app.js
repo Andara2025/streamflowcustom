@@ -5576,6 +5576,32 @@ app.get('/api/rotations/export-bulk', isAuthenticated, async (req, res) => {
   }
 });
 
+app.delete('/api/rotations/delete-bulk', isAuthenticated, async (req, res) => {
+  try {
+    const ids = req.body.ids || [];
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'No IDs provided' });
+    }
+    
+    let deletedCount = 0;
+    for (const id of ids) {
+      const rotation = await Rotation.findById(id);
+      if (rotation && rotation.user_id === req.session.userId) {
+        if (rotation.status === 'active' || rotation.status === 'live') {
+          continue;
+        }
+        await Rotation.delete(id, req.session.userId);
+        deletedCount++;
+      }
+    }
+    
+    res.json({ success: true, message: `Deleted ${deletedCount} rotations successfully` });
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+    res.status(500).json({ success: false, error: 'Bulk delete failed' });
+  }
+});
+
 app.get('/api/streams/export-bulk', isAuthenticated, async (req, res) => {
   try {
     const ids = req.query.ids ? req.query.ids.split(',') : [];

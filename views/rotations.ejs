@@ -10,6 +10,11 @@
       <i class="ti ti-files"></i>
       <span>Export Selected (<span id="selected-count">0</span>)</span>
     </button>
+    
+    <button id="bulk-delete-btn" onclick="deleteSelectedRotations()" class="hidden flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors">
+      <i class="ti ti-trash"></i>
+      <span>Delete Selected (<span id="selected-delete-count">0</span>)</span>
+    </button>
 
     <button onclick="document.getElementById('import-rotation-input').click()" class="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
       <i class="ti ti-download"></i>
@@ -681,13 +686,20 @@ window.updateSelectedCount = function() {
   const checked = document.querySelectorAll('.rotation-checkbox:checked');
   const count = checked.length;
   const btn = document.getElementById('bulk-export-btn');
+  const deleteBtn = document.getElementById('bulk-delete-btn');
   const countSpan = document.getElementById('selected-count');
+  const deleteCountSpan = document.getElementById('selected-delete-count');
   
   if (count > 0) {
     btn.classList.remove('hidden');
     countSpan.textContent = count;
+    if (deleteBtn) {
+      deleteBtn.classList.remove('hidden');
+      if (deleteCountSpan) deleteCountSpan.textContent = count;
+    }
   } else {
     btn.classList.add('hidden');
+    if (deleteBtn) deleteBtn.classList.add('hidden');
   }
   
   // Sync select all checkbox
@@ -712,6 +724,45 @@ window.exportSelectedRotations = function() {
   if (!ids) return;
   
   window.location.href = `/api/rotations/export-bulk?ids=${ids}`;
+};
+
+window.deleteSelectedRotations = async function() {
+  const checked = document.querySelectorAll('.rotation-checkbox:checked');
+  const ids = Array.from(checked).map(cb => cb.value);
+  if (ids.length === 0) return;
+  
+  if (!confirm(`Are you sure you want to delete ${ids.length} selected rotations? Active rotations will be skipped.`)) return;
+  
+  const deleteBtn = document.getElementById('bulk-delete-btn');
+  const originalText = deleteBtn.innerHTML;
+  deleteBtn.innerHTML = '<i class="ti ti-loader animate-spin font-loaded"></i> Deleting...';
+  deleteBtn.disabled = true;
+  
+  try {
+    const response = await fetch('/api/rotations/delete-bulk', {
+      method: 'DELETE',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken 
+      },
+      body: JSON.stringify({ ids })
+    });
+    const result = await response.json();
+    
+    if (result.success) {
+      showToast('success', result.message || 'Rotations deleted successfully');
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      showToast('error', result.error || 'Failed to delete rotations');
+      deleteBtn.innerHTML = originalText;
+      deleteBtn.disabled = false;
+    }
+  } catch (error) {
+    console.error('Delete bulk error:', error);
+    showToast('error', 'An error occurred during bulk delete');
+    deleteBtn.innerHTML = originalText;
+    deleteBtn.disabled = false;
+  }
 };
 
 function openCreateRotationModal() {
