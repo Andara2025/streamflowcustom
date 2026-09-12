@@ -59,6 +59,24 @@ const STREAM_START_TIMEOUT = 15000;
 const YOUTUBE_COPY_ALLOWED_VIDEO_CODECS = new Set(['h264']);
 const YOUTUBE_COPY_ALLOWED_AUDIO_CODECS = new Set(['aac', 'mp3']);
 
+// Per-user mutex: prevents race conditions in stream limit checks
+const userStreamLocks = new Map();
+
+async function withUserLock(userId, fn) {
+  while (userStreamLocks.has(userId)) {
+    await userStreamLocks.get(userId);
+  }
+  let resolveLock;
+  const lockPromise = new Promise(resolve => { resolveLock = resolve; });
+  userStreamLocks.set(userId, lockPromise);
+  try {
+    return await fn();
+  } finally {
+    userStreamLocks.delete(userId);
+    resolveLock();
+  }
+}
+
 let schedulerService = null;
 let syncIntervalId = null;
 let healthCheckIntervalId = null;
@@ -773,13 +791,20 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
       const User = require('../models/User');
       const user = await User.findById(stream.user_id);
       if (user && user.user_role !== 'admin') {
-        const liveStreams = await Stream.findAll(stream.user_id, 'live');
         const maxStreams = user.stream_limit || 0;
-        
-        const activeLiveCount = liveStreams.filter(s => s.id !== streamId).length;
-        if (activeLiveCount >= maxStreams) {
-          startingStreams.delete(streamId);
-          return { success: false, error: `Batas live streaming tercapai. Anda hanya dapat menjalankan ${maxStreams} stream bersamaan.` };
+        if (maxStreams > 0) {
+          const limitOK = await withUserLock(stream.user_id, async () => {
+            const liveStreams = await Stream.findAll(stream.user_id, 'live');
+            const activeLiveCount = liveStreams.filter(s => s.id !== streamId).length;
+            if (activeLiveCount >= maxStreams) {
+              return false;
+            }
+            return true;
+          });
+          if (!limitOK) {
+            startingStreams.delete(streamId);
+            return { success: false, error: `Batas live streaming tercapai. Anda hanya dapat menjalankan ${maxStreams} stream bersamaan.` };
+          }
         }
       }
     }
@@ -1377,5 +1402,6 @@ module.exports = {
   saveStreamHistory,
   gracefulShutdown,
   setSchedulerService,
-  resolvePublicFilePath
+  resolvePublicFilePath,
+  withUserLock
 };

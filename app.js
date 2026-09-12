@@ -5223,14 +5223,18 @@ app.post('/api/streams/:id/status', isAuthenticated, [
       }
       
       if (user.user_role !== 'admin') {
-        const liveStreams = await Stream.findAll(req.session.userId, 'live');
         const maxStreams = user.stream_limit || 0;
-        
-        if (liveStreams.length >= maxStreams) {
-          return res.status(403).json({ 
-            success: false, 
-            error: `Batas live streaming tercapai. Anda hanya dapat menjalankan ${maxStreams} stream bersamaan.` 
+        if (maxStreams > 0) {
+          const limitOK = await streamingService.withUserLock(req.session.userId, async () => {
+            const liveStreams = await Stream.findAll(req.session.userId, 'live');
+            return liveStreams.length < maxStreams;
           });
+          if (!limitOK) {
+            return res.status(403).json({ 
+              success: false, 
+              error: `Batas live streaming tercapai. Anda hanya dapat menjalankan ${maxStreams} stream bersamaan.` 
+            });
+          }
         }
       }
       

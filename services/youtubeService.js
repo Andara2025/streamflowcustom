@@ -9,6 +9,35 @@ const path = require('path');
 
 const loggedAlreadyHasBroadcast = new Set();
 
+// YouTube API Throttle: max 3 concurrent broadcast creations
+const YT_MAX_CONCURRENT = 3;
+const ytActiveCalls = new Set();
+const ytQueue = [];
+
+function ytThrottle(fn) {
+  return new Promise((resolve, reject) => {
+    const run = async () => {
+      ytActiveCalls.add(run);
+      try {
+        resolve(await fn());
+      } catch (err) {
+        reject(err);
+      } finally {
+        ytActiveCalls.delete(run);
+        if (ytQueue.length > 0 && ytActiveCalls.size < YT_MAX_CONCURRENT) {
+          const next = ytQueue.shift();
+          next();
+        }
+      }
+    };
+    if (ytActiveCalls.size < YT_MAX_CONCURRENT) {
+      run();
+    } else {
+      ytQueue.push(run);
+    }
+  });
+}
+
 function getYouTubeOAuth2Client(clientId, clientSecret, redirectUri) {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
@@ -112,6 +141,7 @@ async function syncBroadcastMonetization(youtube, broadcastId, enabled) {
 }
 
 async function createYouTubeBroadcast(streamId, baseUrl) {
+  return ytThrottle(async () => {
   const stream = await Stream.findById(streamId);
   if (!stream) {
     throw new Error('Stream not found');
@@ -434,6 +464,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     rtmpUrl: rtmpUrl,
     streamKey: streamKey
   };
+  }); // end ytThrottle
 }
 
 async function deleteYouTubeBroadcast(streamId) {
