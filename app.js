@@ -15,6 +15,14 @@ if (process.platform === 'win32') {
   }
 }
 
+// Global safety error handling
+process.on('uncaughtException', (err) => {
+  console.error('[SERVER] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[SERVER] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const fs = require('fs-extra');
@@ -48,6 +56,15 @@ const MediaFolder = require('./models/MediaFolder');
 const Playlist = require('./models/Playlist');
 const Stream = require('./models/Stream');
 const ffmpeg = require('fluent-ffmpeg');
+
+function cleanTitle(title) {
+  if (!title) return '';
+  let cleaned = String(title).replace(/\s*(?:\((?:Copy(?:\s*\d+)?|Imported)\))+/gi, '').trim();
+  if (cleaned.length > 100) {
+    cleaned = cleaned.substring(0, 100).trim();
+  }
+  return cleaned;
+}
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const streamingService = require('./services/streamingService');
 const schedulerService = require('./services/schedulerService');
@@ -603,7 +620,7 @@ app.get('/signup', async (req, res) => {
 });
 
 app.post('/signup', upload.single('avatar'), async (req, res) => {
-  const { username, password, confirmPassword, user_role, status } = req.body;
+  const { username, password, confirmPassword, user_role, status, phone } = req.body;
   const recaptchaResponse = req.body['g-recaptcha-response'];
 
   try {
@@ -644,6 +661,15 @@ app.post('/signup', upload.single('avatar'), async (req, res) => {
       return res.render('signup', {
         title: 'Sign Up',
         error: 'Username and password are required',
+        success: null,
+        recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
+      });
+    }
+
+    if (!phone || phone.trim() === '') {
+      return res.render('signup', {
+        title: 'Sign Up',
+        error: 'Nomor WhatsApp wajib diisi',
         success: null,
         recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
       });
@@ -690,7 +716,8 @@ app.post('/signup', upload.single('avatar'), async (req, res) => {
       status: 'inactive',
       package_name: 'tester',
       stream_limit: 0,
-      disk_limit: 0
+      disk_limit: 0,
+      phone: phone
     });
 
     if (newUser) {
@@ -883,7 +910,8 @@ app.get('/dashboard', isAuthenticated, async (req, res) => {
     const initialStreamsData = await Stream.findAllPaginated(req.session.userId, {
       page: 1,
       limit: 10,
-      search: ''
+      search: '',
+      onlyManual: true
     });
 
     const AppSettings = require('./models/AppSettings');
@@ -1543,7 +1571,7 @@ app.post('/api/users/delete', isAdmin, async (req, res) => {
 
 app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res) => {
   try {
-    const { userId, username, role, status, password, diskLimit, expiredAt, package_name, stream_limit } = req.body;
+    const { userId, username, role, status, password, diskLimit, expiredAt, package_name, stream_limit, phone } = req.body;
 
     if (!userId) {
       return res.status(400).json({
@@ -1573,7 +1601,8 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
       disk_limit: diskLimit !== undefined && diskLimit !== '' ? parseInt(diskLimit) : user.disk_limit,
       expired_at: expiredAt !== undefined ? (expiredAt === '' ? null : expiredAt) : user.expired_at,
       package_name: package_name !== undefined ? package_name : user.package_name,
-      stream_limit: stream_limit !== undefined && stream_limit !== '' ? parseInt(stream_limit) : user.stream_limit
+      stream_limit: stream_limit !== undefined && stream_limit !== '' ? parseInt(stream_limit) : user.stream_limit,
+      phone: phone !== undefined ? phone : user.phone
     };
 
     if (password && password.trim() !== '') {
@@ -1598,7 +1627,7 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
 
 app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res) => {
   try {
-    const { username, role, status, password, diskLimit, expiredAt, package_name, stream_limit } = req.body;
+    const { username, role, status, password, diskLimit, expiredAt, package_name, stream_limit, phone } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({
@@ -1615,7 +1644,7 @@ app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res)
       });
     }
 
-    let avatarPath = '/uploads/avatars/default-avatar.png';
+    let avatarPath = '/images/default-avatar.jpg';
     if (req.file) {
       avatarPath = `/uploads/avatars/${req.file.filename}`;
     }
@@ -1629,7 +1658,8 @@ app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res)
       disk_limit: diskLimit ? parseInt(diskLimit) : 0,
       expired_at: expiredAt || null,
       package_name: package_name || 'custom',
-      stream_limit: stream_limit ? parseInt(stream_limit) : 0
+      stream_limit: stream_limit ? parseInt(stream_limit) : 0,
+      phone: phone || null
     };
 
     const result = await User.create(userData);
@@ -1816,6 +1846,9 @@ app.post('/settings/profile', isAuthenticated, (req, res, next) => {
     const updateData = {
       username: req.body.username
     };
+    if (req.body.phone !== undefined) {
+      updateData.phone = req.body.phone;
+    }
     if (req.file) {
       updateData.avatar_path = `/uploads/avatars/${req.file.filename}`;
     }
@@ -4297,6 +4330,33 @@ app.get('/api/stream/content', isAuthenticated, async (req, res) => {
   }
 });
 
+app.get('/api/streams/export-bulk', isAuthenticated, async (req, res) => {
+  try {
+    const ids = req.query.ids ? req.query.ids.split(',') : [];
+    if (ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+    
+    const results = [];
+    for (const id of ids) {
+      const stream = await Stream.findById(id);
+      if (stream && stream.user_id === req.session.userId) {
+        results.push(stream);
+      }
+    }
+    
+    const exportData = {
+      version: '1.0',
+      type: 'stream_bulk_export',
+      data: results
+    };
+    
+    res.setHeader('Content-disposition', 'attachment; filename=bulk-streams-export.json');
+    res.setHeader('Content-type', 'application/json');
+    res.send(JSON.stringify(exportData, null, 2));
+  } catch (error) {
+    res.status(500).json({ error: 'Bulk export failed' });
+  }
+});
+
 app.get('/api/streams/:id/export', isAuthenticated, async (req, res) => {
   try {
     const stream = await Stream.findById(req.params.id);
@@ -4355,23 +4415,65 @@ app.post('/api/streams/import', isAuthenticated, uploadBackup.single('backup'), 
     await fs.remove(req.file.path);
     
     const importData = JSON.parse(content);
-    const streamsToImport = importData.type === 'stream_bulk_export' ? importData.data : (importData.type === 'stream_export' ? [importData.data] : null);
-    
-    if (!streamsToImport) {
-      return res.status(400).json({ success: false, error: 'Invalid stream export file' });
+    let streamsToImport = [];
+
+    if (importData.type === 'stream_bulk_export') {
+      streamsToImport = importData.data || [];
+    } else if (importData.type === 'stream_export') {
+      streamsToImport = [importData.data];
+    } else if (importData.type === 'rotation_export' || importData.type === 'rotation_bulk_export') {
+      // Convert rotation items to stream objects
+      const rotations = importData.type === 'rotation_bulk_export' ? (importData.data || []) : [importData.data];
+      const allVideos = await Video.findAll(req.session.userId);
+      for (const rot of rotations) {
+        if (rot && Array.isArray(rot.items)) {
+          for (const item of rot.items) {
+            const matchedVid = allVideos.find(v => v.title === item.video_title);
+            streamsToImport.push({
+              title: item.title,
+              platform: 'youtube',
+              rtmp_url: '',
+              stream_key: '',
+              video_id: matchedVid ? matchedVid.id : (allVideos[0]?.id || ''),
+              bitrate: 2500,
+              fps: 30,
+              resolution: '1080p',
+              orientation: 'horizontal',
+              use_advanced_settings: 0,
+              loop_video: 1,
+              schedule_time: rot.start_time || null,
+              end_time: rot.end_time || null,
+              stream_mode: 'manual',
+              youtube_privacy: item.privacy || 'unlisted',
+              youtube_category: item.category || '22',
+              youtube_tags: item.tags || '',
+              youtube_description: item.description || '',
+              youtube_monetization: item.youtube_monetization || 0,
+              youtube_altered_content: item.youtube_altered_content || 0,
+              youtube_made_for_kids: item.youtube_made_for_kids || 0
+            });
+          }
+        }
+      }
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid export file format' });
+    }
+
+    if (!streamsToImport || streamsToImport.length === 0) {
+      return res.status(400).json({ success: false, error: 'No stream data found in file' });
     }
     
     for (const streamData of streamsToImport) {
       await Stream.create({
         user_id: req.session.userId,
-        title: `${streamData.title} (Imported)`,
-        platform: streamData.platform,
-        rtmp_url: streamData.rtmp_url,
-        stream_key: streamData.stream_key,
+        title: cleanTitle(streamData.title),
+        platform: streamData.platform || 'youtube',
+        rtmp_url: streamData.rtmp_url || '',
+        stream_key: streamData.stream_key || '',
         video_id: streamData.video_id,
-        bitrate: streamData.bitrate,
-        fps: streamData.fps,
-        resolution: streamData.resolution,
+        bitrate: streamData.bitrate || 2500,
+        fps: streamData.fps || 30,
+        resolution: streamData.resolution || '1080p',
         orientation: streamData.orientation || 'horizontal',
         use_advanced_settings: streamData.use_advanced_settings || 0,
         loop_video: streamData.loop_video || 1,
@@ -4408,11 +4510,12 @@ app.get('/api/streams', isAuthenticated, async (req, res) => {
         page,
         limit,
         filter,
-        search
+        search,
+        onlyManual: true
       });
       res.json({ success: true, ...result });
     } else {
-      const streams = await Stream.findAll(req.session.userId, filter);
+      const streams = await Stream.findAll(req.session.userId, filter, true);
       res.json({ success: true, streams });
     }
   } catch (error) {
@@ -4651,31 +4754,35 @@ app.get('/api/streams/:id', isAuthenticated, async (req, res) => {
     if (stream.youtube_broadcast_id) {
       try {
         const user = await User.findById(req.session.userId);
-        if (user.youtube_access_token && user.youtube_client_id && user.youtube_client_secret) {
-          const clientSecret = decrypt(user.youtube_client_secret);
-          const accessToken = decrypt(user.youtube_access_token);
-          const refreshToken = decrypt(user.youtube_refresh_token);
+        if (user.youtube_client_id && user.youtube_client_secret) {
+          const YoutubeChannel = require('./models/YoutubeChannel');
+          let selectedChannel = stream.youtube_channel_id ? await YoutubeChannel.findById(stream.youtube_channel_id) : null;
+          let accessToken = selectedChannel && selectedChannel.access_token ? decrypt(selectedChannel.access_token) : (user.youtube_access_token ? decrypt(user.youtube_access_token) : null);
+          let refreshToken = selectedChannel && selectedChannel.refresh_token ? decrypt(selectedChannel.refresh_token) : (user.youtube_refresh_token ? decrypt(user.youtube_refresh_token) : null);
 
-          const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-          const host = req.headers['x-forwarded-host'] || req.get('host');
-          const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
+          if (accessToken && refreshToken) {
+            const clientSecret = decrypt(user.youtube_client_secret);
+            const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+            const host = req.headers['x-forwarded-host'] || req.get('host');
+            const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
 
-          const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, redirectUri);
-          oauth2Client.setCredentials({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
+            const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, redirectUri);
+            oauth2Client.setCredentials({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
 
-          const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+            const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
-          const videoResponse = await youtube.videos.list({
-            part: 'snippet',
-            id: stream.youtube_broadcast_id
-          });
+            const videoResponse = await youtube.videos.list({
+              part: 'snippet',
+              id: stream.youtube_broadcast_id
+            });
 
-          if (videoResponse.data.items && videoResponse.data.items.length > 0) {
-            const thumbnails = videoResponse.data.items[0].snippet.thumbnails;
-            stream.youtube_thumbnail = thumbnails.maxres?.url || thumbnails.high?.url || thumbnails.medium?.url || thumbnails.default?.url;
+            if (videoResponse.data.items && videoResponse.data.items.length > 0) {
+              const thumbnails = videoResponse.data.items[0].snippet.thumbnails;
+              stream.youtube_thumbnail = thumbnails.maxres?.url || thumbnails.high?.url || thumbnails.medium?.url || thumbnails.default?.url;
+            }
           }
         }
       } catch (ytError) {
@@ -4708,7 +4815,7 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
     }
 
     if (req.body.streamMode === 'youtube') {
-      if (req.body.title) updateData.title = req.body.title;
+      if (req.body.title) updateData.title = cleanTitle(req.body.title);
       if (req.body.videoId) updateData.video_id = req.body.videoId;
       if (req.body.description !== undefined) updateData.youtube_description = req.body.description;
       if (req.body.privacy) updateData.youtube_privacy = req.body.privacy;
@@ -4890,7 +4997,7 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
       return res.json({ success: true, message: 'Stream updated successfully' });
     }
 
-    if (req.body.streamTitle) updateData.title = req.body.streamTitle;
+    if (req.body.streamTitle) updateData.title = cleanTitle(req.body.streamTitle);
     if (req.body.videoId) updateData.video_id = req.body.videoId;
 
     if (req.body.rtmpUrl) {
@@ -4992,6 +5099,74 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
     res.status(500).json({ success: false, error: 'Failed to update stream' });
   }
 });
+
+const handleStreamBulkDelete = async (req, res) => {
+  console.log('--- DELETE BULK HIT ---', req.body.ids ? req.body.ids.length : 0, 'items');
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'No stream IDs provided' });
+    }
+
+    let deletedCount = 0;
+    const errors = [];
+
+    for (const id of ids) {
+      try {
+        const stream = await Stream.findById(id);
+        if (!stream) {
+          errors.push(`Stream ${id} not found`);
+          continue;
+        }
+
+        if (stream.user_id !== req.session.userId) {
+          errors.push(`Not authorized for stream ${id}`);
+          continue;
+        }
+
+        if (stream.status === 'live' || stream.status === 'starting' || stream.status === 'restarting') {
+          errors.push(`Stream ${id} is currently active and cannot be deleted`);
+          continue;
+        }
+
+        if (typeof streamingService !== 'undefined' && streamingService.activeProcesses && streamingService.activeProcesses.has(id)) {
+          try {
+            await streamingService.stopStream(id);
+          } catch (stopErr) {
+            console.error(`Failed to stop active process for stream ${id}:`, stopErr.message);
+          }
+        }
+
+        try {
+          const { deleteYouTubeBroadcastIfUpcoming } = require('./services/youtubeService');
+          await deleteYouTubeBroadcastIfUpcoming(id);
+        } catch (ytDeleteErr) {
+          console.warn(`[BulkDelete] Warning cleaning YouTube broadcast for ${id}:`, ytDeleteErr.message);
+        }
+
+        await Stream.delete(id, req.session.userId);
+        deletedCount++;
+      } catch (err) {
+        console.error(`Error deleting stream ${id}:`, err);
+        errors.push(`Failed to delete stream ${id}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${deletedCount} of ${ids.length} streams`,
+      deletedCount,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('Error in bulk stream delete:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete streams' });
+  }
+};
+
+app.delete('/api/streams/delete-bulk', isAuthenticated, handleStreamBulkDelete);
+app.post('/api/streams/delete-bulk', isAuthenticated, handleStreamBulkDelete);
+
 app.delete('/api/streams/:id', isAuthenticated, async (req, res) => {
   try {
     const stream = await Stream.findById(req.params.id);
@@ -5000,6 +5175,17 @@ app.delete('/api/streams/:id', isAuthenticated, async (req, res) => {
     }
     if (stream.user_id !== req.session.userId) {
       return res.status(403).json({ success: false, error: 'Not authorized to delete this stream' });
+    }
+    try {
+      if (stream.status === 'live' || stream.status === 'starting' || stream.status === 'restarting' || stream.status === 'scheduled') {
+        try { await streamingService.stopStream(req.params.id); } catch (stopErr) { console.warn(`[DeleteStream] stop warning:`, stopErr.message); }
+      }
+    } catch (e) {}
+    try {
+      const { deleteYouTubeBroadcastIfUpcoming } = require('./services/youtubeService');
+      await deleteYouTubeBroadcastIfUpcoming(req.params.id);
+    } catch (ytDeleteErr) {
+      console.warn(`[DeleteStream] Warning cleaning YouTube broadcast for ${req.params.id}:`, ytDeleteErr.message);
     }
     await Stream.delete(req.params.id, req.session.userId);
     res.json({ success: true, message: 'Stream deleted successfully' });
@@ -5576,7 +5762,7 @@ app.get('/api/rotations/export-bulk', isAuthenticated, async (req, res) => {
   }
 });
 
-app.delete('/api/rotations/delete-bulk', isAuthenticated, async (req, res) => {
+const handleRotationBulkDelete = async (req, res) => {
   try {
     const ids = req.body.ids || [];
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -5600,34 +5786,11 @@ app.delete('/api/rotations/delete-bulk', isAuthenticated, async (req, res) => {
     console.error('Bulk delete error:', error);
     res.status(500).json({ success: false, error: 'Bulk delete failed' });
   }
-});
+};
 
-app.get('/api/streams/export-bulk', isAuthenticated, async (req, res) => {
-  try {
-    const ids = req.query.ids ? req.query.ids.split(',') : [];
-    if (ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
-    
-    const results = [];
-    for (const id of ids) {
-      const stream = await Stream.findById(id);
-      if (stream && stream.user_id === req.session.userId) {
-        results.push(stream);
-      }
-    }
-    
-    const exportData = {
-      version: '1.0',
-      type: 'stream_bulk_export',
-      data: results
-    };
-    
-    res.setHeader('Content-disposition', 'attachment; filename=bulk-streams-export.json');
-    res.setHeader('Content-type', 'application/json');
-    res.send(JSON.stringify(exportData, null, 2));
-  } catch (error) {
-    res.status(500).json({ error: 'Bulk export failed' });
-  }
-});
+app.delete('/api/rotations/delete-bulk', isAuthenticated, handleRotationBulkDelete);
+app.post('/api/rotations/delete-bulk', isAuthenticated, handleRotationBulkDelete);
+
 
 app.get('/api/rotations/:id/export', isAuthenticated, async (req, res) => {
   try {
@@ -5681,10 +5844,41 @@ app.post('/api/rotations/import', isAuthenticated, uploadBackup.single('backup')
     await fs.remove(req.file.path);
     
     const importData = JSON.parse(content);
-    const rotationsToImport = importData.type === 'rotation_bulk_export' ? importData.data : (importData.type === 'rotation_export' ? [importData.data] : null);
-    
-    if (!rotationsToImport) {
-      return res.status(400).json({ success: false, error: 'Invalid rotation export file' });
+    let rotationsToImport = [];
+
+    if (importData.type === 'rotation_bulk_export') {
+      rotationsToImport = importData.data || [];
+    } else if (importData.type === 'rotation_export') {
+      rotationsToImport = [importData.data];
+    } else if (importData.type === 'stream_export' || importData.type === 'stream_bulk_export') {
+      // Convert stream exports into separate rotations per stream (preserving dates)
+      const streams = importData.type === 'stream_bulk_export' ? (importData.data || []) : [importData.data];
+      rotationsToImport = streams.map((s, idx) => ({
+        name: s.title || `Rotasi Stream ${idx + 1}`,
+        is_loop: 1,
+        repeat_mode: 'daily',
+        start_time: s.schedule_time || null,
+        end_time: s.end_time || null,
+        items: [{
+          order_index: 0,
+          video_title: s.video_title,
+          video_id: s.video_id,
+          title: s.title,
+          description: s.youtube_description || s.description || '',
+          tags: s.youtube_tags || s.tags || '',
+          privacy: s.youtube_privacy || s.privacy || 'unlisted',
+          category: s.youtube_category || s.category || '22',
+          youtube_monetization: s.youtube_monetization || 0,
+          youtube_altered_content: s.youtube_altered_content || 0,
+          youtube_made_for_kids: s.youtube_made_for_kids || 0
+        }]
+      }));
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid export file format' });
+    }
+
+    if (!rotationsToImport || rotationsToImport.length === 0) {
+      return res.status(400).json({ success: false, error: 'No rotation data found in file' });
     }
     
     // Try to find videos by title
@@ -5693,7 +5887,7 @@ app.post('/api/rotations/import', isAuthenticated, uploadBackup.single('backup')
     for (const rotationData of rotationsToImport) {
       const newRotation = await Rotation.create({
         user_id: req.session.userId,
-        name: `${rotationData.name} (Imported)`,
+        name: cleanTitle(rotationData.name),
         is_loop: rotationData.is_loop || 1,
         start_time: rotationData.start_time,
         end_time: rotationData.end_time,
@@ -5701,13 +5895,16 @@ app.post('/api/rotations/import', isAuthenticated, uploadBackup.single('backup')
         youtube_channel_id: null
       });
       
-      for (const item of rotationData.items) {
-        const matchedVideo = allVideos.find(v => v.title === item.video_title);
+      for (const item of (rotationData.items || [])) {
+        const matchedVideo = item.video_id ? allVideos.find(v => v.id === item.video_id) : null;
+        const matchedByTitle = item.video_title ? allVideos.find(v => v.title === item.video_title) : null;
+        const finalVideoId = (matchedVideo || matchedByTitle)?.id || item.video_id || (allVideos[0]?.id || '');
+
         await Rotation.addItem({
           rotation_id: newRotation.id,
           order_index: item.order_index,
-          video_id: matchedVideo ? matchedVideo.id : (allVideos[0]?.id || ''),
-          title: item.title,
+          video_id: finalVideoId,
+          title: cleanTitle(item.title),
           description: item.description,
           tags: item.tags,
           privacy: item.privacy,
@@ -5861,7 +6058,7 @@ app.put('/api/rotations/:id', isAuthenticated, uploadThumbnail.any(), async (req
     }
 
     await Rotation.update(req.params.id, {
-      name,
+      name: cleanTitle(name),
       is_loop: true,
       start_time,
       end_time,
@@ -5908,7 +6105,7 @@ app.put('/api/rotations/:id', isAuthenticated, uploadThumbnail.any(), async (req
         rotation_id: req.params.id,
         order_index: item.order_index,
         video_id: item.video_id,
-        title: item.title,
+        title: cleanTitle(item.title),
         description: item.description || '',
         tags: item.tags || '',
         thumbnail_path: thumbnailPath,

@@ -148,6 +148,17 @@
                   <span id="matchText"></span>
                 </div>
               </div>
+
+              <div class="pb-3">
+                <label for="phone" class="text-sm font-medium block mb-2">Nomor WhatsApp <span class="text-red-500">*</span></label>
+                <div class="relative">
+                  <input type="text" id="phone" name="phone"
+                    class="w-full pl-10 pr-4 py-2.5 bg-dark-700/60 border border-gray-600/40 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
+                    placeholder="6281234567890" required>
+                  <i class="ti ti-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Format: 628xxx (gunakan kode negara)</p>
+              </div>
               
               <% if (typeof recaptchaSiteKey !== 'undefined' && recaptchaSiteKey) { %>
               <div class="flex justify-left" style="margin-top: 10px !important;">

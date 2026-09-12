@@ -53,7 +53,7 @@
             <% if (rotation.youtube_channel_name) { %>
             <div class="flex items-center text-[10px] text-gray-400">
               <% if (rotation.youtube_channel_thumbnail) { %>
-              <img src="<%= rotation.youtube_channel_thumbnail %>" alt="" class="w-3 h-3 rounded-full object-cover mr-0.5">
+              <img src="<%= rotation.youtube_channel_thumbnail %>" referrerpolicy="no-referrer" alt="" class="w-3 h-3 rounded-full object-cover mr-0.5">
               <% } else { %>
               <div class="w-3 h-3 rounded-full bg-red-600 flex items-center justify-center mr-0.5">
                 <i class="ti ti-brand-youtube text-white text-[6px]"></i>
@@ -192,7 +192,7 @@
                class="inline-flex items-center gap-1.5 hover:transition-colors group"
                title="<%= rotation.youtube_channel_name %>">
               <% if (rotation.youtube_channel_thumbnail) { %>
-              <img src="<%= rotation.youtube_channel_thumbnail %>" alt="" class="w-5 h-5 rounded-full object-cover">
+              <img src="<%= rotation.youtube_channel_thumbnail %>" referrerpolicy="no-referrer" alt="" class="w-5 h-5 rounded-full object-cover">
               <% } else { %>
               <div class="w-5 h-5 rounded-full bg-red-600 flex items-center justify-center">
                 <i class="ti ti-brand-youtube text-white text-xs"></i>
@@ -247,21 +247,17 @@
           <td class="px-6 py-4">
             <% if (rotation.status === 'active' || rotation.status === 'live') { %>
               <div class="text-sm font-medium text-white">Item <%= (rotation.current_index || 0) + 1 %>/<%= rotation.item_count %></div>
-              <% if (rotation.start_time && rotation.end_time) { %>
-                <%
-                  const startDate = new Date(rotation.start_time.replace('T', ' ').replace(/-/g, '/'));
-                  const endDate = new Date(rotation.end_time.replace('T', ' ').replace(/-/g, '/'));
-                  const formatDate = (d) => {
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const year = d.getFullYear();
-                    const hours = String(d.getHours()).padStart(2, '0');
-                    const mins = String(d.getMinutes()).padStart(2, '0');
-                    return `${day}/${month}/${year}, ${hours}:${mins}`;
-                  };
-                %>
-                <div class="text-xs text-gray-400">Schedule: <%= formatDate(startDate) %> - <%= formatDate(endDate).split(', ')[1] %></div>
-              <% } %>
+              <%
+                let dayLabel = 'Setiap Hari';
+                try {
+                  const _sd = new Date((rotation.start_time || '').replace('T', ' ').replace(/-/g, '/'));
+                  const _days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+                  if (rotation.repeat_mode === 'weekly') dayLabel = _days[_sd.getDay()] || 'Mingguan';
+                  else if (rotation.repeat_mode === 'monthly') dayLabel = 'Tanggal ' + _sd.getDate();
+                  else dayLabel = 'Setiap Hari';
+                } catch (e) {}
+              %>
+              <div class="text-xs text-gray-400"><%= dayLabel %></div>
             <% } else { %>
               <span class="text-sm text-gray-500">--</span>
             <% } %>
@@ -350,7 +346,7 @@
             <div class="relative" id="rotationChannelSelector">
               <button type="button" onclick="toggleRotationChannelDropdown()" class="w-full flex items-center gap-3 px-3 py-2.5 bg-dark-700 border border-gray-600 rounded-lg hover:border-gray-500 focus:border-primary focus:ring-1 focus:ring-primary transition-colors text-left">
                 <div class="w-6 h-6 rounded-full overflow-hidden bg-red-600 flex-shrink-0 flex items-center justify-center" id="rotationChannelThumbContainer">
-                  <img id="rotationChannelThumb" src="<%= typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0 ? (youtubeChannels.find(c => c.is_default) || youtubeChannels[0]).channel_thumbnail : '' %>" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.querySelector('.fallback-icon').classList.remove('hidden');">
+                  <img id="rotationChannelThumb" src="<%= typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0 ? (youtubeChannels.find(c => c.is_default) || youtubeChannels[0]).channel_thumbnail : '' %>" referrerpolicy="no-referrer" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.querySelector('.fallback-icon').classList.remove('hidden');">
                   <i class="ti ti-brand-youtube text-white text-xs fallback-icon hidden"></i>
                 </div>
                 <span id="rotationChannelName" class="flex-1 text-sm text-white truncate"><%= typeof youtubeChannels !== 'undefined' && youtubeChannels.length > 0 ? (youtubeChannels.find(c => c.is_default) || youtubeChannels[0]).channel_name : 'Select Channel' %></span>
@@ -361,7 +357,7 @@
                   <% youtubeChannels.forEach(function(channel) { %>
                   <button type="button" onclick="selectRotationChannel('<%= channel.id %>', '<%= channel.channel_name %>', '<%= channel.channel_thumbnail %>')" class="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-600 text-left rotation-channel-option" data-channel-id="<%= channel.id %>">
                     <div class="w-6 h-6 rounded-full overflow-hidden bg-red-600 flex-shrink-0 flex items-center justify-center">
-                      <img src="<%= channel.channel_thumbnail %>" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
+                      <img src="<%= channel.channel_thumbnail %>" referrerpolicy="no-referrer" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
                       <i class="ti ti-brand-youtube text-white text-xs hidden"></i>
                     </div>
                     <span class="text-sm text-white truncate"><%= channel.channel_name %></span>
@@ -392,27 +388,40 @@
           </div>
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label class="text-sm font-medium text-white block mb-2">Start Date</label>
-              <input type="date" id="rotationStartDate" name="rotationStartDate" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary [color-scheme:dark]" required>
-              <p class="text-xs text-gray-500 mt-1">First day of this rotation schedule</p>
+              <label class="text-sm font-medium text-white block mb-2">Repeat Mode</label>
+              <select id="repeatMode" name="repeatMode" onchange="onRepeatModeChange()" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
+                <option value="daily" selected>Every Day (Harian)</option>
+                <option value="weekly">Every Week (Mingguan)</option>
+                <option value="monthly">Every Month (Bulanan)</option>
+              </select>
             </div>
+            <div id="daySelectionWrapper" class="hidden">
+              <label class="text-sm font-medium text-white block mb-2" id="daySelectionLabel">Select Day</label>
+              <select id="rotationDayOfWeek" onchange="updateCalculatedStartDate()" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
+                <option value="1">Senin (Monday)</option>
+                <option value="2">Selasa (Tuesday)</option>
+                <option value="3">Rabu (Wednesday)</option>
+                <option value="4">Kamis (Thursday)</option>
+                <option value="5">Jumat (Friday)</option>
+                <option value="6">Sabtu (Saturday)</option>
+                <option value="0">Minggu (Sunday)</option>
+              </select>
+              <select id="rotationDayOfMonth" onchange="updateCalculatedStartDate()" class="hidden w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
+                <% for (let d = 1; d <= 31; d++) { %>
+                  <option value="<%= d %>">Tanggal <%= d %></option>
+                <% } %>
+              </select>
+            </div>
+            <input type="hidden" id="rotationStartDate" name="rotationStartDate">
             <div>
               <label class="text-sm font-medium text-white block mb-2">Start Time</label>
               <input type="time" id="rotationStartTime" name="rotationStartTime" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary [color-scheme:dark]" required>
-              <p class="text-xs text-gray-500 mt-1">Daily start time for the rotation</p>
+              <p class="text-xs text-gray-500 mt-1">Start time for rotation</p>
             </div>
             <div>
               <label class="text-sm font-medium text-white block mb-2">End Time <span id="rotationDurationBadge" class="bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded ml-2">Duration: 00:00</span></label>
               <input type="time" id="rotationEndTime" name="rotationEndTime" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary [color-scheme:dark]" required>
-              <p class="text-xs text-gray-500 mt-1">Daily end time for the rotation</p>
-            </div>
-            <div>
-              <label class="text-sm font-medium text-white block mb-2">Repeat</label>
-              <select id="repeatMode" name="repeatMode" class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
-                <option value="daily" selected>Every Day</option>
-                <option value="weekly">Every Week</option>
-                <option value="monthly">Every Month</option>
-              </select>
+              <p class="text-xs text-gray-500 mt-1">End time for rotation</p>
             </div>
           </div>
 
@@ -684,11 +693,14 @@ window.handleImportRotation = async function(input) {
 
 window.updateSelectedCount = function() {
   const checked = document.querySelectorAll('.rotation-checkbox:checked');
-  const count = checked.length;
+  const uniqueIds = new Set(Array.from(checked).map(cb => cb.value));
+  const count = uniqueIds.size;
   const btn = document.getElementById('bulk-export-btn');
   const deleteBtn = document.getElementById('bulk-delete-btn');
   const countSpan = document.getElementById('selected-count');
   const deleteCountSpan = document.getElementById('selected-delete-count');
+  
+  console.log('updateSelectedCount called, count:', count, 'deleteBtn:', deleteBtn);
   
   if (count > 0) {
     btn.classList.remove('hidden');
@@ -720,7 +732,9 @@ window.toggleAllRotations = function(source) {
 
 window.exportSelectedRotations = function() {
   const checked = document.querySelectorAll('.rotation-checkbox:checked');
-  const ids = Array.from(checked).map(cb => cb.value).join(',');
+  const idsArray = Array.from(checked).map(cb => cb.value);
+  const uniqueIds = [...new Set(idsArray)];
+  const ids = uniqueIds.join(',');
   if (!ids) return;
   
   window.location.href = `/api/rotations/export-bulk?ids=${ids}`;
@@ -728,10 +742,21 @@ window.exportSelectedRotations = function() {
 
 window.deleteSelectedRotations = async function() {
   const checked = document.querySelectorAll('.rotation-checkbox:checked');
-  const ids = Array.from(checked).map(cb => cb.value);
+  const idsArray = Array.from(checked).map(cb => cb.value);
+  const ids = [...new Set(idsArray)];
   if (ids.length === 0) return;
   
-  if (!confirm(`Are you sure you want to delete ${ids.length} selected rotations? Active rotations will be skipped.`)) return;
+  const confirmed = await createModalDialog({
+    type: 'danger',
+    icon: 'ti-trash',
+    title: 'Delete Selected Rotations',
+    message: `Are you sure you want to delete ${ids.length} selected rotations?<br>Active/Live rotations will be skipped.`,
+    confirmText: 'Delete Selected',
+    cancelText: 'Cancel',
+    confirmClass: 'bg-red-500 hover:bg-red-600'
+  });
+
+  if (!confirmed) return;
   
   const deleteBtn = document.getElementById('bulk-delete-btn');
   const originalText = deleteBtn.innerHTML;
@@ -739,11 +764,12 @@ window.deleteSelectedRotations = async function() {
   deleteBtn.disabled = true;
   
   try {
+    const token = document.querySelector('input[name="_csrf"]')?.value || csrfToken || '';
     const response = await fetch('/api/rotations/delete-bulk', {
       method: 'DELETE',
       headers: { 
         'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken 
+        'X-CSRF-Token': token
       },
       body: JSON.stringify({ ids })
     });
@@ -765,6 +791,62 @@ window.deleteSelectedRotations = async function() {
   }
 };
 
+window.updateCalculatedStartDate = function() {
+  const repeatMode = document.getElementById('repeatMode').value;
+  const startDateInput = document.getElementById('rotationStartDate');
+  const d = new Date();
+  
+  if (repeatMode === 'daily') {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    startDateInput.value = `${y}-${m}-${day}`;
+  } else if (repeatMode === 'weekly') {
+    const targetDay = parseInt(document.getElementById('rotationDayOfWeek').value, 10);
+    const currentDay = d.getDay();
+    let diff = targetDay - currentDay;
+    if (diff < 0) diff += 7;
+    d.setDate(d.getDate() + diff);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    startDateInput.value = `${y}-${m}-${day}`;
+  } else if (repeatMode === 'monthly') {
+    const targetDate = parseInt(document.getElementById('rotationDayOfMonth').value, 10);
+    if (d.getDate() > targetDate) {
+      d.setMonth(d.getMonth() + 1);
+    }
+    d.setDate(targetDate);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    startDateInput.value = `${y}-${m}-${day}`;
+  }
+};
+
+window.onRepeatModeChange = function() {
+  const repeatMode = document.getElementById('repeatMode').value;
+  const wrapper = document.getElementById('daySelectionWrapper');
+  const dayOfWeekSelect = document.getElementById('rotationDayOfWeek');
+  const dayOfMonthSelect = document.getElementById('rotationDayOfMonth');
+  const label = document.getElementById('daySelectionLabel');
+  
+  if (repeatMode === 'daily') {
+    wrapper.classList.add('hidden');
+  } else if (repeatMode === 'weekly') {
+    wrapper.classList.remove('hidden');
+    label.textContent = 'Pilih Hari';
+    dayOfWeekSelect.classList.remove('hidden');
+    dayOfMonthSelect.classList.add('hidden');
+  } else if (repeatMode === 'monthly') {
+    wrapper.classList.remove('hidden');
+    label.textContent = 'Pilih Tanggal';
+    dayOfWeekSelect.classList.add('hidden');
+    dayOfMonthSelect.classList.remove('hidden');
+  }
+  updateCalculatedStartDate();
+};
+
 function openCreateRotationModal() {
   const modal = document.getElementById('createRotationModal');
   document.getElementById('rotationModalTitle').textContent = 'Create New Rotation';
@@ -780,13 +862,8 @@ function openCreateRotationModal() {
     if (typeof toggleDestinationType === 'function') toggleDestinationType();
   }
   
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  document.getElementById('rotationStartDate').value = `${year}-${month}-${day}`;
-  
   document.getElementById('repeatMode').value = 'daily';
+  onRepeatModeChange();
   
   const channelSelectorBtn = document.querySelector('#rotationChannelSelector > button');
   channelSelectorBtn.disabled = false;
@@ -1124,6 +1201,66 @@ function initTagsInput(itemEl, idx) {
   container._addTags = addTags;
 }
 
+function createModalDialog(options) {
+  const dialog = document.createElement('div');
+  dialog.id = 'custom-modal';
+  dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300';
+
+  const themes = {
+    'info': { icon: options.icon || 'ti-info-circle', color: 'text-primary', bg: 'bg-primary/10', border: 'border-gray-600/50', button: 'bg-primary hover:bg-rose-600', buttonIcon: 'ti-check' },
+    'danger': { icon: options.icon || 'ti-alert-triangle', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-gray-600/50', button: 'bg-red-500 hover:bg-red-600', buttonIcon: 'ti-trash' },
+    'warning': { icon: options.icon || 'ti-alert-triangle', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', button: 'bg-yellow-500 hover:bg-yellow-600', buttonIcon: 'ti-alert-circle' },
+    'success': { icon: options.icon || 'ti-check-circle', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/50', button: 'bg-green-500 hover:bg-green-600', buttonIcon: 'ti-check' }
+  };
+
+  const theme = themes[options.type || 'info'];
+
+  dialog.innerHTML = `
+    <div class="transform transition-all duration-300 opacity-0 scale-95 modal-content max-w-md w-full mx-4">
+      <div class="bg-dark-800 rounded-lg shadow-xl border ${theme.border} overflow-hidden">
+        <div class="px-6 py-5 flex items-center">
+          <div class="w-12 h-12 rounded-full ${theme.bg} flex items-center justify-center mr-4 shrink-0">
+            <i class="ti ${theme.icon} ${theme.color} text-2xl"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-lg font-medium text-white">${options.title}</h3>
+            <p class="text-gray-400 text-sm mt-1">${options.message}</p>
+          </div>
+        </div>
+        <div class="px-6 py-4 flex justify-end space-x-3 border-t border-gray-600/50">
+          <button id="modal-cancel-btn" class="px-4 py-2.5 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors text-sm font-medium flex items-center">
+            <i class="ti ti-x mr-1.5"></i> ${options.cancelText || 'Cancel'}
+          </button>
+          <button id="modal-confirm-btn" class="${options.confirmClass || theme.button} px-4 py-2.5 text-white rounded-lg transition-colors text-sm font-medium flex items-center">
+            <i class="ti ${theme.buttonIcon} mr-1.5"></i> ${options.confirmText || 'Confirm'}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+  document.body.classList.add('overflow-hidden');
+
+  setTimeout(() => {
+    const modalContent = dialog.querySelector('.modal-content');
+    if (modalContent) { modalContent.classList.replace('opacity-0', 'opacity-100'); modalContent.classList.replace('scale-95', 'scale-100'); }
+  }, 10);
+
+  return new Promise((resolve) => {
+    document.getElementById('modal-confirm-btn').addEventListener('click', () => closeModalWithAnimation(true));
+    document.getElementById('modal-cancel-btn').addEventListener('click', () => closeModalWithAnimation(false));
+    document.addEventListener('keydown', function escapeHandler(e) { if (e.key === 'Escape') { closeModalWithAnimation(false); document.removeEventListener('keydown', escapeHandler); } });
+    dialog.addEventListener('click', function (e) { if (e.target === dialog) closeModalWithAnimation(false); });
+
+    function closeModalWithAnimation(confirmed) {
+      const modalContent = dialog.querySelector('.modal-content');
+      if (modalContent) { modalContent.classList.replace('opacity-100', 'opacity-0'); modalContent.classList.replace('scale-100', 'scale-95'); }
+      setTimeout(() => { document.body.classList.remove('overflow-hidden'); dialog.remove(); resolve(confirmed); }, 200);
+    }
+  });
+}
+
 function initThumbnailUpload(itemEl) {
   const area = itemEl.querySelector('.thumbnail-upload-area');
   const input = itemEl.querySelector('.thumbnail-input');
@@ -1231,9 +1368,11 @@ async function saveRotation() {
     saveBtn.classList.remove('opacity-70', 'cursor-not-allowed');
   }
   
+  if (typeof updateCalculatedStartDate === 'function') updateCalculatedStartDate();
   const startDate = document.getElementById('rotationStartDate').value;
   if (!startDate) {
-    showToast('error', 'Please set start date');
+    showToast('error', 'Please select day / repeat mode');
+    resetSaveBtn();
     return;
   }
   
@@ -1387,10 +1526,16 @@ async function editRotation(id) {
       document.getElementById('rotationId').value = rotation.id;
       document.getElementById('rotationName').value = rotation.name;
       document.getElementById('repeatMode').value = rotation.repeat_mode || 'daily';
+      if (typeof onRepeatModeChange === 'function') onRepeatModeChange();
       
       if (rotation.start_time) {
         const startDateStr = rotation.start_time.split('T')[0];
         document.getElementById('rotationStartDate').value = startDateStr;
+        try {
+          const d = new Date(rotation.start_time);
+          if (rotation.repeat_mode === 'weekly') document.getElementById('rotationDayOfWeek').value = String(d.getDay());
+          if (rotation.repeat_mode === 'monthly') document.getElementById('rotationDayOfMonth').value = String(d.getDate());
+        } catch (e) {}
         
         const startTime = new Date(rotation.start_time).toTimeString().slice(0, 5);
         document.getElementById('rotationStartTime').value = startTime;
@@ -1598,9 +1743,10 @@ async function deleteRotation(id) {
   if (!confirm('Are you sure you want to delete this rotation?')) return;
   
   try {
+    const token = document.querySelector('input[name="_csrf"]')?.value || csrfToken || '';
     const response = await fetch(`/api/rotations/${id}`, {
       method: 'DELETE',
-      headers: { 'X-CSRF-Token': csrfToken }
+      headers: { 'X-CSRF-Token': token }
     });
     const result = await response.json();
     
@@ -1617,9 +1763,10 @@ async function deleteRotation(id) {
 
 async function activateRotation(id) {
   try {
+    const token = document.querySelector('input[name="_csrf"]')?.value || csrfToken || '';
     const response = await fetch(`/api/rotations/${id}/activate`, {
       method: 'POST',
-      headers: { 'X-CSRF-Token': csrfToken }
+      headers: { 'X-CSRF-Token': token }
     });
     const result = await response.json();
     
@@ -1636,9 +1783,10 @@ async function activateRotation(id) {
 
 async function stopRotation(id) {
   try {
+    const token = document.querySelector('input[name="_csrf"]')?.value || csrfToken || '';
     const response = await fetch(`/api/rotations/${id}/stop`, {
       method: 'POST',
-      headers: { 'X-CSRF-Token': csrfToken }
+      headers: { 'X-CSRF-Token': token }
     });
     const result = await response.json();
     
@@ -1688,8 +1836,16 @@ async function duplicateRotation(id) {
       
       document.getElementById('rotationModalTitle').textContent = 'Duplicate Rotation';
       document.getElementById('rotationId').value = ''; // Keep empty for new
-      document.getElementById('rotationName').value = rotation.name + ' (Copy)';
+      const cleanName = (rotation.name || '').replace(/\s*\(Copy(?:\s*\d+)?\)+$/gi, '').trim();
+      document.getElementById('rotationName').value = (cleanName ? `${cleanName} (Copy)` : 'Rotation (Copy)').substring(0, 100);
       document.getElementById('repeatMode').value = rotation.repeat_mode || 'daily';
+      if (typeof onRepeatModeChange === 'function') onRepeatModeChange();
+      try {
+        const dd = new Date(rotation.start_time);
+        if (rotation.repeat_mode === 'weekly') document.getElementById('rotationDayOfWeek').value = String(dd.getDay());
+        if (rotation.repeat_mode === 'monthly') document.getElementById('rotationDayOfMonth').value = String(dd.getDate());
+        if (typeof updateCalculatedStartDate === 'function') updateCalculatedStartDate();
+      } catch (e) {}
       
       if (rotation.start_time) {
         const startTime = new Date(rotation.start_time).toTimeString().slice(0, 5);

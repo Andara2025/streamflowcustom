@@ -1,0 +1,16 @@
+{
+  "watch": ["app.js", "routes/", "services/", "models/", "utils/", "views/"],
+  "ext": "js,json,ejs,html,css",
+  "ignore": [
+    "*.db",
+    "*.db-journal",
+    "*.db-wal",
+    "public/uploads/*",
+    "sessions/*",
+    "logs/*",
+    "temp/*",
+    "scratch/*",
+    "node_modules/*"
+  ],
+  "delay": "1000"
+}

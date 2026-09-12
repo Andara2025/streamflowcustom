@@ -11,6 +11,11 @@
       <i class="ti ti-download mr-1.5"></i>
       <span>Backup / Export</span>
     </a>
+    <button onclick="blastWhatsApp()" 
+      class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors flex items-center shadow-lg shadow-green-500/20">
+      <i class="ti ti-brand-whatsapp mr-1.5"></i>
+      <span>Blast WA Expired</span>
+    </button>
     <button onclick="openCreateModal()" 
       class="px-4 py-2 bg-primary hover:bg-rose-600 text-white rounded-lg transition-colors flex items-center">
       <i class="ti ti-plus mr-1.5"></i>
@@ -90,6 +95,7 @@
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Video</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Streaming</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Expired</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">No. WA</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
         </tr>
       </thead>
@@ -173,7 +179,7 @@
                     var now = new Date();
                     var daysLeft = Math.ceil((expDate - now) / (1000*60*60*24));
                   %>
-                  <% if (daysLeft < 0) { %>
+                  <% if (daysLeft <= 0) { %>
                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-900/50 text-red-300">
                       <i class="ti ti-alert-circle mr-1"></i>Expired
                     </span>
@@ -190,9 +196,19 @@
                   <span class="text-gray-600 text-xs">—</span>
                 <% } %>
               </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <% if (user.phone) { %>
+                  <a href="https://wa.me/<%= user.phone %>" target="_blank" class="inline-flex items-center gap-1 text-green-400 hover:text-green-300 transition-colors">
+                    <i class="ti ti-brand-whatsapp"></i>
+                    <span class="text-xs"><%= user.phone %></span>
+                  </a>
+                <% } else { %>
+                  <span class="text-gray-600 text-xs">—</span>
+                <% } %>
+              </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div class="flex space-x-2">
-                  <button onclick="editUser(this.dataset.id, this.dataset.username, this.dataset.role, this.dataset.status, this.dataset.avatar, this.dataset.disk, this.dataset.pkg, this.dataset.stream, this.dataset.expired)" 
+                  <button onclick="editUser(this.dataset.id, this.dataset.username, this.dataset.role, this.dataset.status, this.dataset.avatar, this.dataset.disk, this.dataset.pkg, this.dataset.stream, this.dataset.expired, this.dataset.phone)" 
                     data-id="<%= user.id %>"
                     data-username="<%= user.username %>"
                     data-role="<%= user.user_role %>"
@@ -202,9 +218,25 @@
                     data-pkg="<%= user.package_name || 'custom' %>"
                     data-stream="<%= user.stream_limit || 0 %>"
                     data-expired="<%= user.expired_at || '' %>"
+                    data-phone="<%= user.phone || '' %>"
                     class="text-blue-400 hover:text-blue-300 transition-colors" title="Edit User">
                     <i class="ti ti-edit"></i>
                   </button>
+                  
+                  <% if (user.expired_at && user.phone) { %>
+                    <%
+                      var expDateWA = new Date(user.expired_at);
+                      var nowWA = new Date();
+                      var daysLeftWA = Math.ceil((expDateWA - nowWA) / (1000*60*60*24));
+                    %>
+                    <% if (daysLeftWA <= 0) { %>
+                      <a href="https://wa.me/<%= user.phone %>?text=<%= encodeURIComponent('Halo ' + user.username + ',\n\nAkun StreamFlow Anda telahExpired. Silakan perpanjang paket untuk melanjutkan menggunakan layanan kami.\n\nTerima kasih.') %>"
+                        target="_blank"
+                        class="text-green-400 hover:text-green-300 transition-colors" title="Kirim WhatsApp - Perpanjang Paket">
+                        <i class="ti ti-brand-whatsapp"></i>
+                      </a>
+                    <% } %>
+                  <% } %>
                   
                   <% if (user.id !== req.session.userId) { %>
                     <button onclick="deleteUser(this.dataset.id, this.dataset.username)" 
@@ -220,14 +252,14 @@
           <% }); %>
         <% } else { %>
           <tr id="defaultEmptyState">
-            <td colspan="7" class="px-6 py-8 text-center text-gray-400">
+            <td colspan="8" class="px-6 py-8 text-center text-gray-400">
               <i class="ti ti-users text-4xl mb-2"></i>
               <p>No users found</p>
             </td>
           </tr>
         <% } %>
         <tr id="searchEmptyState" class="hidden">
-          <td colspan="7" class="px-6 py-8 text-center text-gray-400">
+          <td colspan="8" class="px-6 py-8 text-center text-gray-400">
             <i class="ti ti-search-off text-4xl mb-2"></i>
             <p>No users match your search criteria</p>
             <p class="text-sm mt-1">Try adjusting your filters or search terms</p>
@@ -338,6 +370,12 @@
                 <input type="date" id="editExpiredAt" name="expiredAt"
                   class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:dark]">
                 <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada batas waktu.</p>
+              </div>
+              <div>
+                <label for="editPhone" class="block text-sm font-medium text-gray-300 mb-2">Nomor WhatsApp</label>
+                <input type="text" id="editPhone" name="phone" placeholder="6281234567890"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                <p class="text-xs text-gray-500 mt-1">Format: 628xxx (kode negara)</p>
               </div>
             </div>
           </div>
@@ -458,6 +496,12 @@
                   class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:dark]">
                 <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada batas waktu.</p>
               </div>
+              <div>
+                <label for="createPhone" class="block text-sm font-medium text-gray-300 mb-2">Nomor WhatsApp</label>
+                <input type="text" id="createPhone" name="phone" placeholder="6281234567890"
+                  class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+                <p class="text-xs text-gray-500 mt-1">Format: 628xxx (kode negara)</p>
+              </div>
             </div>
           </div>
         </form>
@@ -566,6 +610,26 @@
   </div>
 </div>
 
+<div id="blastModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden transition-opacity">
+  <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-lg border border-gray-600/50 transform transition-all opacity-0 scale-95 flex flex-col max-h-[80vh]" id="blastModalContent">
+      <div class="flex items-center justify-between p-4 border-b border-gray-600/50 flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <i class="ti ti-brand-whatsapp text-green-400 text-xl"></i>
+          <h3 class="text-lg font-medium">Blast WhatsApp - <span id="blastCount">0</span> User Expired</h3>
+        </div>
+        <button onclick="closeBlastModal()" class="rounded-full w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors">
+          <i class="ti ti-x"></i>
+        </button>
+      </div>
+      <div class="p-4 overflow-y-auto" id="blastList"></div>
+      <div class="p-4 border-t border-gray-600/50 flex-shrink-0">
+        <p class="text-xs text-gray-500">Klik "Kirim" pada setiap user untuk membuka WhatsApp. Kirim pesan secara manual ke setiap user.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <style>
 * {
   scrollbar-width: thin;
@@ -625,7 +689,7 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
-function openEditModal(userId, username, role, status, avatar, diskLimit, packageName, streamLimit, expiredAt) {
+function openEditModal(userId, username, role, status, avatar, diskLimit, packageName, streamLimit, expiredAt, phone) {
   document.getElementById('editUserId').value = userId;
   document.getElementById('editUsername').value = username;
   document.getElementById('editRole').value = role;
@@ -634,6 +698,7 @@ function openEditModal(userId, username, role, status, avatar, diskLimit, packag
   document.getElementById('editStreamLimit').value = streamLimit || 0;
   document.getElementById('editPassword').value = '';
   document.getElementById('editExpiredAt').value = expiredAt || '';
+  document.getElementById('editPhone').value = phone || '';
   
   const diskLimitBytes = parseInt(diskLimit) || 0;
   const TB = 1099511627776;
@@ -709,8 +774,8 @@ function closeCreateModal() {
   }, 200);
 }
 
-function editUser(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit, expiredAt) {
-  openEditModal(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit, expiredAt);
+function editUser(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit, expiredAt, phone) {
+  openEditModal(userId, username, role, status, avatarPath, diskLimit, packageName, streamLimit, expiredAt, phone);
 }
 
 const packagesData = JSON.parse(`<%- JSON.stringify(pricingSettings.packages) %>`);
@@ -1138,5 +1203,73 @@ function formatDate(dateString) {
       const secs = totalSeconds % 60;
       
       return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function blastWhatsApp() {
+      const rows = document.querySelectorAll('.user-row');
+      const expiredUsers = [];
+      
+      rows.forEach(row => {
+        const username = row.dataset.username;
+        const phoneCell = row.querySelector('td:nth-child(8)');
+        
+        if (phoneCell) {
+          const phoneLink = phoneCell.querySelector('a');
+          
+          if (phoneLink) {
+            const phone = phoneLink.href.replace('https://wa.me/', '');
+            const name = username.charAt(0).toUpperCase() + username.slice(1);
+            expiredUsers.push({ name, phone });
+          }
+        }
+      });
+      
+      if (expiredUsers.length === 0) {
+        showToast('Tidak ada user expired yang memiliki nomor WhatsApp', 'error');
+        return;
+      }
+      
+      const blastMessage = 'Halo, akun StreamFlow Anda telahExpired. Silakan perpanjang paket untuk melanjutkan menggunakan layanan kami.\n\nTerima kasih.';
+      
+      let html = '<div class="space-y-3">';
+      expiredUsers.forEach((user, i) => {
+        html += `
+          <div class="flex items-center justify-between p-3 bg-dark-700 rounded-lg">
+            <div class="flex items-center gap-3">
+              <span class="text-gray-400 text-sm">${i + 1}.</span>
+              <div>
+                <p class="text-white font-medium">${user.name}</p>
+                <p class="text-gray-400 text-xs">${user.phone}</p>
+              </div>
+            </div>
+            <a href="https://wa.me/${user.phone}?text=${encodeURIComponent(blastMessage)}" 
+               target="_blank"
+               class="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs rounded-lg transition-colors flex items-center gap-1">
+              <i class="ti ti-brand-whatsapp"></i> Kirim
+            </a>
+          </div>`;
+      });
+      html += '</div>';
+      
+      document.getElementById('blastList').innerHTML = html;
+      document.getElementById('blastCount').textContent = expiredUsers.length;
+      
+      const modal = document.getElementById('blastModal');
+      const modalContent = document.getElementById('blastModalContent');
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        modalContent.classList.remove('opacity-0', 'scale-95');
+        modalContent.classList.add('opacity-100', 'scale-100');
+      }, 10);
+    }
+    
+    function closeBlastModal() {
+      const modal = document.getElementById('blastModal');
+      const modalContent = document.getElementById('blastModalContent');
+      modal.classList.add('opacity-0');
+      modalContent.classList.remove('opacity-100', 'scale-100');
+      modalContent.classList.add('opacity-0', 'scale-95');
+      setTimeout(() => { modal.classList.add('hidden'); }, 200);
     }
 </script>

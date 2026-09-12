@@ -41,49 +41,113 @@ function parseLocalDateTime(dateStr) {
   return new Date(year, month - 1, day, hours, minutes, seconds || 0);
 }
 
-function getNextSchedule(rotation, baseDate = null) {
+function calculateRotationWindow(rotation, referenceDate = new Date()) {
   const originalStart = parseLocalDateTime(rotation.start_time);
   const originalEnd = parseLocalDateTime(rotation.end_time);
-  
+
+  if (!originalStart || !originalEnd) {
+    const now = referenceDate;
+    return { start: now, end: now };
+  }
+
   const startHours = originalStart.getHours();
   const startMinutes = originalStart.getMinutes();
   const endHours = originalEnd.getHours();
   const endMinutes = originalEnd.getMinutes();
-  
-  const now = new Date();
-  
-  let nextStart = new Date(originalStart);
-  let nextEnd = new Date(originalEnd);
-  
-  let daysToAdd = 1;
-  switch (rotation.repeat_mode) {
-    case 'daily':
-      daysToAdd = 1;
-      break;
-    case 'weekly':
-      daysToAdd = 7;
-      break;
-    case 'monthly':
-      nextStart.setMonth(nextStart.getMonth() + 1);
-      nextEnd.setMonth(nextEnd.getMonth() + 1);
-      while (nextStart <= now) {
-        nextStart.setMonth(nextStart.getMonth() + 1);
-        nextEnd.setMonth(nextEnd.getMonth() + 1);
-      }
-      return { start: nextStart, end: nextEnd };
-    default:
-      daysToAdd = 1;
+
+  const now = referenceDate;
+  const isCrossMidnight = (endHours < startHours) || (endHours === startHours && endMinutes <= startMinutes);
+  const repeatMode = rotation.repeat_mode || 'daily';
+
+  function buildWindow(baseY, baseM, baseD) {
+    const s = new Date(baseY, baseM, baseD, startHours, startMinutes, 0, 0);
+    const e = new Date(baseY, baseM, baseD + (isCrossMidnight ? 1 : 0), endHours, endMinutes, 0, 0);
+    return { start: s, end: e };
   }
-  
-  nextStart.setDate(nextStart.getDate() + daysToAdd);
-  nextEnd.setDate(nextEnd.getDate() + daysToAdd);
-  
-  while (nextStart <= now) {
+
+  // WEEKLY: hormati hari pilihan user (Senin-Minggu), bukan hari ini
+  if (repeatMode === 'weekly') {
+    const targetDow = originalStart.getDay();
+    for (let offset = -1; offset <= 7; offset++) {
+      const base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+      if (base.getDay() !== targetDow) continue;
+      const w = buildWindow(base.getFullYear(), base.getMonth(), base.getDate());
+      if (now >= w.start && now < w.end) return w;
+      if (w.start > now) return w;
+    }
+    // fallback: cari Senin-Minggu berikutnya
+    for (let offset = 0; offset <= 14; offset++) {
+      const base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+      if (base.getDay() !== targetDow) continue;
+      const w = buildWindow(base.getFullYear(), base.getMonth(), base.getDate());
+      if (w.end > now) return w;
+    }
+  }
+
+  // MONTHLY: hormati tanggal pilihan user (1-31)
+  if (repeatMode === 'monthly') {
+    const targetDom = originalStart.getDate();
+    for (let mOffset = -1; mOffset <= 13; mOffset++) {
+      const ref = new Date(now.getFullYear(), now.getMonth() + mOffset, 1);
+      const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+      const dom = Math.min(targetDom, lastDay);
+      const w = buildWindow(ref.getFullYear(), ref.getMonth(), dom);
+      if (now >= w.start && now < w.end) return w;
+      if (w.start > now) return w;
+    }
+  }
+
+  // DAILY (dan fallback): logika hari ini seperti semula
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startHours, startMinutes, 0, 0);
+  const endToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (isCrossMidnight ? 1 : 0), endHours, endMinutes, 0, 0);
+
+  const startYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, startHours, startMinutes, 0, 0);
+  const endYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endHours, endMinutes, 0, 0);
+
+  if (isCrossMidnight && now >= startYesterday && now < endYesterday) {
+    return { start: startYesterday, end: endYesterday };
+  }
+
+  if (now >= startToday && now < endToday) {
+    return { start: startToday, end: endToday };
+  }
+
+  if (now < startToday) {
+    return { start: startToday, end: endToday };
+  }
+
+  let daysToAdd = 1;
+  if (repeatMode === 'weekly') daysToAdd = 7;
+  if (repeatMode === 'monthly') {
+    const nextStartM = new Date(startToday);
+    const nextEndM = new Date(endToday);
+    while (nextEndM <= now) {
+      nextStartM.setMonth(nextStartM.getMonth() + 1);
+      nextEndM.setMonth(nextEndM.getMonth() + 1);
+    }
+    return { start: nextStartM, end: nextEndM };
+  }
+
+  const nextStart = new Date(startToday);
+  const nextEnd = new Date(endToday);
+
+  while (nextEnd <= now) {
     nextStart.setDate(nextStart.getDate() + daysToAdd);
     nextEnd.setDate(nextEnd.getDate() + daysToAdd);
   }
-  
+
   return { start: nextStart, end: nextEnd };
+}
+
+function getNextSchedule(rotation, baseDate = null) {
+  const refDate = baseDate || new Date();
+  const window = calculateRotationWindow(rotation, refDate);
+  if (window.end <= refDate) {
+    const futureRef = new Date(refDate.getTime() + 60 * 1000);
+    return calculateRotationWindow(rotation, futureRef);
+  }
+  const afterWindowRef = new Date(window.end.getTime() + 60 * 1000);
+  return calculateRotationWindow(rotation, afterWindowRef);
 }
 
 function init() {
@@ -102,7 +166,8 @@ async function moveRotationToNextScheduledItem(rotation, items, currentIndex, re
       await Rotation.update(rotation.id, {
         current_index: 0,
         start_time: formatLocalDateTime(nextSchedule.start),
-        end_time: formatLocalDateTime(nextSchedule.end)
+        end_time: formatLocalDateTime(nextSchedule.end),
+        status: 'active'
       }, rotation.user_id);
       console.log(`[RotationService] ${reason} Rotation ${rotation.name} diulang dari item pertama pada ${formatLocalDateTime(nextSchedule.start)}`);
     } else {
@@ -113,14 +178,12 @@ async function moveRotationToNextScheduledItem(rotation, items, currentIndex, re
     return;
   }
 
-  const nextSchedule = getNextSchedule(rotation);
-
+  // Moving to next item WITHIN current rotation window: do NOT add 1 day to start_time!
   await Rotation.update(rotation.id, {
     current_index: nextIndex,
-    start_time: formatLocalDateTime(nextSchedule.start),
-    end_time: formatLocalDateTime(nextSchedule.end)
+    status: 'active'
   }, rotation.user_id);
-  console.log(`[RotationService] ${reason} Lanjut ke item ${nextIndex + 1}/${items.length} pada ${formatLocalDateTime(nextSchedule.start)}`);
+  console.log(`[RotationService] ${reason} Lanjut ke item ${nextIndex + 1}/${items.length} (${rotation.start_time})`);
 }
 
 async function checkRotations() {
@@ -134,6 +197,23 @@ async function checkRotations() {
       const items = await Rotation.getItemsByRotationId(rotation.id);
       if (items.length === 0) continue;
 
+      let scheduledStart = parseLocalDateTime(rotation.start_time);
+      let scheduledEnd = parseLocalDateTime(rotation.end_time);
+
+      // Auto-correct distorted schedule dates caused by previous item increment bugs
+      const currentWindow = calculateRotationWindow(rotation, now);
+      if (scheduledStart > currentWindow.start) {
+        console.log(`[RotationService] Auto-correcting schedule for rotation ${rotation.name} from ${formatLocalDateTime(scheduledStart)} to active window ${formatLocalDateTime(currentWindow.start)}`);
+        rotation.start_time = formatLocalDateTime(currentWindow.start);
+        rotation.end_time = formatLocalDateTime(currentWindow.end);
+        scheduledStart = currentWindow.start;
+        scheduledEnd = currentWindow.end;
+        await Rotation.update(rotation.id, {
+          start_time: rotation.start_time,
+          end_time: rotation.end_time
+        }, rotation.user_id);
+      }
+
       const currentIndex = rotation.current_index || 0;
       
       if (currentIndex >= items.length) {
@@ -145,7 +225,6 @@ async function checkRotations() {
             await stopRotationStream(rotation, item);
             activeRotationStreams.delete(streamKey);
             loggedAlreadyRunning.delete(streamKey);
-            // Update rotation status back to active (waiting)
             await Rotation.update(rotation.id, { status: 'active' }, rotation.user_id);
           }
           failedRotationStarts.delete(streamKey);
@@ -157,7 +236,8 @@ async function checkRotations() {
           await Rotation.update(rotation.id, { 
             current_index: 0,
             start_time: formatLocalDateTime(nextSchedule.start),
-            end_time: formatLocalDateTime(nextSchedule.end)
+            end_time: formatLocalDateTime(nextSchedule.end),
+            status: 'active'
           }, rotation.user_id);
           console.log(`[RotationService] Rotation ${rotation.name} rescheduled for ${formatLocalDateTime(nextSchedule.start)}`);
         } else {
@@ -166,9 +246,6 @@ async function checkRotations() {
         }
         continue;
       }
-
-      const scheduledStart = parseLocalDateTime(rotation.start_time);
-      const scheduledEnd = parseLocalDateTime(rotation.end_time);
 
       if (now < scheduledStart) {
         if (!loggedScheduleInfo.has(`notstarted_${rotation.id}`)) {
@@ -190,29 +267,20 @@ async function checkRotations() {
             await stopRotationStream(rotation, currentItem);
             activeRotationStreams.delete(streamKey);
             loggedAlreadyRunning.delete(streamKey);
-            // Update rotation status back to active (waiting)
             await Rotation.update(rotation.id, { status: 'active' }, rotation.user_id);
           }
           failedRotationStarts.delete(streamKey);
         }
 
-        const nextIndex = currentIndex + 1;
-        
-        if (nextIndex >= items.length) {
-          await moveRotationToNextScheduledItem(
-            rotation,
-            items,
-            currentIndex,
-            'Semua item di slot hari ini selesai.'
-          );
-        } else {
-          await moveRotationToNextScheduledItem(
-            rotation,
-            items,
-            currentIndex,
-            'Slot hari ini berakhir.'
-          );
-        }
+        // Window ended -> reschedule for next cycle
+        const nextSchedule = getNextSchedule(rotation);
+        await Rotation.update(rotation.id, {
+          current_index: 0,
+          start_time: formatLocalDateTime(nextSchedule.start),
+          end_time: formatLocalDateTime(nextSchedule.end),
+          status: 'active'
+        }, rotation.user_id);
+        console.log(`[RotationService] Time window ended. Rescheduled rotation ${rotation.name} for ${formatLocalDateTime(nextSchedule.start)}`);
         continue;
       }
 
@@ -236,7 +304,6 @@ async function checkRotations() {
             itemId: currentItem.id,
             streamId: result.streamId 
           });
-          // Update rotation status to live
           await Rotation.update(rotation.id, { status: 'live' }, rotation.user_id);
         } else if (result.code === 'UNSUPPORTED_COPY_MODE_MEDIA') {
           failedRotationStarts.delete(streamKey);
@@ -298,7 +365,8 @@ async function startRotationStream(rotation, item) {
         user_id: rotation.user_id,
         is_youtube_api: false,
         schedule_time: rotation.start_time,
-        end_time: rotation.end_time
+        end_time: rotation.end_time,
+        is_rotation: true
       });
 
       const startResult = await streamingService.startStream(stream.id);
@@ -319,10 +387,19 @@ async function startRotationStream(rotation, item) {
     if (rotation.youtube_channel_id) {
       selectedChannel = await YoutubeChannel.findById(rotation.youtube_channel_id);
     }
+    if (!selectedChannel) {
+      selectedChannel = await YoutubeChannel.findDefault(rotation.user_id);
+    }
+    if (!selectedChannel) {
+      const userChannels = await YoutubeChannel.findAll(rotation.user_id);
+      if (userChannels.length > 0) {
+        selectedChannel = userChannels[0];
+      }
+    }
     
     if (!selectedChannel || selectedChannel.user_id !== rotation.user_id) {
       console.error(`[RotationService] [ERROR] YouTube channel association broken or unauthorized for rotation ${rotation.id}. Expected Channel UUID: ${rotation.youtube_channel_id}`);
-      return { success: false, error: 'YouTube channel not found or unauthorized. Please re-select channel in rotation settings.' };
+      return { success: false, error: 'YouTube channel not found or unauthorized. Please select a channel in rotation settings.' };
     }
 
     if (!selectedChannel || !selectedChannel.access_token) {
@@ -330,160 +407,56 @@ async function startRotationStream(rotation, item) {
       return { success: false, error: 'YouTube not connected' };
     }
 
-    const oauth2Client = new google.auth.OAuth2(
-      user.youtube_client_id,
-      decrypt(user.youtube_client_secret),
-      getRedirectUri(user)
+    // Reuse or create local Stream record for rotation
+    const userStreams = await new Promise((resolve) => {
+      const { db } = require('../db/database');
+      db.all('SELECT * FROM streams WHERE user_id = ? AND is_rotation = 1', [rotation.user_id], (err, rows) => {
+        resolve(rows || []);
+      });
+    });
+    let stream = userStreams.find(s => 
+      s.schedule_time === rotation.start_time &&
+      s.title === item.title &&
+      s.video_id === actualVideoId &&
+      s.is_youtube_api &&
+      (s.status === 'scheduled' || s.status === 'offline' || s.status === 'starting' || s.status === 'live')
     );
 
-    oauth2Client.setCredentials({
-      access_token: decrypt(selectedChannel.access_token),
-      refresh_token: decrypt(selectedChannel.refresh_token)
-    });
-
-    oauth2Client.on('tokens', async (tokens) => {
-      if (tokens.access_token) {
-        await YoutubeChannel.update(selectedChannel.id, {
-          access_token: encrypt(tokens.access_token)
-        });
+    if (!stream) {
+      const thumbnailToUpload = item.original_thumbnail_path || item.thumbnail_path;
+      let thumbUrl = null;
+      if (thumbnailToUpload) {
+        thumbUrl = `/uploads/thumbnails/${thumbnailToUpload}`;
       }
-      if (tokens.refresh_token) {
-        await YoutubeChannel.update(selectedChannel.id, {
-          refresh_token: encrypt(tokens.refresh_token)
-        });
-      }
-    });
 
-    const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
-
-    const scheduledStartTime = new Date().toISOString();
-
-    const broadcastResponse = await youtube.liveBroadcasts.insert({
-      part: ['snippet', 'status', 'contentDetails'],
-      requestBody: {
-        snippet: {
-          title: item.title,
-          description: item.description || '',
-          scheduledStartTime: scheduledStartTime
-        },
-        status: {
-          privacyStatus: item.privacy || 'unlisted',
-          selfDeclaredMadeForKids: item.youtube_made_for_kids === 1 || item.youtube_made_for_kids === true
-        },
-        contentDetails: {
-          enableAutoStart: true,
-          enableAutoStop: true,
-          latencyPreference: 'normal'
-        }
-      }
-    });
-
-    const broadcast = broadcastResponse.data;
-
-    let monetizationEnabled = item.youtube_monetization === true || item.youtube_monetization === 1;
-    if (monetizationEnabled) {
-      try {
-        await syncBroadcastMonetization(youtube, broadcast.id, true);
-      } catch (monetizationError) {
-        monetizationEnabled = false;
-        console.warn(`[RotationService] Failed to enable monetization for broadcast ${broadcast.id}. Continuing without monetization. Error: ${monetizationError.message}`);
-      }
+      stream = await Stream.create({
+        title: item.title,
+        video_id: actualVideoId,
+        rtmp_url: '',
+        stream_key: '',
+        platform: 'YouTube',
+        platform_icon: 'brand-youtube',
+        loop_video: true,
+        use_advanced_settings: false,
+        status: 'scheduled',
+        user_id: rotation.user_id,
+        youtube_description: item.description,
+        youtube_privacy: item.privacy,
+        youtube_category: item.category,
+        youtube_tags: item.tags,
+        youtube_monetization: item.youtube_monetization === true || item.youtube_monetization === 1,
+        youtube_altered_content: item.youtube_altered_content,
+        youtube_made_for_kids: item.youtube_made_for_kids,
+        youtube_channel_id: selectedChannel.id,
+        youtube_thumbnail: thumbUrl,
+        is_youtube_api: true,
+        schedule_time: rotation.start_time,
+        end_time: rotation.end_time,
+        is_rotation: true
+      });
+    } else {
+      console.log(`[RotationService] Found existing local stream record ${stream.id} for rotation item "${item.title}". Will attempt reuse.`);
     }
-
-    const streamResponse = await youtube.liveStreams.insert({
-      part: ['snippet', 'cdn'],
-      requestBody: {
-        snippet: {
-          title: `Stream for ${item.title}`
-        },
-        cdn: {
-          frameRate: '30fps',
-          ingestionType: 'rtmp',
-          resolution: '1080p'
-        }
-      }
-    });
-
-    const liveStream = streamResponse.data;
-
-    await youtube.liveBroadcasts.bind({
-      part: ['id', 'contentDetails'],
-      id: broadcast.id,
-      streamId: liveStream.id
-    });
-
-    const rtmpUrl = liveStream.cdn.ingestionInfo.ingestionAddress;
-    const streamKey = liveStream.cdn.ingestionInfo.streamName;
-
-    const thumbnailToUpload = item.original_thumbnail_path || item.thumbnail_path;
-    if (thumbnailToUpload) {
-      try {
-        const thumbnailPath = path.join(__dirname, '..', 'public', 'uploads', 'thumbnails', thumbnailToUpload);
-        if (fs.existsSync(thumbnailPath)) {
-          await youtube.thumbnails.set({
-            videoId: broadcast.id,
-            media: {
-              mimeType: 'image/jpeg',
-              body: fs.createReadStream(thumbnailPath)
-            }
-          });
-        }
-      } catch (thumbError) {
-        console.error('[RotationService] Error setting thumbnail:', thumbError.message);
-      }
-    }
-
-    const tags = sanitizeYouTubeTags(item.tags);
-    if (tags.length > 0 || item.category || item.youtube_altered_content || item.youtube_made_for_kids) {
-      try {
-        await youtube.videos.update({
-          part: ['snippet', 'status', 'contentDetails'],
-          requestBody: {
-            id: broadcast.id,
-            snippet: {
-              title: item.title,
-              description: item.description || '',
-              categoryId: item.category || '22',
-              tags: tags
-            },
-            status: {
-              selfDeclaredMadeForKids: item.youtube_made_for_kids === 1 || item.youtube_made_for_kids === true
-            },
-            contentDetails: {
-              hasAlteredContent: item.youtube_altered_content === 1 || item.youtube_altered_content === true
-            }
-          }
-        });
-      } catch (updateError) {
-        console.error('[RotationService] Error updating video metadata:', updateError.message);
-      }
-    }
-
-    const stream = await Stream.create({
-      title: item.title,
-      video_id: actualVideoId,
-      rtmp_url: rtmpUrl,
-      stream_key: streamKey,
-      platform: 'YouTube',
-      platform_icon: 'brand-youtube',
-      loop_video: true,
-      use_advanced_settings: false,
-      status: 'scheduled',
-      user_id: rotation.user_id,
-      youtube_broadcast_id: broadcast.id,
-      youtube_stream_id: liveStream.id,
-      youtube_description: item.description,
-      youtube_privacy: item.privacy,
-      youtube_category: item.category,
-      youtube_tags: item.tags,
-      youtube_monetization: monetizationEnabled,
-      youtube_altered_content: item.youtube_altered_content,
-      youtube_made_for_kids: item.youtube_made_for_kids,
-      youtube_channel_id: selectedChannel.id,
-      is_youtube_api: true,
-      schedule_time: rotation.start_time,
-      end_time: rotation.end_time
-    });
 
     const startResult = await streamingService.startStream(stream.id);
     if (!startResult.success) {
@@ -494,7 +467,8 @@ async function startRotationStream(rotation, item) {
       };
     }
 
-    return { success: true, streamId: stream.id, broadcastId: broadcast.id };
+    const updatedStream = await Stream.findById(stream.id);
+    return { success: true, streamId: stream.id, broadcastId: updatedStream ? updatedStream.youtube_broadcast_id : null };
   } catch (error) {
     console.error('[RotationService] Error starting rotation stream:', error);
     return { success: false, error: error.message, code: error.code || null };
@@ -524,7 +498,12 @@ async function stopRotationStream(rotation, item) {
     
     if (!streamId) {
       // Fallback: search in DB if not in memory (legacy/safety)
-      const streams = await Stream.findAll(rotationData.user_id);
+      const streams = await new Promise((resolve) => {
+        const { db } = require('../db/database');
+        db.all('SELECT * FROM streams WHERE user_id = ? AND is_rotation = 1', [rotationData.user_id], (err, rows) => {
+          resolve(rows || []);
+        });
+      });
       const rotationStream = streams.find(s => 
         s.video_id === actualVideoId && 
         s.title === item.title && 
@@ -609,34 +588,19 @@ async function activateRotation(rotationId) {
     }
 
     const now = new Date();
-    const originalStart = parseLocalDateTime(rotation.start_time);
-    const originalEnd = parseLocalDateTime(rotation.end_time);
-    
-    let nextStart = new Date(now);
-    let nextEnd = new Date(now);
-    
-    nextStart.setHours(originalStart.getHours(), originalStart.getMinutes(), 0, 0);
-    nextEnd.setHours(originalEnd.getHours(), originalEnd.getMinutes(), 0, 0);
-    
-    if (nextEnd <= nextStart) {
-      nextEnd.setDate(nextEnd.getDate() + 1);
-    }
-    
-    if (now >= nextStart) {
-      nextStart.setDate(nextStart.getDate() + 1);
-      nextEnd.setDate(nextEnd.getDate() + 1);
-    }
+    const window = calculateRotationWindow(rotation, now);
     
     const updateData = {
       status: 'active',
       current_index: 0,
-      start_time: formatLocalDateTime(nextStart),
-      end_time: formatLocalDateTime(nextEnd)
+      start_time: formatLocalDateTime(window.start),
+      end_time: formatLocalDateTime(window.end)
     };
     
-    console.log(`[RotationService] Activating rotation ${rotationId} for ${formatLocalDateTime(nextStart)} - ${formatLocalDateTime(nextEnd)}`);
+    console.log(`[RotationService] Activating rotation ${rotationId} for ${formatLocalDateTime(window.start)} - ${formatLocalDateTime(window.end)}`);
 
     await Rotation.update(rotationId, updateData, rotation.user_id);
+    checkRotations();
     return { success: true };
   } catch (error) {
     console.error('[RotationService] Error activating rotation:', error);

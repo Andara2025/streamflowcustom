@@ -418,6 +418,12 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE streams ADD COLUMN is_rotation INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding is_rotation column to streams:', err.message);
+        }
+      });
+
       db.run(`ALTER TABLE users ADD COLUMN disk_limit INTEGER DEFAULT 0`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding disk_limit column to users:', err.message);
@@ -450,7 +456,13 @@ function createTables() {
 
       db.run(`ALTER TABLE users ADD COLUMN reset_password_expires TEXT`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
-          console.error('Error adding reset_password_expires column to users:', err.message);
+          console.error('Error adding reset_password_expires column:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE users ADD COLUMN phone TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding phone column:', err.message);
         }
       });
 

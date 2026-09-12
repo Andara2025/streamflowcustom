@@ -23,12 +23,12 @@
         data-tab="integration">
         <i class="ti ti-plug mr-2"></i>Integration
       </button>
-      <% if (user.user_role === 'admin') { %>
       <button
         class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
         data-tab="gemini">
         <i class="ti ti-sparkles mr-2"></i>Gemini AI
       </button>
+      <% if (user.user_role === 'admin') { %>
       <button
         class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
         data-tab="pricing">
@@ -97,6 +97,19 @@
                 class="bg-dark-900 text-white pl-10 pr-4 py-2 rounded-lg block w-full sm:max-w-md focus:outline-none focus:ring-1 focus:ring-primary"
                 value="<%= user.username %>">
             </div>
+          </div>
+          
+          <div class="space-y-2">
+            <label for="phone" class="block text-sm font-medium text-gray-300">Nomor WhatsApp</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                <i class="ti ti-phone"></i>
+              </span>
+              <input type="text" id="phone" name="phone" placeholder="6281234567890"
+                class="bg-dark-900 text-white pl-10 pr-4 py-2 rounded-lg block w-full sm:max-w-md focus:outline-none focus:ring-1 focus:ring-primary"
+                value="<%= user.phone || '' %>">
+            </div>
+            <p class="text-xs text-gray-500">Format: 628xxx (gunakan kode negara)</p>
           </div>
           
           <div class="pt-4">
@@ -480,7 +493,6 @@
       </div>
     </div>
 
-    <% if (user.user_role === 'admin') { %>
     <div id="gemini-tab" class="settings-content hidden">
       <div class="bg-gray-800 rounded-lg p-6 max-w-2xl">
         <h3 class="text-lg font-semibold mb-2">Gemini AI Configuration</h3>
@@ -522,7 +534,6 @@
         </form>
       </div>
     </div>
-    <% } %>
 
     <% if (user.user_role === 'admin') { %>
     <div id="pricing-tab" class="settings-content hidden">

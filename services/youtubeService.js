@@ -123,7 +123,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
 
   if (stream.youtube_broadcast_id && stream.rtmp_url && stream.stream_key) {
     if (!loggedAlreadyHasBroadcast.has(streamId)) {
-      console.log(`[YouTubeService] Stream ${streamId} already has YouTube broadcast, skipping creation`);
+      console.log(`[YouTubeService] Stream ${streamId} already has YouTube broadcast & RTMP info, skipping creation`);
       loggedAlreadyHasBroadcast.add(streamId);
     }
     return { 
@@ -143,11 +143,23 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
 
   console.log(`[YouTubeService] [DEBUG] Binding check: Stream=${streamId}, User=${stream.user_id}, ChannelInternalID=${stream.youtube_channel_id}`);
 
-  const selectedChannel = await YoutubeChannel.findById(stream.youtube_channel_id);
-  
+  let selectedChannel = null;
+  if (stream.youtube_channel_id) {
+    selectedChannel = await YoutubeChannel.findById(stream.youtube_channel_id);
+  }
+  if (!selectedChannel) {
+    selectedChannel = await YoutubeChannel.findDefault(stream.user_id);
+  }
+  if (!selectedChannel) {
+    const userChannels = await YoutubeChannel.findAll(stream.user_id);
+    if (userChannels.length > 0) {
+      selectedChannel = userChannels[0];
+    }
+  }
+
   if (!selectedChannel) {
     console.error(`[YouTubeService] [ERROR] Channel not found for stream ${streamId}. Expected Internal ID: ${stream.youtube_channel_id}`);
-    throw new Error('YouTube channel association is broken. Please re-select channel in stream settings.');
+    throw new Error('YouTube channel not connected or association broken. Please select a channel in stream settings.');
   }
 
   if (selectedChannel.user_id !== stream.user_id) {
@@ -187,15 +199,92 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
 
   const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
+  // REUSE CHECK: If stream already has a broadcast ID, verify if it is valid and upcoming on YouTube API
+  if (stream.youtube_broadcast_id) {
+    try {
+      const checkRes = await youtube.liveBroadcasts.list({
+        part: 'snippet,status,contentDetails',
+        id: stream.youtube_broadcast_id
+      });
+      
+      const existingBroadcast = checkRes.data.items?.[0];
+      if (existingBroadcast) {
+        const lifeCycleStatus = existingBroadcast.status?.lifeCycleStatus;
+        if (lifeCycleStatus === 'upcoming' || lifeCycleStatus === 'created' || lifeCycleStatus === 'ready') {
+          console.log(`[YouTubeService] Found valid existing UPCOMING broadcast ${stream.youtube_broadcast_id} (status: ${lifeCycleStatus})`);
+          
+          let liveStreamId = stream.youtube_stream_id;
+          let rtmpUrl = stream.rtmp_url;
+          let streamKey = stream.stream_key;
+
+          if (liveStreamId && (!rtmpUrl || !streamKey)) {
+            try {
+              const streamRes = await youtube.liveStreams.list({
+                part: 'cdn',
+                id: liveStreamId
+              });
+              const cdn = streamRes.data.items?.[0]?.cdn;
+              if (cdn && cdn.ingestionInfo) {
+                rtmpUrl = cdn.ingestionInfo.ingestionAddress;
+                streamKey = cdn.ingestionInfo.streamName;
+              }
+            } catch (streamErr) {
+              console.log(`[YouTubeService] Could not fetch existing liveStream details: ${streamErr.message}`);
+            }
+          }
+
+          if (!liveStreamId || !rtmpUrl || !streamKey) {
+            // Create live stream and bind to existing broadcast
+            const streamResponse = await youtube.liveStreams.insert({
+              part: 'snippet,cdn,contentDetails,status',
+              requestBody: {
+                snippet: { title: `${(stream.title || 'Live Stream').substring(0, 90)} - Stream` },
+                cdn: { frameRate: '30fps', ingestionType: 'rtmp', resolution: '1080p' },
+                contentDetails: { isReusable: false }
+              }
+            });
+            const newLiveStream = streamResponse.data;
+            liveStreamId = newLiveStream.id;
+            rtmpUrl = newLiveStream.cdn.ingestionInfo.ingestionAddress;
+            streamKey = newLiveStream.cdn.ingestionInfo.streamName;
+
+            await youtube.liveBroadcasts.bind({
+              part: 'id,contentDetails',
+              id: stream.youtube_broadcast_id,
+              streamId: liveStreamId
+            });
+          }
+
+          await Stream.update(streamId, {
+            youtube_stream_id: liveStreamId,
+            rtmp_url: rtmpUrl,
+            stream_key: streamKey
+          });
+
+          return {
+            success: true,
+            broadcastId: stream.youtube_broadcast_id,
+            streamId: liveStreamId,
+            rtmpUrl: rtmpUrl,
+            streamKey: streamKey
+          };
+        }
+      }
+    } catch (checkErr) {
+      console.log(`[YouTubeService] Error verifying existing broadcast ${stream.youtube_broadcast_id}: ${checkErr.message}. Will create new broadcast.`);
+    }
+  }
+
   const tagsArray = sanitizeYouTubeTags(stream.youtube_tags);
+  const broadcastTitle = (stream.title || 'Live Stream').substring(0, 100);
 
   const broadcastSnippet = {
-    title: stream.title,
+    title: broadcastTitle,
     description: stream.youtube_description || '',
     scheduledStartTime: new Date().toISOString()
   };
 
-  console.log(`[YouTubeService] Creating YouTube broadcast for stream ${streamId}`);
+  console.log(`[YouTubeService] Creating new YouTube broadcast for stream ${streamId}`);
 
   let broadcastResponse;
   const broadcastData = {
@@ -245,7 +334,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
           requestBody: {
             id: broadcast.id,
             snippet: {
-              title: stream.title,
+              title: broadcastTitle,
               description: stream.youtube_description || '',
               categoryId: stream.youtube_category || '22',
               tags: tagsArray.length > 0 ? tagsArray : currentSnippet.tags,
@@ -304,7 +393,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     part: 'snippet,cdn,contentDetails,status',
     requestBody: {
       snippet: {
-        title: `${stream.title} - Stream`
+        title: `${(stream.title || 'Live Stream').substring(0, 90)} - Stream`
       },
       cdn: {
         frameRate: '30fps',
@@ -370,9 +459,68 @@ async function deleteYouTubeBroadcast(streamId) {
   }
 }
 
+async function deleteYouTubeBroadcastIfUpcoming(streamId) {
+  try {
+    loggedAlreadyHasBroadcast.delete(streamId);
+
+    const stream = await Stream.findById(streamId);
+    if (!stream || !stream.is_youtube_api || !stream.youtube_broadcast_id) {
+      return { success: true, message: 'No YouTube broadcast to clean up' };
+    }
+
+    const user = await User.findById(stream.user_id);
+    if (!user || !user.youtube_client_id || !user.youtube_client_secret) {
+      return { success: false, error: 'User credentials missing' };
+    }
+
+    let selectedChannel = stream.youtube_channel_id ? await YoutubeChannel.findById(stream.youtube_channel_id) : null;
+    if (!selectedChannel) selectedChannel = await YoutubeChannel.findDefault(stream.user_id);
+    if (!selectedChannel || selectedChannel.user_id !== stream.user_id) return { success: false };
+
+    const clientSecret = decrypt(user.youtube_client_secret);
+    const accessToken = decrypt(selectedChannel.access_token);
+    const refreshToken = decrypt(selectedChannel.refresh_token);
+    if (!clientSecret || !accessToken) return { success: false };
+
+    const port = process.env.PORT || 7575;
+    const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, `http://localhost:${port}/auth/youtube/callback`);
+    oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+    const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+
+    // CRITICAL SAFETY CHECK: Fetch status from YouTube API before any delete operation
+    const listRes = await youtube.liveBroadcasts.list({
+      part: 'status',
+      id: stream.youtube_broadcast_id
+    });
+
+    const broadcastItem = listRes.data.items?.[0];
+    if (broadcastItem) {
+      const lifeCycleStatus = broadcastItem.status?.lifeCycleStatus;
+      // STRICT SAFETY: ONLY delete if it is UPCOMING or CREATED or READY. NEVER delete complete or live VODs!
+      if (lifeCycleStatus === 'upcoming' || lifeCycleStatus === 'created' || lifeCycleStatus === 'ready') {
+        await youtube.liveBroadcasts.delete({ id: stream.youtube_broadcast_id });
+        console.log(`[YouTubeService] Safely deleted UPCOMING broadcast ${stream.youtube_broadcast_id} from YouTube Studio`);
+      } else {
+        console.log(`[YouTubeService] Preserving broadcast ${stream.youtube_broadcast_id} on YouTube Studio (status: '${lifeCycleStatus}', NOT upcoming)`);
+      }
+    }
+
+    await Stream.update(streamId, {
+      rtmp_url: '',
+      stream_key: ''
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error(`[YouTubeService] Error in deleteYouTubeBroadcastIfUpcoming for stream ${streamId}:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   createYouTubeBroadcast,
   deleteYouTubeBroadcast,
+  deleteYouTubeBroadcastIfUpcoming,
   getYouTubeOAuth2Client,
   syncBroadcastMonetization,
   sanitizeYouTubeTags

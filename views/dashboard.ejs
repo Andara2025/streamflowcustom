@@ -246,6 +246,11 @@
           <i class="ti ti-files"></i>
           <span>Export Selected (<span id="selected-streams-count">0</span>)</span>
         </button>
+        <button id="bulk-delete-streams-btn" onclick="deleteSelectedStreams()"
+          class="hidden w-full sm:w-auto flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors">
+          <i class="ti ti-trash"></i>
+          <span>Delete Selected (<span id="selected-delete-streams-count">0</span>)</span>
+        </button>
         <button onclick="document.getElementById('import-stream-input').click()"
           class="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
           <i class="ti ti-download"></i>
@@ -2435,10 +2440,10 @@
         <div>${statusBadge}</div>
         <div class="flex items-center gap-1.5">
           ${getActionButtonHTML(stream.status, stream.id, 'mobile')}
-          <button class="p-1 hover:bg-dark-700 rounded transition-colors ${stream.status === 'live' || stream.status === 'scheduled' ? 'opacity-50 cursor-not-allowed' : ''}" onclick="${stream.status === 'live' || stream.status === 'scheduled' ? '' : `editStream('${stream.id}')`}" ${stream.status === 'live' || stream.status === 'scheduled' ? 'disabled' : ''} title="Edit Stream"><i class="ti ti-edit text-gray-400 hover:text-white text-sm"></i></button>
+          <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="editStream('${stream.id}')" title="Edit Stream"><i class="ti ti-edit text-gray-400 hover:text-white text-sm"></i></button>
           <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="location.href='/api/streams/${stream.id}/export'" title="Export Stream"><i class="ti ti-download text-blue-400 hover:text-blue-300 text-sm"></i></button>
           <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="duplicateStream('${stream.id}')" title="Duplicate Stream"><i class="ti ti-copy text-gray-400 hover:text-white text-sm"></i></button>
-          <button class="p-1 hover:bg-dark-700 rounded transition-colors ${stream.status === 'live' || stream.status === 'scheduled' ? 'opacity-50 cursor-not-allowed' : ''}" onclick="${stream.status === 'live' || stream.status === 'scheduled' ? '' : `deleteStream('${stream.id}')`}" ${stream.status === 'live' || stream.status === 'scheduled' ? 'disabled' : ''} title="Delete Stream"><i class="ti ti-trash text-gray-400 hover:text-red-400 text-sm"></i></button>
+          <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="deleteStream('${stream.id}')" title="Delete Stream"><i class="ti ti-trash text-gray-400 hover:text-red-400 text-sm"></i></button>
         </div>
       </div>
     `;
@@ -2608,15 +2613,13 @@
                     title="Duplicate Stream">
               <i class="ti ti-copy text-gray-400 hover:text-white"></i>
             </button>
-            <button class="p-1.5 hover:bg-dark-700 rounded transition-colors ${stream.status === 'live' || stream.status === 'scheduled' ? 'opacity-50 cursor-not-allowed' : ''}" 
-                    onclick="${stream.status === 'live' || stream.status === 'scheduled' ? '' : `editStream('${stream.id}')`}"
-                    ${stream.status === 'live' || stream.status === 'scheduled' ? 'disabled' : ''}
+            <button class="p-1.5 hover:bg-dark-700 rounded transition-colors" 
+                    onclick="editStream('${stream.id}')"
                     title="Edit Stream">
               <i class="ti ti-edit text-gray-400 hover:text-white"></i>
             </button>
-            <button class="p-1.5 hover:bg-dark-700 rounded transition-colors ${stream.status === 'live' || stream.status === 'scheduled' ? 'opacity-50 cursor-not-allowed' : ''}" 
-                    onclick="${stream.status === 'live' || stream.status === 'scheduled' ? '' : `deleteStream('${stream.id}')`}"
-                    ${stream.status === 'live' || stream.status === 'scheduled' ? 'disabled' : ''}
+            <button class="p-1.5 hover:bg-dark-700 rounded transition-colors" 
+                    onclick="deleteStream('${stream.id}')"
                     title="Delete Stream">
               <i class="ti ti-trash text-gray-400 hover:text-red-400"></i>
             </button>
@@ -2906,10 +2909,12 @@
       });
 
       if (confirmed) {
+        const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
         fetch(`/api/streams/${streamId}`, {
           method: 'DELETE',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
           }
         })
           .then(response => response.json())
@@ -3661,12 +3666,13 @@
             // Open the NEW stream modal
             openNewStreamModal();
             
-            const isYoutubeStream = stream.is_youtube_api === true || stream.is_youtube_api === 1;
-            
+            const cleanTitle = (stream.title || '').replace(/\s*\(Copy(?:\s*\d+)?\)+$/gi, '').trim();
+            const newTitle = (cleanTitle ? `${cleanTitle} (Copy)` : 'Live Stream (Copy)').substring(0, 100);
+
             if (isYoutubeStream) {
               if (typeof setStreamMode === 'function') setStreamMode('auto');
               
-              document.getElementById('ytStreamTitle').value = stream.title + ' (Copy)';
+              document.getElementById('ytStreamTitle').value = newTitle;
               document.getElementById('ytDescription').value = stream.youtube_description || '';
               document.getElementById('ytPrivacy').value = stream.youtube_privacy || 'unlisted';
               document.getElementById('ytCategory').value = stream.youtube_category || '22';
@@ -3699,7 +3705,7 @@
             } else {
               if (typeof setStreamMode === 'function') setStreamMode('manual');
               
-              document.getElementById('streamTitle').value = stream.title + ' (Copy)';
+              document.getElementById('streamTitle').value = newTitle;
               document.getElementById('rtmpUrl').value = stream.rtmp_url || '';
               document.getElementById('streamKey').value = stream.stream_key || '';
               
@@ -4886,15 +4892,23 @@
 
     window.updateStreamSelectedCount = function() {
       const checked = document.querySelectorAll('.stream-checkbox:checked');
-      const count = checked.length;
+      const uniqueIds = new Set(Array.from(checked).map(cb => cb.value));
+      const count = uniqueIds.size;
       const btn = document.getElementById('bulk-export-streams-btn');
+      const deleteBtn = document.getElementById('bulk-delete-streams-btn');
       const countSpan = document.getElementById('selected-streams-count');
+      const deleteCountSpan = document.getElementById('selected-delete-streams-count');
       
       if (count > 0) {
         btn.classList.remove('hidden');
         countSpan.textContent = count;
+        if (deleteBtn) {
+          deleteBtn.classList.remove('hidden');
+          if (deleteCountSpan) deleteCountSpan.textContent = count;
+        }
       } else {
         btn.classList.add('hidden');
+        if (deleteBtn) deleteBtn.classList.add('hidden');
       }
       
       const allCheckbox = document.getElementById('select-all-streams');
@@ -4914,10 +4928,67 @@
 
     window.exportSelectedStreams = function() {
       const checked = document.querySelectorAll('.stream-checkbox:checked');
-      const ids = Array.from(checked).map(cb => cb.value).join(',');
+      const idsArray = Array.from(checked).map(cb => cb.value);
+      const uniqueIds = [...new Set(idsArray)];
+      const ids = uniqueIds.join(',');
       if (!ids) return;
       
       window.location.href = `/api/streams/export-bulk?ids=${ids}`;
+    };
+
+    window.deleteSelectedStreams = async function() {
+      const checked = document.querySelectorAll('.stream-checkbox:checked');
+      const idsArray = Array.from(checked).map(cb => cb.value);
+      const ids = [...new Set(idsArray)];
+      if (ids.length === 0) return;
+      
+      const confirmed = await createModalDialog({
+        type: 'danger',
+        icon: 'ti-trash',
+        title: 'Delete Selected Streams',
+        message: `Are you sure you want to delete ${ids.length} selected streams?<br>Live streams will be automatically skipped.`,
+        confirmText: 'Delete Selected',
+        cancelText: 'Cancel',
+        confirmClass: 'bg-red-500 hover:bg-red-600'
+      });
+
+      if (!confirmed) return;
+      
+      const deleteBtn = document.getElementById('bulk-delete-streams-btn');
+      const originalText = deleteBtn.innerHTML;
+      deleteBtn.innerHTML = '<i class="ti ti-loader animate-spin font-loaded"></i> Deleting...';
+      deleteBtn.disabled = true;
+      
+      try {
+        const response = await fetch('/api/streams/delete-bulk', {
+          method: 'DELETE',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('input[name="_csrf"]')?.value || '' 
+          },
+          body: JSON.stringify({ ids })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast('success', result.message || 'Streams deleted successfully');
+          refreshStreamsView();
+          const selectAll = document.getElementById('select-all-streams');
+          if (selectAll) selectAll.checked = false;
+          updateStreamSelectedCount();
+          deleteBtn.innerHTML = originalText;
+          deleteBtn.disabled = false;
+        } else {
+          showToast('error', result.error || 'Failed to delete streams');
+          deleteBtn.innerHTML = originalText;
+          deleteBtn.disabled = false;
+        }
+      } catch (error) {
+        console.error('Delete bulk error:', error);
+        showToast('error', 'An error occurred during bulk delete');
+        deleteBtn.innerHTML = originalText;
+        deleteBtn.disabled = false;
+      }
     };
 
     function debounceSearch(func, wait) {

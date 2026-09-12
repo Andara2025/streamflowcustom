@@ -1,0 +1,1 @@
+Unable to find an active Studio instance. Check with the user to verify they have turned the MCP server on in Roblox Studio

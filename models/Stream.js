@@ -32,7 +32,8 @@ class Stream {
       is_youtube_api = false,
       youtube_monetization = false,
       youtube_altered_content = false,
-      youtube_made_for_kids = false
+      youtube_made_for_kids = false,
+      is_rotation = false
     } = streamData;
     const loop_video_int = loop_video ? 1 : 0;
     const use_advanced_settings_int = use_advanced_settings ? 1 : 0;
@@ -40,6 +41,7 @@ class Stream {
     const youtube_monetization_int = youtube_monetization ? 1 : 0;
     const youtube_altered_content_int = youtube_altered_content ? 1 : 0;
     const youtube_made_for_kids_int = youtube_made_for_kids ? 1 : 0;
+    const is_rotation_int = is_rotation ? 1 : 0;
     const final_status = status || (schedule_time ? 'scheduled' : 'offline');
     const status_updated_at = new Date().toISOString();
     return new Promise((resolve, reject) => {
@@ -48,13 +50,13 @@ class Stream {
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video,
           schedule_time, end_time, duration, status, status_updated_at, use_advanced_settings, user_id,
-          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api, youtube_monetization, youtube_altered_content, youtube_made_for_kids
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api, youtube_monetization, youtube_altered_content, youtube_made_for_kids, is_rotation
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video_int,
           schedule_time, end_time, duration, final_status, status_updated_at, use_advanced_settings_int, user_id,
-          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api_int, youtube_monetization_int, youtube_altered_content_int, youtube_made_for_kids_int
+          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api_int, youtube_monetization_int, youtube_altered_content_int, youtube_made_for_kids_int, is_rotation_int
         ],
         function (err) {
           if (err) {
@@ -80,12 +82,13 @@ class Stream {
           row.youtube_monetization = row.youtube_monetization === 1;
           row.youtube_altered_content = row.youtube_altered_content === 1;
           row.youtube_made_for_kids = row.youtube_made_for_kids === 1;
+          row.is_rotation = row.is_rotation === 1;
         }
         resolve(row);
       });
     });
   }
-  static findAll(userId = null, filter = null) {
+  static findAll(userId = null, filter = null, excludeRotation = false) {
     return new Promise((resolve, reject) => {
       let query = `
         SELECT s.*, 
@@ -112,6 +115,9 @@ class Stream {
       `;
       const params = [];
       const conditions = [];
+      if (excludeRotation) {
+        conditions.push('(s.is_rotation = 0 OR s.is_rotation IS NULL)');
+      }
       
       if (userId) {
         conditions.push('s.user_id = ?');
@@ -158,7 +164,7 @@ class Stream {
     });
   }
   static findAllPaginated(userId = null, options = {}) {
-    const { page = 1, limit = 10, filter = null, search = '' } = options;
+    const { page = 1, limit = 10, filter = null, search = '', onlyManual = false } = options;
     const offset = (page - 1) * limit;
     return new Promise((resolve, reject) => {
       let baseQuery = `
@@ -169,6 +175,9 @@ class Stream {
       `;
       const params = [];
       const conditions = [];
+      if (onlyManual) {
+        conditions.push('(s.is_rotation = 0 OR s.is_rotation IS NULL)');
+      }
       if (userId) {
         conditions.push('s.user_id = ?');
         params.push(userId);
@@ -305,6 +314,27 @@ class Stream {
             return reject(err);
           }
           resolve({ success: true, deleted: this.changes > 0 });
+        }
+      );
+    });
+  }
+
+  static deleteBulk(ids, userId) {
+    return new Promise((resolve, reject) => {
+      if (!ids || ids.length === 0) return resolve({ success: true, deleted: 0 });
+      
+      const placeholders = ids.map(() => '?').join(',');
+      const params = [...ids, userId];
+      
+      db.run(
+        `DELETE FROM streams WHERE id IN (${placeholders}) AND user_id = ?`,
+        params,
+        function (err) {
+          if (err) {
+            console.error('Error bulk deleting streams:', err.message);
+            return reject(err);
+          }
+          resolve({ success: true, deleted: this.changes });
         }
       );
     });
@@ -471,6 +501,7 @@ class Stream {
         WHERE s.status = 'scheduled'
         AND s.schedule_time IS NOT NULL
         AND s.schedule_time <= ?
+        AND (s.is_rotation = 0 OR s.is_rotation IS NULL)
       `;
       db.all(query, [endTimeStr], (err, rows) => {
         if (err) {

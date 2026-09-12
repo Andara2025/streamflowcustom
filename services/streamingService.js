@@ -1039,15 +1039,15 @@ async function stopStream(streamId) {
     const stream = await Stream.findById(streamId);
 
     if (!streamData) {
-      if (stream && stream.status === 'live') {
+      if (stream) {
         await Stream.updateStatus(streamId, 'offline', stream.user_id);
         if (schedulerService) {
           schedulerService.handleStreamStopped(streamId);
         }
         cleanupStreamData(streamId);
-        return { success: true, message: 'Stream status fixed' };
+        return { success: true, message: 'Stream stopped successfully' };
       }
-      return { success: false, error: 'Stream is not active' };
+      return { success: true, message: 'Stream already offline' };
     }
 
     addStreamLog(streamId, 'Stopping stream...');
