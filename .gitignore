@@ -1,10 +1,12 @@
 node_modules
 public/uploads/
 logs/
+db/sessions/
 
 # ignore real env from repo
 .env
 package-lock.json
 db/streamflow.db
+database.sqlite
 keys.json
 license_generator.js
