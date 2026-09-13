@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - PEJUANG MONET</title>
+  <meta name="description" content="Privacy Policy of PEJUANG MONET - how we collect, use, store and protect your Google and YouTube data.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { colors: { primary: '#e11d48', dark: { 900: '#0f172a', 800: '#1e293b', 700: '#334155' } } } }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+    .glass { background: rgba(30,41,59,.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,.1); }
+    .prose-privacy h2 { font-size: 1.5rem; font-weight: 700; margin-top: 2.5rem; margin-bottom: .75rem; color: #fff; }
+    .prose-privacy h3 { font-size: 1.125rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: .5rem; color: #fda4af; }
+    .prose-privacy p, .prose-privacy li { color: #cbd5e1; line-height: 1.75; }
+    .prose-privacy ul { list-style: disc; padding-left: 1.5rem; margin-top: .5rem; }
+    .prose-privacy code { background: #1e293b; padding: 2px 6px; border-radius: 6px; font-size: .85em; color: #fda4af; }
+  </style>
+</head>
+<body class="antialiased">
+  <nav class="w-full glass border-b border-gray-800">
+    <div class="max-w-5xl mx-auto px-4 py-5 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/images/logopejuang.png" alt="PEJUANG MONET Logo" class="h-9 w-auto">
+        <span class="font-bold text-xl">PEJUANG <span class="text-primary">MONET</span></span>
+      </a>
+      <div class="flex items-center gap-4 text-sm">
+        <a href="/" class="text-gray-300 hover:text-white">Home</a>
+        <a href="/terms" class="text-gray-300 hover:text-white">Terms of Service</a>
+        <a href="/login" class="bg-primary hover:bg-rose-700 text-white px-4 py-2 rounded-lg font-medium">Login</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-5xl mx-auto px-4 py-12">
+    <div class="glass rounded-2xl p-8 md:p-12">
+      <h1 class="text-4xl font-extrabold mb-2">Privacy Policy</h1>
+      <p class="text-gray-400 mb-8">Last updated: September 13, 2026 &mdash; App: <strong class="text-white">PEJUANG MONET</strong> &mdash; Website: <strong class="text-white">https://pejuangmonet.cloud/</strong></p>
+
+      <div class="prose-privacy text-[15px]">
+        <p>PEJUANG MONET ("we", "our", "us") operates the website <strong>https://pejuangmonet.cloud/</strong> and the cloud live-streaming application PEJUANG MONET. This Privacy Policy explains what data we collect when you connect your Google / YouTube account, why we need it, how we store and protect it, and how you can request deletion. By using our service you agree to this policy.</p>
+        <p>Contact for privacy questions and data-deletion requests: <strong>support@pejuangmonet.cloud</strong> and WhatsApp <strong>+62 852-6288-2706</strong>. We respond within 7 business days.</p>
+
+        <h2>1. Data We Collect</h2>
+        <h3>1.1 Google account data (via OAuth consent)</h3>
+        <ul>
+          <li>Basic profile: email address and Google account ID (to create your PEJUANG MONET account and identify you).</li>
+          <li>OAuth tokens: access token and refresh token issued by Google (to call YouTube API on your behalf).</li>
+        </ul>
+        <h3>1.2 YouTube channel data (via YouTube Data API v3)</h3>
+        <ul>
+          <li>Channel ID, channel title, channel thumbnail URL, subscriber count.</li>
+          <li>Live broadcast data you create through our app: broadcast ID, stream ID, title, description, privacy status, scheduled start/end time, live chat ID (if enabled).</li>
+          <li>Video metadata you manage through our app: video ID, title, description, tags, category, privacy status.</li>
+        </ul>
+        <h3>1.3 Service data</h3>
+        <ul>
+          <li>Account credentials for our own site (email + bcrypt-hashed password), uploaded video files, streaming schedules, playlists, and application logs for debugging and abuse prevention.</li>
+        </ul>
+        <p>We do <strong>not</strong> collect your Google password, payment card numbers (payments are handled by our payment provider), or data from other Google services such as Gmail, Drive, or Contacts.</p>
+
+        <h2>2. Google API Scopes We Request and Why</h2>
+        <p>We request only the scopes needed for cloud live streaming. Each scope is used as follows:</p>
+        <ul>
+          <li><code>https://www.googleapis.com/auth/youtube.readonly</code> &mdash; <strong>Read your channel and video information.</strong> Used to display your channel name, thumbnail, subscriber count, and to verify that a broadcast belongs to you before we start/stop it. Read-only, never modifies data.</li>
+          <li><code>https://www.googleapis.com/auth/youtube.force-ssl</code> &mdash; <strong>Create and manage your live broadcasts and live streams.</strong> Used when you click "Start Live", "Schedule", "Stop", or "Delete broadcast" in our dashboard. This creates <code>liveBroadcasts</code> and <code>liveStreams</code>, binds them, transitions broadcast status (testing &rarr; live &rarr; complete), and updates titles/descriptions you typed.</li>
+          <li><code>https://www.googleapis.com/auth/youtube</code> &mdash; <strong>Manage your YouTube videos and broadcasts.</strong> Used for the same streaming workflow above plus updating video metadata (title, description, privacy status unlisted/public/private) that you explicitly set in our stream settings page.</li>
+        </ul>
+        <p>We do not use these scopes for advertising, profiling, selling data, or for any feature unrelated to the streaming actions you explicitly trigger.</p>
+
+        <h2>3. How We Use Your Data</h2>
+        <ul>
+          <li>Authenticate you and keep you logged in.</li>
+          <li>Connect your YouTube channel(s) after you click "Connect YouTube Channel" and approve consent.</li>
+          <li>Execute only the streaming actions you schedule or start (create/bind/start/stop/delete broadcasts).</li>
+          <li>Show your channel status, streaming history, and analytics in your dashboard.</li>
+          <li>Troubleshoot errors, prevent abuse, and enforce our Terms of Service.</li>
+        </ul>
+
+        <h2>4. How We Store and Protect Data</h2>
+        <ul>
+          <li>OAuth client secrets and YouTube tokens are <strong>encrypted at rest</strong> (AES) before being stored in our database (SQLite on our VPS). Passwords are hashed with bcrypt and never stored in plain text.</li>
+          <li>Access tokens expire after ~1 hour and are refreshed automatically using your refresh token via the official <code>googleapis</code> library. Refreshed tokens are re-encrypted and saved.</li>
+          <li>Servers are protected by firewall (UFW), HTTPS via Nginx reverse proxy, and restricted SSH access. Only authorized administrators can access production data.</li>
+          <li>We retain YouTube tokens and channel data while your account is active. If you disconnect a channel or delete your account, tokens are deleted from our database (see Section 6).</li>
+        </ul>
+
+        <h2>5. Data Sharing</h2>
+        <p>We <strong>do not sell, rent, or share</strong> your Google / YouTube data with third parties for marketing. Data is transmitted only to:</p>
+        <ul>
+          <li><strong>Google / YouTube API</strong> — to perform the actions you requested (e.g. create a live broadcast on your channel).</li>
+          <li><strong>Infrastructure providers</strong> (VPS hosting, payment gateway) strictly as needed to operate the service; they do not receive your YouTube OAuth tokens.</li>
+          <li><strong>Law enforcement</strong> only when required by applicable law.</li>
+        </ul>
+        <p>Our use and transfer of information received from Google APIs adheres to the <a class="underline text-rose-300" href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements, and to the <a class="underline text-rose-300" href="https://developers.google.com/youtube/terms/api-services-terms-of-service" target="_blank" rel="noopener">YouTube API Services Terms of Service</a>.</p>
+
+        <h2>6. Your Rights: Access, Revoke, Delete</h2>
+        <ul>
+          <li><strong>Disconnect anytime:</strong> Dashboard &gt; Settings &gt; Integration &gt; Disconnect YouTube Channel. This deletes access/refresh tokens for that channel from our servers immediately.</li>
+          <li><strong>Revoke via Google (recommended):</strong> visit <a class="underline text-rose-300" href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>, remove "PEJUANG MONET", then disconnect in our dashboard. Our app will stop working for that channel until you reconnect.</li>
+          <li><strong>Delete account and all data:</strong> email <strong>support@pejuangmonet.cloud</strong> from your registered email with subject "DELETE MY DATA". Include your registered email and channel ID. We delete your user record, tokens, uploaded files metadata, schedules, and logs tied to you within 30 days and confirm by email.</li>
+          <li><strong>Access / correction:</strong> email us to request a copy or correction of your personal data.</li>
+        </ul>
+
+        <h2>7. Data Retention</h2>
+        <p>Active account data is kept while you use the service. Streaming logs are kept up to 12 months for debugging and abuse investigation, then deleted or anonymized. Backups are rotated and overwritten within 30 days of a deletion request.</p>
+
+        <h2>8. Children's Privacy</h2>
+        <p>Our service is not directed to children under 13. We do not knowingly collect data from children. If you believe a child provided data, contact us and we will delete it promptly.</p>
+
+        <h2>9. Security</h2>
+        <p>We use HTTPS, encrypted secrets, hashed passwords, rate limiting, and session protection. No method is 100% secure, but we follow industry best practices and promptly patch vulnerabilities.</p>
+
+        <h2>10. Changes to This Policy</h2>
+        <p>We may update this policy when features or Google requirements change. The "Last updated" date will be revised, and material changes will be announced in the dashboard and/or by email before taking effect.</p>
+
+        <h2>11. Contact</h2>
+        <p>PEJUANG MONET — https://pejuangmonet.cloud/<br>
+        Email: <strong>support@pejuangmonet.cloud</strong><br>
+        WhatsApp: <strong>+62 852-6288-2706</strong><br>
+        Instagram: https://www.instagram.com/rahmad.pasaribu</p>
+      </div>
+    </div>
+
+    <footer class="mt-8 text-center text-sm text-gray-500">
+      <div class="flex items-center justify-center gap-4 mb-3">
+        <a href="/" class="hover:text-white">Home</a><span>•</span>
+        <a href="/privacy" class="hover:text-white">Privacy Policy</a><span>•</span>
+        <a href="/terms" class="hover:text-white">Terms of Service</a><span>•</span>
+        <a href="mailto:support@pejuangmonet.cloud" class="hover:text-white">Contact</a>
+      </div>
+      <p>&copy; 2026 PEJUANG MONET Platform. All rights reserved.</p>
+    </footer>
+  </main>
+</body>
+</html>

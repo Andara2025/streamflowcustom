@@ -860,6 +860,13 @@ app.get('/', async (req, res) => {
   const pricingSettings = await AppSettings.getPricingSettings();
   res.render('landing', { layout: false, title: 'PEJUANG MONET - 24/7 Cloud Live Streaming', pricingSettings });
 });
+// Public legal pages (required for Google OAuth verification - no login)
+app.get('/privacy', async (req, res) => {
+  res.render('privacy', { layout: false, title: 'Privacy Policy' });
+});
+app.get('/terms', async (req, res) => {
+  res.render('terms', { layout: false, title: 'Terms of Service' });
+});
 app.get('/welcome', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
