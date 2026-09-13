@@ -301,6 +301,43 @@
     </div>
   </section>
 
+  <!-- FAQ Section -->
+  <section id="faq" class="py-24 bg-dark-800/50 relative">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-primary font-semibold tracking-wide uppercase text-sm">FAQ</h2>
+        <p class="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Pertanyaan yang Sering Ditanyakan</p>
+        <p class="mt-4 text-gray-400">Masih bingung? <a href="https://wa.me/6285262882706" target="_blank" class="text-primary hover:text-rose-400 font-medium">Chat admin via WhatsApp</a></p>
+      </div>
+      <div class="space-y-4" id="faq-list">
+        <div class="glass rounded-xl overflow-hidden">
+          <button class="faq-toggle w-full flex items-center justify-between px-6 py-5 text-left font-bold hover:text-primary transition-colors">Apakah PC harus menyala 24 jam?<i class="ti ti-chevron-down faq-icon transition-transform"></i></button>
+          <div class="faq-answer hidden px-6 pb-5 text-gray-400 text-[15px] leading-relaxed">Tidak. Semua live berjalan di cloud server kami (FFmpeg + scheduler). Anda cukup upload video, atur jadwal/looping, lalu matikan PC/HP. Server yang melakukan streaming ke YouTube, Facebook, TikTok, atau RTMP tujuan Anda.</div>
+        </div>
+        <div class="glass rounded-xl overflow-hidden">
+          <button class="faq-toggle w-full flex items-center justify-between px-6 py-5 text-left font-bold hover:text-primary transition-colors">Bagaimana cara menghubungkan channel YouTube?<i class="ti ti-chevron-down faq-icon transition-transform"></i></button>
+          <div class="faq-answer hidden px-6 pb-5 text-gray-400 text-[15px] leading-relaxed">Masuk ke Dashboard &gt; Settings &gt; Integration, simpan YouTube Client ID &amp; Secret Anda, lalu klik "Connect YouTube Channel" dan setujui izin Google. Pastikan redirect URI <span class="text-rose-300">https://domain-anda/auth/youtube/callback</span> sudah didaftarkan di Google Cloud Console agar tidak error 400 redirect_uri_mismatch.</div>
+        </div>
+        <div class="glass rounded-xl overflow-hidden">
+          <button class="faq-toggle w-full flex items-center justify-between px-6 py-5 text-left font-bold hover:text-primary transition-colors">Kenapa channel terputus tiap 7 hari?<i class="ti ti-chevron-down faq-icon transition-transform"></i></button>
+          <div class="faq-answer hidden px-6 pb-5 text-gray-400 text-[15px] leading-relaxed">Itu karena project Google Anda masih berstatus Testing — refresh token kedaluwarsa 7 hari. Solusinya ubah status ke Production di OAuth Consent Screen (Publish App), lalu hubungkan ulang sekali. Setelah itu token berumur panjang dan tidak perlu reconnect tiap minggu.</div>
+        </div>
+        <div class="glass rounded-xl overflow-hidden">
+          <button class="faq-toggle w-full flex items-center justify-between px-6 py-5 text-left font-bold hover:text-primary transition-colors">Apakah aman untuk monetisasi / jam tayang?<i class="ti ti-chevron-down faq-icon transition-transform"></i></button>
+          <div class="faq-answer hidden px-6 pb-5 text-gray-400 text-[15px] leading-relaxed">Platform hanya menjalankan streaming sesuai perintah Anda via YouTube API resmi. Aman tidaknya monetisasi tetap tergantung konten Anda: gunakan video original/berhak cipta, patuhi Community Guidelines YouTube, dan hindari spam atau re-upload tanpa izin. Jangan gunakan konten orang lain tanpa hak.</div>
+        </div>
+        <div class="glass rounded-xl overflow-hidden">
+          <button class="faq-toggle w-full flex items-center justify-between px-6 py-5 text-left font-bold hover:text-primary transition-colors">Berapa channel / live bersamaan yang bisa jalan?<i class="ti ti-chevron-down faq-icon transition-transform"></i></button>
+          <div class="faq-answer hidden px-6 pb-5 text-gray-400 text-[15px] leading-relaxed">Tergantung paket: Tester 1 live, Pemula 2 live, Mahir 5 live, Expert 10 live, Master 20 live. Satu channel YouTube disarankan hanya 1 live aktif dalam satu waktu. Upgrade paket kapan saja via halaman Order.</div>
+        </div>
+        <div class="glass rounded-xl overflow-hidden">
+          <button class="faq-toggle w-full flex items-center justify-between px-6 py-5 text-left font-bold hover:text-primary transition-colors">Data Google/YouTube saya dipakai untuk apa?<i class="ti ti-chevron-down faq-icon transition-transform"></i></button>
+          <div class="faq-answer hidden px-6 pb-5 text-gray-400 text-[15px] leading-relaxed">Hanya untuk streaming yang Anda perintahkan: membaca info channel, membuat/mengelola live broadcast, dan update judul/deskripsi. Token terenkripsi dan tidak dijual. Detail lengkap di <a href="/privacy" class="text-primary hover:text-rose-400 font-medium">Privacy Policy</a> dan <a href="/terms" class="text-primary hover:text-rose-400 font-medium">Terms of Service</a>. Anda bisa Disconnect atau hapus data kapan saja via email support@pejuangmonet.cloud.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- CTA Section -->
   <section class="py-20 relative">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -321,57 +358,76 @@
   </section>
 
   <!-- Footer -->
-  <footer class="bg-dark-900 py-12 border-t border-gray-800">
+  <footer class="bg-dark-900 pt-16 pb-8 border-t border-gray-800">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex flex-col md:flex-row justify-between items-center gap-6">
-        <div class="flex items-center gap-2">
-          <img src="/images/logopejuang.png" alt="PEJUANG MONET Logo" class="h-8">
-          <span class="font-bold text-xl tracking-tight">PEJUANG <span class="text-primary">MONET</span></span>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
+        <div class="md:col-span-1">
+          <div class="flex items-center gap-2 mb-4">
+            <img src="/images/logopejuang.png" alt="PEJUANG MONET Logo" class="h-9">
+            <span class="font-bold text-xl tracking-tight">PEJUANG <span class="text-primary">MONET</span></span>
+          </div>
+          <p class="text-gray-400 text-sm leading-relaxed mb-5">Platform cloud live streaming 24/7 untuk kejar jam tayang YouTube tanpa PC menyala. Scheduling, looping, dan multi-platform RTMP.</p>
+          <div class="flex items-center gap-2">
+            <a href="https://chat.whatsapp.com/FfgvEREd1ZtKJPNh8WD4If?s=cl&p=a&ilr=0&amv=0" target="_blank" rel="noopener noreferrer" title="Grup WhatsApp" class="w-9 h-9 rounded-lg bg-green-600 hover:bg-green-500 flex items-center justify-center text-white transition-colors"><i class="ti ti-brand-whatsapp"></i></a>
+            <a href="https://www.instagram.com/rahmad.pasaribu?igsh=MTh6dG9iNmNvdjJjZA==" target="_blank" rel="noopener noreferrer" title="Instagram" class="w-9 h-9 rounded-lg bg-gradient-to-r from-purple-600 to-pink-500 flex items-center justify-center text-white transition-all"><i class="ti ti-brand-instagram"></i></a>
+            <a href="https://www.facebook.com/share/18zXRGP28N/" target="_blank" rel="noopener noreferrer" title="Facebook" class="w-9 h-9 rounded-lg bg-blue-700 hover:bg-blue-600 flex items-center justify-center text-white transition-colors"><i class="ti ti-brand-facebook"></i></a>
+          </div>
         </div>
-        <!-- Social Media Links -->
-        <div class="flex items-center gap-4">
-          <a href="https://chat.whatsapp.com/FfgvEREd1ZtKJPNh8WD4If?s=cl&p=a&ilr=0&amv=0"
-            target="_blank" rel="noopener noreferrer"
-            class="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm rounded-lg transition-colors duration-200">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-            </svg>
-            <span>Grup WhatsApp</span>
-          </a>
-          <a href="https://www.instagram.com/rahmad.pasaribu?igsh=MTh6dG9iNmNvdjJjZA=="
-            target="_blank" rel="noopener noreferrer"
-            class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white text-sm rounded-lg transition-all duration-200">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-            </svg>
-            <span>Instagram</span>
-          </a>
-          <a href="https://www.facebook.com/share/18zXRGP28N/"
-            target="_blank" rel="noopener noreferrer"
-            class="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors duration-200">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-            </svg>
-            <span>Facebook</span>
-          </a>
+        <div>
+          <h4 class="font-bold text-sm uppercase tracking-wider text-gray-300 mb-4">Produk</h4>
+          <ul class="space-y-2.5 text-sm">
+            <li><a href="#fitur" class="text-gray-400 hover:text-white transition-colors">Fitur</a></li>
+            <li><a href="#harga" class="text-gray-400 hover:text-white transition-colors">Harga Paket</a></li>
+            <li><a href="#faq" class="text-gray-400 hover:text-white transition-colors">FAQ</a></li>
+            <li><a href="/login" class="text-gray-400 hover:text-white transition-colors">Login</a></li>
+            <li><a href="/signup" class="text-gray-400 hover:text-white transition-colors">Daftar Sekarang</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-bold text-sm uppercase tracking-wider text-gray-300 mb-4">Legal</h4>
+          <ul class="space-y-2.5 text-sm">
+            <li><a href="/privacy" class="text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
+            <li><a href="/terms" class="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
+            <li><a href="mailto:support@pejuangmonet.cloud" class="text-gray-400 hover:text-white transition-colors">Penghapusan Data</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-bold text-sm uppercase tracking-wider text-gray-300 mb-4">Bantuan</h4>
+          <ul class="space-y-2.5 text-sm">
+            <li><a href="https://wa.me/6285262882706" target="_blank" class="text-gray-400 hover:text-white transition-colors">Chat Admin (WA)</a></li>
+            <li><a href="mailto:support@pejuangmonet.cloud" class="text-gray-400 hover:text-white transition-colors">support@pejuangmonet.cloud</a></li>
+            <li><a href="/login" class="text-gray-400 hover:text-white transition-colors">Dashboard Member</a></li>
+          </ul>
         </div>
       </div>
-      <div class="mt-6 pt-6 border-t border-gray-800 text-center">
-        <div class="flex items-center justify-center gap-4 mb-3 text-sm">
-          <a href="/privacy" class="text-gray-400 hover:text-white">Privacy Policy</a>
+      <div class="pt-6 border-t border-gray-800 flex flex-col md:flex-row items-center justify-between gap-3">
+        <p class="text-gray-500 text-sm">&copy; 2026 PEJUANG MONET Platform. All rights reserved.</p>
+        <div class="flex items-center gap-4 text-sm">
+          <a href="/privacy" class="text-gray-500 hover:text-white transition-colors">Privacy</a>
           <span class="text-gray-700">•</span>
-          <a href="/terms" class="text-gray-400 hover:text-white">Terms of Service</a>
+          <a href="/terms" class="text-gray-500 hover:text-white transition-colors">Terms</a>
           <span class="text-gray-700">•</span>
-          <a href="mailto:support@pejuangmonet.cloud" class="text-gray-400 hover:text-white">support@pejuangmonet.cloud</a>
+          <span class="text-gray-600">v2.2</span>
         </div>
-        <p class="text-gray-500 text-sm">
-          &copy; 2026 PEJUANG MONET Platform. All rights reserved. &mdash; Optimized for YouTube Monetization.
-        </p>
       </div>
     </div>
   </footer>
 
   <script>
+    // FAQ accordion
+    document.querySelectorAll('.faq-toggle').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var answer = this.nextElementSibling;
+        var icon = this.querySelector('.faq-icon');
+        var isHidden = answer.classList.contains('hidden');
+        document.querySelectorAll('.faq-answer').forEach(function (el) { el.classList.add('hidden'); });
+        document.querySelectorAll('.faq-icon').forEach(function (el) { el.style.transform = ''; });
+        if (isHidden) {
+          answer.classList.remove('hidden');
+          if (icon) icon.style.transform = 'rotate(180deg)';
+        }
+      });
+    });
     // Simple script to add blur to navbar on scroll
     window.addEventListener('scroll', () => {
       const nav = document.getElementById('navbar');
