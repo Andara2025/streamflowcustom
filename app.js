@@ -46,7 +46,7 @@ const rateLimit = require('express-rate-limit');
 const User = require('./models/User');
 const { db, checkIfUsersExist, initializeDatabase } = require('./db/database');
 const systemMonitor = require('./services/systemMonitor');
-const { uploadVideo, upload, uploadThumbnail, uploadAudio, uploadBackup } = require('./middleware/uploadMiddleware');
+const { uploadVideo, upload, uploadThumbnail, uploadAudio, uploadBackup, uploadCsv } = require('./middleware/uploadMiddleware');
 const chunkUploadService = require('./services/chunkUploadService');
 const audioConverter = require('./services/audioConverter');
 const { ensureDirectories } = require('./utils/storage');
@@ -1356,6 +1356,102 @@ app.get('/admin/users/export', isProAdmin, async (req, res) => {
   } catch (error) {
     console.error('Export Error:', error);
     res.status(500).send('Failed to export users');
+  }
+});
+
+// Import users from CSV (format produced by /admin/users/export).
+// CSV has no passwords, so each imported user gets a random temporary
+// password shown ONCE to the admin. Duplicates (username/email) are skipped.
+function parseCsvLine(line) {
+  const fields = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else { inQuotes = false; }
+      } else { cur += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { fields.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+  }
+  fields.push(cur);
+  return fields.map(f => f.trim());
+}
+
+app.post('/admin/users/import', isProAdmin, uploadCsv.single('csv'), async (req, res) => {
+  const fs = require('fs');
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'File CSV tidak ditemukan. Pilih file .csv hasil Export.' });
+    }
+    let content = '';
+    try {
+      content = fs.readFileSync(req.file.path, 'utf8');
+    } catch (e) {
+      return res.status(400).json({ success: false, message: 'Gagal membaca file CSV.' });
+    } finally {
+      try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+    }
+    // Strip BOM if present (Excel-saved CSV)
+    if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+    const lines = content.split(/\r?\n/).filter(l => l.trim() !== '');
+    if (lines.length < 2) {
+      return res.status(400).json({ success: false, message: 'CSV kosong atau tanpa baris data.' });
+    }
+    if (lines.length > 2001) {
+      return res.status(400).json({ success: false, message: 'Maksimal 2000 baris user per import.' });
+    }
+    const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+    const idx = (name) => headers.indexOf(name);
+    const iUser = idx('username'), iEmail = idx('email'), iRole = idx('role'),
+      iStatus = idx('status'), iPkg = idx('package'), iStream = idx('stream limit'),
+      iDisk = idx('disk limit'), iExp = idx('expired at');
+    if (iUser === -1) {
+      return res.status(400).json({ success: false, message: 'Header CSV tidak dikenali. Pakai file hasil tombol Backup / Export.' });
+    }
+    const crypto = require('crypto');
+    const allowedRoles = ['admin', 'member', 'user'];
+    const imported = [], skipped = [], failed = [];
+    for (let r = 1; r < lines.length; r++) {
+      const cols = parseCsvLine(lines[r]);
+      const username = (cols[iUser] || '').trim();
+      const email = iEmail !== -1 ? (cols[iEmail] || '').trim() : '';
+      if (!username) { failed.push({ row: r + 1, reason: 'Username kosong' }); continue; }
+      try {
+        if (await User.findByUsername(username)) { skipped.push({ username, reason: 'Username sudah ada' }); continue; }
+        if (email && await User.findByEmail(email)) { skipped.push({ username, reason: 'Email sudah dipakai' }); continue; }
+        const tempPassword = crypto.randomBytes(12).toString('base64url').slice(0, 12);
+        const role = (iRole !== -1 && allowedRoles.includes((cols[iRole] || '').trim().toLowerCase()))
+          ? (cols[iRole] || '').trim().toLowerCase() : 'member';
+        const created = await User.create({
+          username,
+          password: tempPassword,
+          user_role: role,
+          status: (iStatus !== -1 && (cols[iStatus] || '').trim()) || 'active',
+          package_name: (iPkg !== -1 && (cols[iPkg] || '').trim()) || 'custom',
+          stream_limit: (iStream !== -1 && parseInt(cols[iStream], 10)) || 0,
+          disk_limit: (iDisk !== -1 && parseInt(cols[iDisk], 10)) || 0,
+          expired_at: (iExp !== -1 && (cols[iExp] || '').trim()) || null,
+          phone: null
+        });
+        if (email) {
+          try { await User.update(created.id, { email }); } catch (e) { /* kolom email mungkin belum ada */ }
+        }
+        imported.push({ username, email, tempPassword });
+      } catch (e) {
+        failed.push({ username: username || ('baris ' + (r + 1)), reason: e.message || 'Gagal membuat user' });
+      }
+    }
+    res.json({ success: true, imported, skipped, failed });
+  } catch (error) {
+    console.error('Import users error:', error);
+    try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+    res.status(500).json({ success: false, message: 'Gagal import CSV.' });
   }
 });
 

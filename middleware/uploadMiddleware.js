@@ -119,10 +119,26 @@ const uploadBackup = multer({
   fileFilter: backupFilter
 });
 
+const csvFilter = (req, file, cb) => {
+  const fileExt = path.extname(file.originalname).toLowerCase();
+  if (fileExt === '.csv') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only .csv files are allowed'), false);
+  }
+};
+
+const uploadCsv = multer({
+  storage: backupStorage,
+  fileFilter: csvFilter,
+  limits: { fileSize: 2 * 1024 * 1024 }
+});
+
 module.exports = {
   uploadVideo,
   uploadAudio,
   upload,
   uploadThumbnail,
-  uploadBackup
+  uploadBackup,
+  uploadCsv
 };
