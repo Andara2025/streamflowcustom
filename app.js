@@ -1342,12 +1342,13 @@ app.delete('/api/history/:id', isAuthenticated, async (req, res) => {
 app.get('/admin/users/export', isProAdmin, async (req, res) => {
   try {
     const users = await User.findAll();
-    let csv = 'ID,Username,Email,Role,Status,Package,Stream Limit,Disk Limit,Expired At,Created At\n';
+    let csv = 'ID,Username,Email,Phone,Role,Status,Package,Stream Limit,Disk Limit,Expired At,Created At\n';
     
     users.forEach(user => {
       const escapedUsername = user.username ? `"${user.username.replace(/"/g, '""')}"` : '';
       const escapedEmail = user.email ? `"${user.email.replace(/"/g, '""')}"` : '';
-      csv += `${user.id},${escapedUsername},${escapedEmail},${user.user_role},${user.status},${user.package_name || 'custom'},${user.stream_limit || 0},${user.disk_limit || 0},${user.expired_at || ''},${user.created_at}\n`;
+      const escapedPhone = user.phone ? `"${String(user.phone).replace(/"/g, '""')}"` : '';
+      csv += `${user.id},${escapedUsername},${escapedEmail},${escapedPhone},${user.user_role},${user.status},${user.package_name || 'custom'},${user.stream_limit || 0},${user.disk_limit || 0},${user.expired_at || ''},${user.created_at}\n`;
     });
     
     res.setHeader('Content-Type', 'text/csv');
@@ -1408,7 +1409,7 @@ app.post('/admin/users/import', isProAdmin, uploadCsv.single('csv'), async (req,
     }
     const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase());
     const idx = (name) => headers.indexOf(name);
-    const iUser = idx('username'), iEmail = idx('email'), iRole = idx('role'),
+    const iUser = idx('username'), iEmail = idx('email'), iPhone = idx('phone'), iRole = idx('role'),
       iStatus = idx('status'), iPkg = idx('package'), iStream = idx('stream limit'),
       iDisk = idx('disk limit'), iExp = idx('expired at');
     if (iUser === -1) {
@@ -1437,7 +1438,7 @@ app.post('/admin/users/import', isProAdmin, uploadCsv.single('csv'), async (req,
           stream_limit: (iStream !== -1 && parseInt(cols[iStream], 10)) || 0,
           disk_limit: (iDisk !== -1 && parseInt(cols[iDisk], 10)) || 0,
           expired_at: (iExp !== -1 && (cols[iExp] || '').trim()) || null,
-          phone: null
+          phone: (iPhone !== -1 && (cols[iPhone] || '').trim()) || null
         });
         if (email) {
           try { await User.update(created.id, { email }); } catch (e) { /* kolom email mungkin belum ada */ }
