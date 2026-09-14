@@ -450,6 +450,10 @@ function waitForStreamStartup(streamId, ffmpegProcess, startupState) {
 }
 
 async function buildFFmpegArgsForPlaylist(stream, playlist) {
+  // STREAMCOPY-ONLY POLICY: no re-encode ever. Package limits are enforced
+  // at upload time (validateVideoSpecs) and at stream create/update time.
+  // Force copy mode even if old DB rows still have use_advanced_settings=1.
+  stream.use_advanced_settings = 0;
   if (!playlist.videos || playlist.videos.length === 0) {
     throw new Error('Playlist is empty');
   }
@@ -632,6 +636,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
 }
 
 async function buildFFmpegArgs(stream) {
+  // STREAMCOPY-ONLY POLICY: see buildFFmpegArgsForPlaylist.
+  stream.use_advanced_settings = 0;
   const streamWithVideo = await Stream.getStreamWithVideo(stream.id);
 
   if (streamWithVideo && streamWithVideo.video_type === 'playlist') {

@@ -1797,6 +1797,110 @@ function validateVideoSpecs(metadata, pkg = 'tester') {
   return { valid: true };
 }
 
+// STREAMCOPY-ONLY POLICY: package limits for stream settings + video source.
+// Re-encode is disabled (see streamingService). Anything above the package
+// must be REJECTED, never re-encoded.
+function getPackageStreamLimits(pkg = 'tester') {
+  const limits = { maxWidth: 1280, maxHeight: 720, maxResStr: '720p', maxBitrate: 5000, maxFps: 30 };
+  if (pkg === 'mahir') {
+    limits.maxWidth = 1280; limits.maxHeight = 720; limits.maxResStr = '720p'; limits.maxBitrate = 5000;
+  } else if (pkg === 'expert') {
+    limits.maxWidth = 1920; limits.maxHeight = 1080; limits.maxResStr = '1080p'; limits.maxBitrate = 6000;
+  } else if (pkg === 'master' || pkg === 'custom' || pkg === 'admin') {
+    limits.maxWidth = 1920; limits.maxHeight = 1080; limits.maxResStr = '1080p'; limits.maxBitrate = 6500;
+  }
+  return limits;
+}
+
+function parseResolutionString(res) {
+  if (!res || typeof res !== 'string') return null;
+  const m = res.trim().match(/^(\d+)\s*x\s*(\d+)$/i);
+  if (!m) return null;
+  return { w: parseInt(m[1], 10), h: parseInt(m[2], 10) };
+}
+
+function checkStreamSettingsAgainstPackage({ resolution, bitrate, fps }, pkg = 'tester') {
+  const limits = getPackageStreamLimits(pkg);
+  if (resolution) {
+    const parsed = parseResolutionString(resolution);
+    if (parsed) {
+      const okLandscape = parsed.w <= limits.maxWidth && parsed.h <= limits.maxHeight;
+      const okPortrait = parsed.w <= limits.maxHeight && parsed.h <= limits.maxWidth;
+      if (!okLandscape && !okPortrait) {
+        return { valid: false, error: `Resolusi stream melebihi paket ${pkg} (maks ${limits.maxResStr}, diminta: ${resolution}). Upgrade paket atau gunakan video ${limits.maxResStr}.` };
+      }
+    }
+  }
+  if (bitrate !== undefined && bitrate !== null && bitrate !== '') {
+    const b = parseInt(bitrate, 10);
+    if (!isNaN(b) && b > Math.round(limits.maxBitrate * 1.30)) {
+      return { valid: false, error: `Bitrate stream melebihi paket ${pkg} (maks ${limits.maxBitrate} kbps + toleransi 30%, diminta: ${b} kbps).` };
+    }
+  }
+  if (fps !== undefined && fps !== null && fps !== '') {
+    const f = parseFloat(fps);
+    if (!isNaN(f) && f > limits.maxFps + 2) {
+      return { valid: false, error: `FPS stream melebihi paket ${pkg} (maks ${limits.maxFps} fps, diminta: ${fps}).` };
+    }
+  }
+  return { valid: true };
+}
+
+function checkVideoRowAgainstPackage(videoRow, pkg = 'tester') {
+  if (!videoRow) return { valid: true };
+  const limits = getPackageStreamLimits(pkg);
+  if (videoRow.resolution) {
+    const parsed = parseResolutionString(videoRow.resolution);
+    if (parsed) {
+      const okLandscape = parsed.w <= limits.maxWidth && parsed.h <= limits.maxHeight;
+      const okPortrait = parsed.w <= limits.maxHeight && parsed.h <= limits.maxWidth;
+      if (!okLandscape && !okPortrait) {
+        return { valid: false, error: `Video "${videoRow.title || videoRow.id}" resolusinya ${videoRow.resolution}, melebihi paket ${pkg} (maks ${limits.maxResStr}). Upload ulang versi ${limits.maxResStr} atau upgrade paket. Re-encode otomatis dimatikan.` };
+      }
+    }
+  }
+  if (videoRow.bitrate !== undefined && videoRow.bitrate !== null && videoRow.bitrate !== '') {
+    const b = parseInt(videoRow.bitrate, 10);
+    if (!isNaN(b) && b > Math.round(limits.maxBitrate * 1.30)) {
+      return { valid: false, error: `Video "${videoRow.title || videoRow.id}" bitratenya ${b} kbps, melebihi paket ${pkg} (maks ${limits.maxBitrate} kbps + toleransi 30%).` };
+    }
+  }
+  if (videoRow.fps !== undefined && videoRow.fps !== null && videoRow.fps !== '') {
+    const f = parseFloat(videoRow.fps);
+    if (!isNaN(f) && f > limits.maxFps + 2) {
+      return { valid: false, error: `Video "${videoRow.title || videoRow.id}" FPS-nya ${videoRow.fps}, melebihi paket ${pkg} (maks ${limits.maxFps} fps).` };
+    }
+  }
+  return { valid: true };
+}
+
+async function checkVideoSourceAgainstPackage(videoId, pkg = 'tester') {
+  if (!videoId) return { valid: true };
+  try {
+    const Video = require('./models/Video');
+    const direct = await Video.findById(videoId);
+    if (direct) return checkVideoRowAgainstPackage(direct, pkg);
+    // Maybe a playlist id?
+    try {
+      const Playlist = require('./models/Playlist');
+      if (typeof Playlist.findByIdWithVideos === 'function') {
+        const pl = await Playlist.findByIdWithVideos(videoId);
+        if (pl && Array.isArray(pl.videos)) {
+          for (const v of pl.videos) {
+            const r = checkVideoRowAgainstPackage(v, pkg);
+            if (!r.valid) return r;
+          }
+        }
+      }
+    } catch (e) { /* not a playlist, ignore */ }
+    return { valid: true };
+  } catch (e) {
+    // Fail open on DB errors to avoid blocking unrelated flows; upload-time check remains.
+    console.error('checkVideoSourceAgainstPackage error:', e.message);
+    return { valid: true };
+  }
+}
+
 function getLocalIpAddresses() {
   const interfaces = os.networkInterfaces();
   const addresses = [];
@@ -4618,6 +4722,24 @@ app.post('/api/streams', isAuthenticated, [
     if (!streamData.status) {
       streamData.status = 'offline';
     }
+    // STREAMCOPY-ONLY: reject anything above package instead of re-encoding.
+    try {
+      const pkgUser = await User.findById(req.session.userId);
+      const pkg = (pkgUser && pkgUser.package_name) || 'tester';
+      const settingsCheck = checkStreamSettingsAgainstPackage(
+        { resolution: streamData.resolution, bitrate: streamData.bitrate, fps: streamData.fps }, pkg);
+      if (!settingsCheck.valid) {
+        return res.status(400).json({ success: false, error: settingsCheck.error });
+      }
+      if (streamData.video_id) {
+        const sourceCheck = await checkVideoSourceAgainstPackage(streamData.video_id, pkg);
+        if (!sourceCheck.valid) {
+          return res.status(400).json({ success: false, error: sourceCheck.error });
+        }
+      }
+    } catch (vErr) {
+      console.error('Stream package validation error:', vErr.message);
+    }
     const stream = await Stream.create(streamData);
     res.json({ success: true, stream });
   } catch (error) {
@@ -4671,6 +4793,17 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
 
     if (!title) {
       return res.status(400).json({ success: false, error: 'Stream title is required' });
+    }
+
+    // STREAMCOPY-ONLY: reject above-package video source instead of re-encoding.
+    try {
+      const pkg = (user && user.package_name) || 'tester';
+      const sourceCheck = await checkVideoSourceAgainstPackage(videoId, pkg);
+      if (!sourceCheck.valid) {
+        return res.status(400).json({ success: false, error: sourceCheck.error });
+      }
+    } catch (vErr) {
+      console.error('YouTube stream package validation error:', vErr.message);
     }
 
     let localThumbnailPath = null;
@@ -5047,6 +5180,31 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
       updateData.loop_video = req.body.loopVideo === 'true' || req.body.loopVideo === true;
     }
     updateData.use_advanced_settings = false;
+    // STREAMCOPY-ONLY: reject above-package settings/source instead of re-encoding.
+    try {
+      const pkgUser = await User.findById(req.session.userId);
+      const pkg = (pkgUser && pkgUser.package_name) || 'tester';
+      if (updateData.resolution !== undefined || updateData.bitrate !== undefined || updateData.fps !== undefined) {
+        const merged = {
+          resolution: updateData.resolution !== undefined ? updateData.resolution : stream.resolution,
+          bitrate: updateData.bitrate !== undefined ? updateData.bitrate : stream.bitrate,
+          fps: updateData.fps !== undefined ? updateData.fps : stream.fps
+        };
+        const settingsCheck = checkStreamSettingsAgainstPackage(merged, pkg);
+        if (!settingsCheck.valid) {
+          return res.status(400).json({ success: false, error: settingsCheck.error });
+        }
+      }
+      const vidToCheck = updateData.video_id !== undefined ? updateData.video_id : stream.video_id;
+      if (vidToCheck) {
+        const sourceCheck = await checkVideoSourceAgainstPackage(vidToCheck, pkg);
+        if (!sourceCheck.valid) {
+          return res.status(400).json({ success: false, error: sourceCheck.error });
+        }
+      }
+    } catch (vErr) {
+      console.error('Stream update package validation error:', vErr.message);
+    }
     const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     function parseLocalDateTime(dateTimeString) {
