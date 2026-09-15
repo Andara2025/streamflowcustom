@@ -321,7 +321,10 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     snippet: broadcastSnippet,
     contentDetails: {
       enableAutoStart: true,
-      enableAutoStop: true,
+      // 24/7 streamcopy: JANGAN autoStop. Dengan autoStop=true, YouTube
+      // mengakhiri broadcast (jadi VOD) setiap ada jeda data sesaat
+      // (jitter Jerman -> YouTube), padahal FFmpeg retry dan app masih live.
+      enableAutoStop: false,
       monitorStream: {
         enableMonitorStream: false
       }
