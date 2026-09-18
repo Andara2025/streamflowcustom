@@ -9,8 +9,15 @@ const fs = require('fs');
 const { syncBroadcastMonetization, sanitizeYouTubeTags } = require('./youtubeService');
 
 function getRedirectUri(user) {
-  if (user && user.youtube_redirect_uri) {
+  // PERMANENT FIX: prioritas BASE_URL (my.id), abaikan cloud lama
+  if (process.env.BASE_URL && !process.env.BASE_URL.includes('pejuangmonet.cloud')) {
+    return `${process.env.BASE_URL.replace(/\/$/, '')}/auth/youtube/callback`;
+  }
+  if (user && user.youtube_redirect_uri && !user.youtube_redirect_uri.includes('pejuangmonet.cloud')) {
     return user.youtube_redirect_uri;
+  }
+  if (process.env.BASE_URL) {
+    return `${process.env.BASE_URL.replace(/\/$/, '')}/auth/youtube/callback`;
   }
   const port = process.env.PORT || 7575;
   return `http://localhost:${port}/auth/youtube/callback`;

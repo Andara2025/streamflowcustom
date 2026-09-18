@@ -44,6 +44,15 @@ async function checkScheduledStreams() {
         continue;
       }
 
+      // PERMANENT FIX: double-check jadwal, jangan start jika schedule_time masih di masa depan (cegah live prematur karena timezone)
+      if (currentStream.schedule_time) {
+        const sched = new Date(currentStream.schedule_time);
+        // toleransi 60 detik agar tidak miss
+        if (!isNaN(sched.getTime()) && sched.getTime() > now.getTime() + 60000) {
+          continue;
+        }
+      }
+
       const baseUrl = process.env.BASE_URL || 'http://localhost:7575';
       const result = await streamingService.startStream(stream.id, false, baseUrl);
 
