@@ -6557,6 +6557,8 @@ app.get('/admin/reporting', isProAdmin, async (req, res) => {
   }
 });
 
+const recoveryService = require('./services/recoveryService');
+
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
     await initializeDatabase();
@@ -6588,19 +6590,19 @@ const server = app.listen(port, '0.0.0.0', async () => {
   } else {
     console.log(`  http://localhost:${port}`);
   }
-  try {
-    const streams = await Stream.findAll(null, 'live');
-    if (streams && streams.length > 0) {
-      console.log(`Resetting ${streams.length} live streams to offline state...`);
-      for (const stream of streams) {
-        await Stream.updateStatus(stream.id, 'offline');
-      }
-    }
-  } catch (error) {
-    console.error('Error resetting stream statuses:', error);
-  }
+
+  // Smart Startup Recovery: restart streams masih dalam jadwal,
+  // kill orphan FFmpeg, set offline stream yang sudah lewat jadwal.
+  // Menggantikan logika lama yang reset semua ke offline secara buta.
   schedulerService.init(streamingService);
   rotationService.init();
+
+  try {
+    await recoveryService.runStartupRecovery(streamingService);
+  } catch (error) {
+    console.error('[RecoveryService] Startup recovery error:', error);
+  }
+
   try {
     await streamingService.syncStreamStatuses();
   } catch (error) {
