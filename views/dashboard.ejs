@@ -2053,8 +2053,9 @@
         if (enableSchedule) {
           const scheduleStart = document.getElementById('ytScheduleStart').value;
           const scheduleEnd = document.getElementById('ytScheduleEnd').value;
-          if (scheduleStart) ytFormData.scheduleStartTime = scheduleStart;
-          if (scheduleEnd) ytFormData.scheduleEndTime = scheduleEnd;
+          if (scheduleStart) ytFormData.scheduleStartTime = new Date(scheduleStart).toISOString();
+          if (scheduleEnd) ytFormData.scheduleEndTime = new Date(scheduleEnd).toISOString();
+          ytFormData.timezoneOffset = new Date().getTimezoneOffset();
         }
 
         ytFormData.ytMonetization = document.getElementById('ytEnableMonetization').checked;
@@ -2172,11 +2173,12 @@
         }
       }
       if (scheduleStartTime) {
-        formData.scheduleStartTime = scheduleStartTime;
+        formData.scheduleStartTime = new Date(scheduleStartTime).toISOString();
       }
       if (scheduleEndTime) {
-        formData.scheduleEndTime = scheduleEndTime;
+        formData.scheduleEndTime = new Date(scheduleEndTime).toISOString();
       }
+      formData.timezoneOffset = new Date().getTimezoneOffset();
       fetch('/api/streams', {
         method: 'POST',
         headers: {
@@ -2225,15 +2227,17 @@
 
     function formatDate(date) {
       if (!date) return '';
-      const serverDate = convertFromServerTime(date.toISOString());
-      return serverDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const d = (date instanceof Date) ? date : new Date(date);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
     function formatTime(date) {
       if (!date) return '';
-      const serverDate = convertFromServerTime(date.toISOString());
-      const hours = String(serverDate.getHours()).padStart(2, '0');
-      const minutes = String(serverDate.getMinutes()).padStart(2, '0');
+      const d = (date instanceof Date) ? date : new Date(date);
+      if (isNaN(d.getTime())) return '';
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
       return `${hours}:${minutes}`;
     }
 
@@ -4011,12 +4015,14 @@
     }
 
     function formatDateTimeLocal(date) {
-      const serverDate = convertFromServerTime(date.toISOString());
-      const year = serverDate.getFullYear();
-      const month = String(serverDate.getMonth() + 1).padStart(2, '0');
-      const day = String(serverDate.getDate()).padStart(2, '0');
-      const hours = String(serverDate.getHours()).padStart(2, '0');
-      const minutes = String(serverDate.getMinutes()).padStart(2, '0');
+      if (!date) return '';
+      const d = (date instanceof Date) ? date : new Date(date);
+      if (isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
       return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
     function closeEditStreamModal() {
@@ -4336,8 +4342,11 @@
 
             const enableSchedule = document.getElementById('editYtEnableSchedule').checked;
             if (enableSchedule) {
-              ytFormDataObj.scheduleStartTime = document.getElementById('editYtScheduleStart').value;
-              ytFormDataObj.scheduleEndTime = document.getElementById('editYtScheduleEnd').value;
+              const startVal = document.getElementById('editYtScheduleStart').value;
+              const endVal = document.getElementById('editYtScheduleEnd').value;
+              ytFormDataObj.scheduleStartTime = startVal ? new Date(startVal).toISOString() : '';
+              ytFormDataObj.scheduleEndTime = endVal ? new Date(endVal).toISOString() : '';
+              ytFormDataObj.timezoneOffset = new Date().getTimezoneOffset();
             } else {
               ytFormDataObj.scheduleStartTime = '';
               ytFormDataObj.scheduleEndTime = '';
@@ -4438,8 +4447,9 @@
               return;
             }
           }
-          formData.scheduleStartTime = scheduleStartTime || '';
-          formData.scheduleEndTime = scheduleEndTime || '';
+          formData.scheduleStartTime = scheduleStartTime ? new Date(scheduleStartTime).toISOString() : '';
+          formData.scheduleEndTime = scheduleEndTime ? new Date(scheduleEndTime).toISOString() : '';
+          formData.timezoneOffset = new Date().getTimezoneOffset();
           fetch(`/api/streams/${streamId}`, {
             method: 'PUT',
             headers: {
@@ -4568,19 +4578,12 @@
     }
 
     function convertToServerTime(date) {
-      if (dashboardServerTimezoneOffset === null) return date;
-      const localOffset = date.getTimezoneOffset();
-      const offsetDiff = localOffset - dashboardServerTimezoneOffset;
-      return new Date(date.getTime() + offsetDiff * 60 * 1000);
+      return date;
     }
 
     function convertFromServerTime(isoString) {
       if (!isoString) return null;
-      const date = new Date(isoString);
-      if (dashboardServerTimezoneOffset === null) return date;
-      const localOffset = date.getTimezoneOffset();
-      const offsetDiff = localOffset - dashboardServerTimezoneOffset;
-      return new Date(date.getTime() + offsetDiff * 60 * 1000);
+      return (isoString instanceof Date) ? isoString : new Date(isoString);
     }
 
     function calculateDuration(startTime, endTime, isEdit = false) {

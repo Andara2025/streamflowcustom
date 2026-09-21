@@ -551,11 +551,87 @@ async function deleteYouTubeBroadcastIfUpcoming(streamId) {
   }
 }
 
+async function completeYouTubeBroadcast(streamId) {
+  try {
+    loggedAlreadyHasBroadcast.delete(streamId);
+
+    const stream = await Stream.findById(streamId);
+    if (!stream || !stream.is_youtube_api || !stream.youtube_broadcast_id) {
+      return { success: true, message: 'No YouTube broadcast to complete' };
+    }
+
+    const user = await User.findById(stream.user_id);
+    if (!user || !user.youtube_client_id || !user.youtube_client_secret) {
+      return { success: false, error: 'User credentials missing' };
+    }
+
+    let selectedChannel = stream.youtube_channel_id ? await YoutubeChannel.findById(stream.youtube_channel_id) : null;
+    if (!selectedChannel) selectedChannel = await YoutubeChannel.findDefault(stream.user_id);
+    if (!selectedChannel || selectedChannel.user_id !== stream.user_id) {
+      return { success: false, error: 'YouTube channel not found or unauthorized' };
+    }
+
+    const clientSecret = decrypt(user.youtube_client_secret);
+    const accessToken = decrypt(selectedChannel.access_token);
+    const refreshToken = decrypt(selectedChannel.refresh_token);
+    if (!clientSecret || !accessToken) return { success: false, error: 'Tokens missing' };
+
+    const port = process.env.PORT || 7575;
+    const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, `http://localhost:${port}/auth/youtube/callback`);
+    oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+
+    oauth2Client.on('tokens', async (tokens) => {
+      if (tokens.access_token) {
+        await YoutubeChannel.update(selectedChannel.id, { access_token: encrypt(tokens.access_token) });
+      }
+      if (tokens.refresh_token) {
+        await YoutubeChannel.update(selectedChannel.id, { refresh_token: encrypt(tokens.refresh_token) });
+      }
+    });
+
+    const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+
+    try {
+      const listRes = await youtube.liveBroadcasts.list({
+        part: 'status',
+        id: stream.youtube_broadcast_id
+      });
+      const broadcastItem = listRes.data.items?.[0];
+      const lifeCycleStatus = broadcastItem?.status?.lifeCycleStatus;
+
+      if (lifeCycleStatus === 'live' || lifeCycleStatus === 'testing') {
+        await youtube.liveBroadcasts.transition({
+          broadcastStatus: 'complete',
+          id: stream.youtube_broadcast_id,
+          part: 'id,status'
+        });
+        console.log(`[YouTubeService] Successfully transitioned broadcast ${stream.youtube_broadcast_id} to complete`);
+      } else {
+        console.log(`[YouTubeService] Broadcast ${stream.youtube_broadcast_id} status is '${lifeCycleStatus}', no transition needed`);
+      }
+    } catch (transitionErr) {
+      console.warn(`[YouTubeService] Transition broadcast error for ${stream.youtube_broadcast_id}:`, transitionErr.message);
+    }
+
+    await Stream.update(streamId, {
+      rtmp_url: '',
+      stream_key: ''
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error(`[YouTubeService] Error in completeYouTubeBroadcast for stream ${streamId}:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   createYouTubeBroadcast,
   deleteYouTubeBroadcast,
   deleteYouTubeBroadcastIfUpcoming,
+  completeYouTubeBroadcast,
   getYouTubeOAuth2Client,
   syncBroadcastMonetization,
   sanitizeYouTubeTags
 };
+

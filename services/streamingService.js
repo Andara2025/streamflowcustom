@@ -1104,7 +1104,7 @@ async function stopStream(streamId) {
         if (stream && stream.is_youtube_api && stream.youtube_broadcast_id) {
           try {
             const youtubeService = require('./youtubeService');
-            await youtubeService.deleteYouTubeBroadcast(streamId);
+            await youtubeService.completeYouTubeBroadcast(streamId);
           } catch (e) {
             console.error(`[StreamingService] Background YouTube cleanup error for ${streamId}:`, e.message);
           }

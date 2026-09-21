@@ -4783,39 +4783,59 @@ app.post('/api/streams', isAuthenticated, [
       use_advanced_settings: false,
       user_id: req.session.userId
     };
-    const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    function parseLocalDateTime(dateTimeString) {
-      const [datePart, timePart] = dateTimeString.split('T');
+    function parseUniversalScheduleDate(dateTimeString, clientOffset = null) {
+      if (!dateTimeString) return null;
+      const str = String(dateTimeString).trim();
+      if (!str) return null;
+      if (str.includes('Z') || /[+-]\d{2}(:?\d{2})?$/.test(str)) {
+        const d = new Date(str);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      const [datePart, timePart] = str.split('T');
+      if (!datePart) {
+        const d = new Date(str);
+        return isNaN(d.getTime()) ? null : d;
+      }
       const [year, month, day] = datePart.split('-').map(Number);
-      const [hours, minutes] = timePart.split(':').map(Number);
+      const [hours, minutes] = (timePart || '00:00').split(':').map(Number);
 
-      return new Date(year, month - 1, day, hours, minutes);
+      if (clientOffset !== null && !isNaN(clientOffset)) {
+        const utcMs = Date.UTC(year, month - 1, day, hours || 0, minutes || 0) + (Number(clientOffset) * 60000);
+        return new Date(utcMs);
+      }
+      return new Date(year, month - 1, day, hours || 0, minutes || 0);
     }
 
+    const clientTzOffset = req.body.timezoneOffset !== undefined ? Number(req.body.timezoneOffset) : null;
+
     if (req.body.scheduleStartTime) {
-      const scheduleStartDate = parseLocalDateTime(req.body.scheduleStartTime);
-      streamData.schedule_time = scheduleStartDate.toISOString();
-      streamData.status = 'scheduled';
+      const scheduleStartDate = parseUniversalScheduleDate(req.body.scheduleStartTime, clientTzOffset);
+      if (scheduleStartDate) {
+        streamData.schedule_time = scheduleStartDate.toISOString();
+        streamData.status = 'scheduled';
 
-      if (req.body.scheduleEndTime) {
-        const scheduleEndDate = parseLocalDateTime(req.body.scheduleEndTime);
+        if (req.body.scheduleEndTime) {
+          const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
+          if (scheduleEndDate) {
+            if (scheduleEndDate <= scheduleStartDate) {
+              return res.status(400).json({
+                success: false,
+                error: 'End time must be after start time'
+              });
+            }
 
-        if (scheduleEndDate <= scheduleStartDate) {
-          return res.status(400).json({
-            success: false,
-            error: 'End time must be after start time'
-          });
+            streamData.end_time = scheduleEndDate.toISOString();
+            const durationMs = scheduleEndDate - scheduleStartDate;
+            const durationMinutes = Math.round(durationMs / (1000 * 60));
+            streamData.duration = durationMinutes > 0 ? durationMinutes : null;
+          }
         }
-
-        streamData.end_time = scheduleEndDate.toISOString();
-        const durationMs = scheduleEndDate - scheduleStartDate;
-        const durationMinutes = Math.round(durationMs / (1000 * 60));
-        streamData.duration = durationMinutes > 0 ? durationMinutes : null;
       }
     } else if (req.body.scheduleEndTime) {
-      const scheduleEndDate = parseLocalDateTime(req.body.scheduleEndTime);
-      streamData.end_time = scheduleEndDate.toISOString();
+      const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
+      if (scheduleEndDate) {
+        streamData.end_time = scheduleEndDate.toISOString();
+      }
     }
 
     if (!streamData.status) {
@@ -4945,23 +4965,24 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
       youtube_made_for_kids: ytMadeForKids === 'true' || ytMadeForKids === true
     };
 
+    const clientTzOffset = req.body.timezoneOffset !== undefined ? Number(req.body.timezoneOffset) : null;
     if (scheduleStartTime) {
-      const [datePart, timePart] = scheduleStartTime.split('T');
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [hours, minutes] = timePart.split(':').map(Number);
-      const scheduleDate = new Date(year, month - 1, day, hours, minutes);
-      streamData.schedule_time = scheduleDate.toISOString();
-      streamData.status = 'scheduled';
+      const scheduleDate = parseUniversalScheduleDate(scheduleStartTime, clientTzOffset);
+      if (scheduleDate) {
+        streamData.schedule_time = scheduleDate.toISOString();
+        streamData.status = 'scheduled';
+      } else {
+        streamData.status = 'offline';
+      }
     } else {
       streamData.status = 'offline';
     }
 
     if (scheduleEndTime) {
-      const [datePart, timePart] = scheduleEndTime.split('T');
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [hours, minutes] = timePart.split(':').map(Number);
-      const endDate = new Date(year, month - 1, day, hours, minutes);
-      streamData.end_time = endDate.toISOString();
+      const endDate = parseUniversalScheduleDate(scheduleEndTime, clientTzOffset);
+      if (endDate) {
+        streamData.end_time = endDate.toISOString();
+      }
     }
 
     const stream = await Stream.create(streamData);
@@ -5046,12 +5067,7 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
     }
     const updateData = {};
 
-    function parseScheduleDateTime(dateTimeString) {
-      const [datePart, timePart] = dateTimeString.split('T');
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [hours, minutes] = timePart.split(':').map(Number);
-      return new Date(year, month - 1, day, hours, minutes);
-    }
+    const clientTzOffset = req.body.timezoneOffset !== undefined ? Number(req.body.timezoneOffset) : null;
 
     if (req.body.streamMode === 'youtube') {
       if (req.body.title) updateData.title = cleanTitle(req.body.title);
@@ -5074,13 +5090,15 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
       }
 
       if (req.body.scheduleStartTime) {
-        const scheduleStartDate = parseScheduleDateTime(req.body.scheduleStartTime);
-        updateData.schedule_time = scheduleStartDate.toISOString();
-        updateData.status = 'scheduled';
+        const scheduleStartDate = parseUniversalScheduleDate(req.body.scheduleStartTime, clientTzOffset);
+        if (scheduleStartDate) {
+          updateData.schedule_time = scheduleStartDate.toISOString();
+          updateData.status = 'scheduled';
+        }
 
         if (req.body.scheduleEndTime) {
-          const scheduleEndDate = parseScheduleDateTime(req.body.scheduleEndTime);
-          updateData.end_time = scheduleEndDate.toISOString();
+          const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
+          updateData.end_time = scheduleEndDate ? scheduleEndDate.toISOString() : null;
         } else if ('scheduleEndTime' in req.body && !req.body.scheduleEndTime) {
           updateData.end_time = null;
         }
@@ -5089,8 +5107,8 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
         if ('scheduleEndTime' in req.body && !req.body.scheduleEndTime) {
           updateData.end_time = null;
         } else if (req.body.scheduleEndTime) {
-          const scheduleEndDate = parseScheduleDateTime(req.body.scheduleEndTime);
-          updateData.end_time = scheduleEndDate.toISOString();
+          const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
+          updateData.end_time = scheduleEndDate ? scheduleEndDate.toISOString() : null;
         }
       }
 

@@ -63,8 +63,12 @@ function calculateRotationWindow(rotation, referenceDate = new Date()) {
   const endMinutes = originalEnd.getMinutes();
 
   const now = referenceDate;
-  const isCrossMidnight = (endHours < startHours) || (endHours === startHours && endMinutes <= startMinutes);
   const repeatMode = rotation.repeat_mode || 'daily';
+  if (repeatMode === 'none') {
+    return { start: originalStart, end: originalEnd };
+  }
+
+  const isCrossMidnight = (endHours < startHours) || (endHours === startHours && endMinutes <= startMinutes);
 
   function buildWindow(baseY, baseM, baseD) {
     const s = new Date(baseY, baseM, baseD, startHours, startMinutes, 0, 0);
@@ -207,19 +211,17 @@ async function checkRotations() {
       let scheduledStart = parseLocalDateTime(rotation.start_time);
       let scheduledEnd = parseLocalDateTime(rotation.end_time);
 
-      // Auto-correct distorted schedule dates caused by previous item increment bugs
-      const currentWindow = calculateRotationWindow(rotation, now);
-      if (scheduledStart > currentWindow.start) {
-        console.log(`[RotationService] Auto-correcting schedule for rotation ${rotation.name} from ${formatLocalDateTime(scheduledStart)} to active window ${formatLocalDateTime(currentWindow.start)}`);
-        rotation.start_time = formatLocalDateTime(currentWindow.start);
-        rotation.end_time = formatLocalDateTime(currentWindow.end);
-        scheduledStart = currentWindow.start;
-        scheduledEnd = currentWindow.end;
-        await Rotation.update(rotation.id, {
-          start_time: rotation.start_time,
-          end_time: rotation.end_time
-        }, rotation.user_id);
+      if (!scheduledStart || !scheduledEnd) continue;
+
+      if (now < scheduledStart) {
+        if (!loggedScheduleInfo.has(`notstarted_${rotation.id}`)) {
+          console.log(`[RotationService] Rotation ${rotation.name} not yet started (starts at ${scheduledStart.toLocaleString()})`);
+          loggedScheduleInfo.add(`notstarted_${rotation.id}`);
+        }
+        continue;
       }
+
+      loggedScheduleInfo.delete(`notstarted_${rotation.id}`);
 
       const currentIndex = rotation.current_index || 0;
       
@@ -254,16 +256,6 @@ async function checkRotations() {
         continue;
       }
 
-      if (now < scheduledStart) {
-        if (!loggedScheduleInfo.has(`notstarted_${rotation.id}`)) {
-          console.log(`[RotationService] Rotation ${rotation.name} not yet started (starts at ${scheduledStart.toLocaleString()})`);
-          loggedScheduleInfo.add(`notstarted_${rotation.id}`);
-        }
-        continue;
-      }
-
-      loggedScheduleInfo.delete(`notstarted_${rotation.id}`);
-
       if (now >= scheduledEnd) {
         console.log(`[RotationService] Rotation ${rotation.name} time window has ended`);
         
@@ -279,15 +271,23 @@ async function checkRotations() {
           failedRotationStarts.delete(streamKey);
         }
 
-        // Window ended -> reschedule for next cycle
-        const nextSchedule = getNextSchedule(rotation);
-        await Rotation.update(rotation.id, {
-          current_index: 0,
-          start_time: formatLocalDateTime(nextSchedule.start),
-          end_time: formatLocalDateTime(nextSchedule.end),
-          status: 'active'
-        }, rotation.user_id);
-        console.log(`[RotationService] Time window ended. Rescheduled rotation ${rotation.name} for ${formatLocalDateTime(nextSchedule.start)}`);
+        if (rotation.repeat_mode && rotation.repeat_mode !== 'none') {
+          // Window ended -> reschedule for next cycle
+          const nextSchedule = getNextSchedule(rotation);
+          await Rotation.update(rotation.id, {
+            current_index: 0,
+            start_time: formatLocalDateTime(nextSchedule.start),
+            end_time: formatLocalDateTime(nextSchedule.end),
+            status: 'active'
+          }, rotation.user_id);
+          console.log(`[RotationService] Time window ended. Rescheduled rotation ${rotation.name} for ${formatLocalDateTime(nextSchedule.start)}`);
+        } else {
+          await Rotation.update(rotation.id, {
+            current_index: 0,
+            status: 'completed'
+          }, rotation.user_id);
+          console.log(`[RotationService] Time window ended. Rotation ${rotation.name} completed (non-repeating)`);
+        }
         continue;
       }
 
