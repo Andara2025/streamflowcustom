@@ -79,15 +79,17 @@ function calculateRotationWindow(rotation, referenceDate = new Date()) {
   // WEEKLY: hormati hari pilihan user (Senin-Minggu), bukan hari ini
   if (repeatMode === 'weekly') {
     const targetDow = originalStart.getDay();
-    for (let offset = -1; offset <= 7; offset++) {
+    // Mulai dari 0 (hari ini), bukan -1 (kemarin), kecuali window lintas tengah malam
+    const startOffset = isCrossMidnight ? -1 : 0;
+    for (let offset = startOffset; offset <= 7; offset++) {
       const base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
       if (base.getDay() !== targetDow) continue;
       const w = buildWindow(base.getFullYear(), base.getMonth(), base.getDate());
-      if (now >= w.start && now < w.end) return w;
-      if (w.start > now) return w;
+      if (now >= w.start && now < w.end) return w;  // sedang aktif
+      if (w.start > now) return w;                   // window berikutnya
     }
-    // fallback: cari Senin-Minggu berikutnya
-    for (let offset = 0; offset <= 14; offset++) {
+    // fallback: cari hari yang sama minggu depan
+    for (let offset = 1; offset <= 14; offset++) {
       const base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
       if (base.getDay() !== targetDow) continue;
       const w = buildWindow(base.getFullYear(), base.getMonth(), base.getDate());
