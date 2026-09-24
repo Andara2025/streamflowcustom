@@ -57,8 +57,8 @@ class YoutubeChannel {
 
     return new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO youtube_channels (id, user_id, channel_id, channel_name, channel_thumbnail, subscriber_count, access_token, refresh_token, is_default)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO youtube_channels (id, user_id, channel_id, channel_name, channel_thumbnail, subscriber_count, access_token, refresh_token, is_default, youtube_client_id, youtube_client_secret)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           data.user_id,
@@ -68,7 +68,9 @@ class YoutubeChannel {
           data.subscriber_count || '0',
           data.access_token,
           data.refresh_token,
-          isDefault
+          isDefault,
+          data.youtube_client_id || null,
+          data.youtube_client_secret || null
         ],
         function (err) {
           if (err) return reject(err);

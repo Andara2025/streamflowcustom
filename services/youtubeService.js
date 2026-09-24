@@ -197,9 +197,17 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     throw new Error('Unauthorized channel access. Ownership mismatch.');
   }
 
-  console.log(`[YouTubeService] [INFO] Using Channel: Name="${selectedChannel.channel_name}", YouTubeID="${selectedChannel.channel_id}" for Stream: "${stream.title}"`);
+  const effectiveClientId = selectedChannel.youtube_client_id || user.youtube_client_id;
+  const rawClientSecret = selectedChannel.youtube_client_secret || user.youtube_client_secret;
 
-  const clientSecret = decrypt(user.youtube_client_secret);
+  if (!effectiveClientId || !rawClientSecret) {
+    console.error(`[YouTubeService] [CRITICAL] No YouTube credentials found for stream ${streamId} or channel ${selectedChannel.id}.`);
+    throw new Error('YouTube API credentials not configured');
+  }
+
+  console.log(`[YouTubeService] [INFO] Using Channel: Name="${selectedChannel.channel_name}", YouTubeID="${selectedChannel.channel_id}", ClientID="${effectiveClientId.substring(0, 15)}..." for Stream: "${stream.title}"`);
+
+  const clientSecret = decrypt(rawClientSecret);
   const accessToken = decrypt(selectedChannel.access_token);
   const refreshToken = decrypt(selectedChannel.refresh_token);
 
@@ -208,7 +216,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
   }
 
   const redirectUri = `${baseUrl}/auth/youtube/callback`;
-  const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, redirectUri);
+  const oauth2Client = getYouTubeOAuth2Client(effectiveClientId, clientSecret, redirectUri);
   oauth2Client.setCredentials({
     access_token: accessToken,
     refresh_token: refreshToken
@@ -324,7 +332,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
       // 24/7 streamcopy: JANGAN autoStop. Dengan autoStop=true, YouTube
       // mengakhiri broadcast (jadi VOD) setiap ada jeda data sesaat
       // (jitter Jerman -> YouTube), padahal FFmpeg retry dan app masih live.
-      enableAutoStop: false,
+      enableAutoStop: true,
       monitorStream: {
         enableMonitorStream: false
       }
@@ -511,13 +519,17 @@ async function deleteYouTubeBroadcastIfUpcoming(streamId) {
     if (!selectedChannel) selectedChannel = await YoutubeChannel.findDefault(stream.user_id);
     if (!selectedChannel || selectedChannel.user_id !== stream.user_id) return { success: false };
 
-    const clientSecret = decrypt(user.youtube_client_secret);
+    const effectiveClientId = selectedChannel.youtube_client_id || user.youtube_client_id;
+    const rawClientSecret = selectedChannel.youtube_client_secret || user.youtube_client_secret;
+    if (!effectiveClientId || !rawClientSecret) return { success: false };
+
+    const clientSecret = decrypt(rawClientSecret);
     const accessToken = decrypt(selectedChannel.access_token);
     const refreshToken = decrypt(selectedChannel.refresh_token);
     if (!clientSecret || !accessToken) return { success: false };
 
     const port = process.env.PORT || 7575;
-    const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, `http://localhost:${port}/auth/youtube/callback`);
+    const oauth2Client = getYouTubeOAuth2Client(effectiveClientId, clientSecret, `http://localhost:${port}/auth/youtube/callback`);
     oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
@@ -561,8 +573,8 @@ async function completeYouTubeBroadcast(streamId) {
     }
 
     const user = await User.findById(stream.user_id);
-    if (!user || !user.youtube_client_id || !user.youtube_client_secret) {
-      return { success: false, error: 'User credentials missing' };
+    if (!user) {
+      return { success: false, error: 'User missing' };
     }
 
     let selectedChannel = stream.youtube_channel_id ? await YoutubeChannel.findById(stream.youtube_channel_id) : null;
@@ -571,13 +583,17 @@ async function completeYouTubeBroadcast(streamId) {
       return { success: false, error: 'YouTube channel not found or unauthorized' };
     }
 
-    const clientSecret = decrypt(user.youtube_client_secret);
+    const effectiveClientId = selectedChannel.youtube_client_id || user.youtube_client_id;
+    const rawClientSecret = selectedChannel.youtube_client_secret || user.youtube_client_secret;
+    if (!effectiveClientId || !rawClientSecret) return { success: false, error: 'YouTube credentials missing' };
+
+    const clientSecret = decrypt(rawClientSecret);
     const accessToken = decrypt(selectedChannel.access_token);
     const refreshToken = decrypt(selectedChannel.refresh_token);
     if (!clientSecret || !accessToken) return { success: false, error: 'Tokens missing' };
 
     const port = process.env.PORT || 7575;
-    const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, `http://localhost:${port}/auth/youtube/callback`);
+    const oauth2Client = getYouTubeOAuth2Client(effectiveClientId, clientSecret, `http://localhost:${port}/auth/youtube/callback`);
     oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
 
     oauth2Client.on('tokens', async (tokens) => {

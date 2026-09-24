@@ -3653,13 +3653,24 @@ app.get('/auth/youtube', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
 
-    if (!user.youtube_client_id || !user.youtube_client_secret) {
-      return res.redirect('/settings?error=Please save your YouTube API credentials first&activeTab=integration');
+    const customClientId = req.query.customClientId ? req.query.customClientId.trim() : null;
+    const customClientSecret = req.query.customClientSecret ? req.query.customClientSecret.trim() : null;
+
+    let effectiveClientId = customClientId || user.youtube_client_id;
+    let clientSecret = null;
+
+    if (customClientSecret) {
+      clientSecret = customClientSecret;
+      req.session.oauthCustomClientId = customClientId;
+      req.session.oauthCustomClientSecret = encrypt(customClientSecret);
+    } else if (user.youtube_client_secret) {
+      clientSecret = decrypt(user.youtube_client_secret);
+      delete req.session.oauthCustomClientId;
+      delete req.session.oauthCustomClientSecret;
     }
 
-    const clientSecret = decrypt(user.youtube_client_secret);
-    if (!clientSecret) {
-      return res.redirect('/settings?error=Failed to decrypt credentials&activeTab=integration');
+    if (!effectiveClientId || !clientSecret) {
+      return res.redirect('/settings?error=Please save your YouTube API credentials first&activeTab=integration');
     }
 
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
@@ -3667,7 +3678,7 @@ app.get('/auth/youtube', isAuthenticated, async (req, res) => {
     // PERMANENT FIX: selalu pakai host yang sedang diakses (my.id), abaikan BASE_URL lama yang masih cloud
     const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
 
-    const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, redirectUri);
+    const oauth2Client = getYouTubeOAuth2Client(effectiveClientId, clientSecret, redirectUri);
 
     const scopes = [
       'https://www.googleapis.com/auth/youtube.readonly',
@@ -3704,13 +3715,24 @@ app.get('/auth/youtube/callback', isAuthenticated, async (req, res) => {
 
     const user = await User.findById(req.session.userId);
 
-    if (!user.youtube_client_id || !user.youtube_client_secret) {
-      return res.redirect('/settings?error=YouTube credentials not found&activeTab=integration');
+    const customClientId = req.session.oauthCustomClientId || null;
+    const encryptedCustomSecret = req.session.oauthCustomClientSecret || null;
+    delete req.session.oauthCustomClientId;
+    delete req.session.oauthCustomClientSecret;
+
+    let effectiveClientId = customClientId || user.youtube_client_id;
+    let clientSecret = null;
+    let savedChannelSecret = null;
+
+    if (encryptedCustomSecret) {
+      clientSecret = decrypt(encryptedCustomSecret);
+      savedChannelSecret = encryptedCustomSecret;
+    } else if (user.youtube_client_secret) {
+      clientSecret = decrypt(user.youtube_client_secret);
     }
 
-    const clientSecret = decrypt(user.youtube_client_secret);
-    if (!clientSecret) {
-      return res.redirect('/settings?error=Failed to decrypt credentials&activeTab=integration');
+    if (!effectiveClientId || !clientSecret) {
+      return res.redirect('/settings?error=YouTube credentials not found&activeTab=integration');
     }
 
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
@@ -3718,7 +3740,7 @@ app.get('/auth/youtube/callback', isAuthenticated, async (req, res) => {
     // PERMANENT FIX: sama seperti di /auth/youtube - pakai host request
     const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
 
-    const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, redirectUri);
+    const oauth2Client = getYouTubeOAuth2Client(effectiveClientId, clientSecret, redirectUri);
 
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
@@ -3742,23 +3764,26 @@ app.get('/auth/youtube/callback', isAuthenticated, async (req, res) => {
     const YoutubeChannel = require('./models/YoutubeChannel');
     const existingChannel = await YoutubeChannel.findByChannelId(req.session.userId, channelId);
 
+    const channelPayload = {
+      access_token: encrypt(tokens.access_token),
+      refresh_token: tokens.refresh_token ? encrypt(tokens.refresh_token) : (existingChannel ? existingChannel.refresh_token : null),
+      channel_name: channelName,
+      channel_thumbnail: channelThumbnail,
+      subscriber_count: subscriberCount
+    };
+
+    if (customClientId && savedChannelSecret) {
+      channelPayload.youtube_client_id = customClientId;
+      channelPayload.youtube_client_secret = savedChannelSecret;
+    }
+
     if (existingChannel) {
-      await YoutubeChannel.update(existingChannel.id, {
-        access_token: encrypt(tokens.access_token),
-        refresh_token: tokens.refresh_token ? encrypt(tokens.refresh_token) : existingChannel.refresh_token,
-        channel_name: channelName,
-        channel_thumbnail: channelThumbnail,
-        subscriber_count: subscriberCount
-      });
+      await YoutubeChannel.update(existingChannel.id, channelPayload);
     } else {
       await YoutubeChannel.create({
         user_id: req.session.userId,
         channel_id: channelId,
-        channel_name: channelName,
-        channel_thumbnail: channelThumbnail,
-        subscriber_count: subscriberCount,
-        access_token: encrypt(tokens.access_token),
-        refresh_token: tokens.refresh_token ? encrypt(tokens.refresh_token) : null
+        ...channelPayload
       });
     }
 
@@ -3771,6 +3796,37 @@ app.get('/auth/youtube/callback', isAuthenticated, async (req, res) => {
     console.error('YouTube OAuth callback error:', error);
     const errorMessage = error.message || 'Failed to connect YouTube account';
     res.redirect(`/settings?error=${encodeURIComponent(errorMessage)}&activeTab=integration`);
+  }
+});
+
+app.post('/api/settings/youtube-channel/:id/credentials', isAuthenticated, async (req, res) => {
+  try {
+    const YoutubeChannel = require('./models/YoutubeChannel');
+    const channel = await YoutubeChannel.findById(req.params.id);
+    if (!channel || channel.user_id !== req.session.userId) {
+      return res.status(404).json({ success: false, error: 'Channel not found' });
+    }
+
+    const { clientId, clientSecret } = req.body;
+    const updateData = {};
+
+    if (clientId && clientId.trim()) {
+      updateData.youtube_client_id = clientId.trim();
+    } else if (clientId === '') {
+      updateData.youtube_client_id = null; // Revert to account default
+    }
+
+    if (clientSecret && clientSecret.trim() && clientSecret !== '••••••••••••••••') {
+      updateData.youtube_client_secret = encrypt(clientSecret.trim());
+    } else if (clientSecret === '') {
+      updateData.youtube_client_secret = null; // Revert to account default
+    }
+
+    await YoutubeChannel.update(channel.id, updateData);
+    res.json({ success: true, message: 'Channel credentials updated successfully' });
+  } catch (error) {
+    console.error('Error updating channel credentials:', error);
+    res.status(500).json({ success: false, error: 'Failed to update channel credentials' });
   }
 });
 

@@ -376,6 +376,18 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE youtube_channels ADD COLUMN youtube_client_id TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding youtube_client_id column to youtube_channels:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE youtube_channels ADD COLUMN youtube_client_secret TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding youtube_client_secret column to youtube_channels:', err.message);
+        }
+      });
+
       db.run(`ALTER TABLE videos ADD COLUMN audio_codec TEXT`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding audio_codec column to videos:', err.message);

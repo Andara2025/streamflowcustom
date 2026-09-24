@@ -415,16 +415,29 @@
                               <% } %>
                             </div>
                           <div>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                               <p class="font-medium text-white"><%= channel.channel_name %></p>
                               <% if (channel.is_default) { %>
-                                <span class="px-2 py-0.5 bg-blue-600/20 text-blue-600 text-xs rounded-sm">Default</span>
+                                <span class="px-2 py-0.5 bg-blue-600/20 text-blue-400 text-xs rounded-sm">Default</span>
+                              <% } %>
+                              <% if (channel.youtube_client_id) { %>
+                                <span class="px-2 py-0.5 bg-emerald-600/20 text-emerald-400 text-xs rounded-sm flex items-center gap-1" title="Menggunakan Client ID Khusus (Kuota Terpisah)">
+                                  <i class="ti ti-key text-[10px]"></i> Custom Project (<%= channel.youtube_client_id.substring(0, 8) %>...)
+                                </span>
+                              <% } else { %>
+                                <span class="px-2 py-0.5 bg-gray-700/50 text-gray-400 text-xs rounded-sm" title="Menggunakan Client ID bawaan akun">
+                                  Default Account Key
+                                </span>
                               <% } %>
                             </div>
                             <p class="text-xs text-gray-400"><%= Number(channel.subscriber_count || 0).toLocaleString() %> subscribers</p>
                           </div>
                         </div>
                         <div class="flex items-center gap-2">
+                          <button type="button" onclick="openChannelCredentialsModal('<%= channel.id %>', '<%= channel.channel_name %>', '<%= channel.youtube_client_id || '' %>')"
+                            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm" title="Edit Client ID Channel ini">
+                            <i class="ti ti-key"></i>
+                          </button>
                           <% if (!channel.is_default) { %>
                             <button type="button" onclick="setDefaultChannel('<%= channel.id %>')"
                               class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm" title="Set as default">
@@ -489,6 +502,115 @@
               <% } %>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Modal: Add Channel (Choice of Default or Custom Client ID) -->
+      <div id="add-channel-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl max-w-lg w-full p-6 shadow-2xl animate-fade-in">
+          <div class="flex items-center justify-between mb-4 border-b border-gray-700 pb-3">
+            <h4 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="ti ti-brand-youtube text-red-500"></i> Connect YouTube Channel
+            </h4>
+            <button type="button" onclick="closeAddChannelModal()" class="text-gray-400 hover:text-white">
+              <i class="ti ti-x text-xl"></i>
+            </button>
+          </div>
+
+          <div class="space-y-4 text-sm">
+            <p class="text-gray-300">
+              Pilih apakah ingin menggunakan <strong>Default Client ID Akun</strong> atau <strong>Project Google Cloud Baru (Custom)</strong> untuk channel ini.
+            </p>
+
+            <div class="space-y-2">
+              <label class="flex items-center gap-3 p-3 bg-dark-900 rounded-lg border border-gray-700 cursor-pointer hover:border-gray-600">
+                <input type="radio" name="channel_oauth_type" value="default" checked onchange="toggleCustomOAuthFields(false)" class="text-primary focus:ring-0">
+                <div>
+                  <span class="font-medium text-white block">Gunakan Default Client ID Akun</span>
+                  <span class="text-xs text-gray-400">Memakai Client ID yang sudah tersimpan di profil akun</span>
+                </div>
+              </label>
+
+              <label class="flex items-center gap-3 p-3 bg-dark-900 rounded-lg border border-gray-700 cursor-pointer hover:border-gray-600">
+                <input type="radio" name="channel_oauth_type" value="custom" onchange="toggleCustomOAuthFields(true)" class="text-primary focus:ring-0">
+                <div>
+                  <span class="font-medium text-white block">Gunakan Client ID Baru / Project Google Lain</span>
+                  <span class="text-xs text-emerald-400">Rekomendasi jika kuota project lama sudah penuh / ingin kuota 10.000 terpisah</span>
+                </div>
+              </label>
+            </div>
+
+            <!-- Custom OAuth Inputs -->
+            <div id="custom-oauth-fields" class="space-y-3 pt-2 hidden border-t border-gray-700/50">
+              <div>
+                <label class="block text-xs font-medium text-gray-300 mb-1">New Google Client ID</label>
+                <input type="text" id="modal-custom-client-id" placeholder="xxxx.apps.googleusercontent.com"
+                  class="w-full bg-dark-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:ring-1 focus:ring-primary focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-300 mb-1">New Google Client Secret</label>
+                <input type="password" id="modal-custom-client-secret" placeholder="GOCSPX-xxxx"
+                  class="w-full bg-dark-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:ring-1 focus:ring-primary focus:outline-none">
+              </div>
+              <p class="text-[11px] text-gray-400">
+                *Pastikan Redirect URI (<code class="text-blue-400 select-all"><%= typeof baseUrl !== 'undefined' ? baseUrl : '' %>/auth/youtube/callback</code>) sudah didaftarkan di Google Cloud Project yang baru.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-700">
+            <button type="button" onclick="closeAddChannelModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors">
+              Batal
+            </button>
+            <button type="button" onclick="proceedAddChannelOAuth()" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+              <i class="ti ti-login"></i> Lanjut Otorisasi Google
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Edit Channel Credentials -->
+      <div id="edit-channel-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl max-w-md w-full p-6 shadow-2xl animate-fade-in">
+          <div class="flex items-center justify-between mb-4 border-b border-gray-700 pb-3">
+            <h4 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="ti ti-key text-emerald-400"></i> Edit Project Key Channel
+            </h4>
+            <button type="button" onclick="closeEditChannelModal()" class="text-gray-400 hover:text-white">
+              <i class="ti ti-x text-xl"></i>
+            </button>
+          </div>
+
+          <form id="edit-channel-credentials-form" onsubmit="handleSaveChannelCredentials(event)" class="space-y-4 text-sm">
+            <input type="hidden" id="edit-channel-id" value="">
+            
+            <div>
+              <p class="text-xs text-gray-400 mb-1">Nama Channel:</p>
+              <p id="edit-channel-name" class="font-semibold text-white"></p>
+            </div>
+
+            <div class="space-y-3 pt-2">
+              <div>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Custom Client ID (Kosongkan jika ingin pakai Default Akun)</label>
+                <input type="text" id="edit-client-id" placeholder="Kosongkan untuk pakai default akun"
+                  class="w-full bg-dark-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:ring-1 focus:ring-primary focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Custom Client Secret</label>
+                <input type="password" id="edit-client-secret" placeholder="Masukkan Secret baru atau kosongkan"
+                  class="w-full bg-dark-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:ring-1 focus:ring-primary focus:outline-none">
+              </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-700">
+              <button type="button" onclick="closeEditChannelModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors">
+                Batal
+              </button>
+              <button type="submit" id="save-channel-credentials-btn" class="px-5 py-2 bg-primary hover:bg-rose-600 text-white rounded-lg text-sm font-medium transition-colors">
+                Simpan Perubahan
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
