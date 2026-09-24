@@ -1451,7 +1451,7 @@
 
       if (connectYoutubeBtn) {
         connectYoutubeBtn.addEventListener('click', () => {
-          window.location.href = '/auth/youtube';
+          openAddChannelModal();
         });
       }
 
@@ -1611,5 +1611,121 @@
         tokenFileInput.value = '';
       }
     });
+  }
+
+  // --- YouTube Multi Client ID Modal Functions ---
+  function openAddChannelModal() {
+    const modal = document.getElementById('add-channel-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      toggleCustomOAuthFields(false);
+      const defaultRadio = document.querySelector('input[name="channel_oauth_type"][value="default"]');
+      if (defaultRadio) defaultRadio.checked = true;
+      const cidInput = document.getElementById('modal-custom-client-id');
+      const secInput = document.getElementById('modal-custom-client-secret');
+      if (cidInput) cidInput.value = '';
+      if (secInput) secInput.value = '';
+    }
+  }
+
+  function closeAddChannelModal() {
+    const modal = document.getElementById('add-channel-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function toggleCustomOAuthFields(show) {
+    const fields = document.getElementById('custom-oauth-fields');
+    if (fields) {
+      if (show) {
+        fields.classList.remove('hidden');
+      } else {
+        fields.classList.add('hidden');
+      }
+    }
+  }
+
+  function proceedAddChannelOAuth() {
+    const selectedType = document.querySelector('input[name="channel_oauth_type"]:checked')?.value || 'default';
+    if (selectedType === 'custom') {
+      const clientId = document.getElementById('modal-custom-client-id')?.value.trim();
+      const clientSecret = document.getElementById('modal-custom-client-secret')?.value.trim();
+
+      if (!clientId || !clientSecret) {
+        showToast('error', 'Silakan masukkan Custom Client ID dan Client Secret!');
+        return;
+      }
+
+      const params = new URLSearchParams({
+        customClientId: clientId,
+        customClientSecret: clientSecret
+      });
+      window.location.href = `/auth/youtube?${params.toString()}`;
+    } else {
+      window.location.href = '/auth/youtube';
+    }
+  }
+
+  function openChannelCredentialsModal(channelId, channelName, currentClientId) {
+    const modal = document.getElementById('edit-channel-modal');
+    if (!modal) return;
+
+    document.getElementById('edit-channel-id').value = channelId;
+    document.getElementById('edit-channel-name').textContent = channelName;
+    document.getElementById('edit-client-id').value = currentClientId || '';
+    document.getElementById('edit-client-secret').value = '';
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeEditChannelModal() {
+    const modal = document.getElementById('edit-channel-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  async function handleSaveChannelCredentials(event) {
+    event.preventDefault();
+
+    const channelId = document.getElementById('edit-channel-id').value;
+    const clientId = document.getElementById('edit-client-id').value.trim();
+    const clientSecret = document.getElementById('edit-client-secret').value.trim();
+    const btn = document.getElementById('save-channel-credentials-btn');
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader animate-spin"></i> Menyimpan...';
+
+    try {
+      const response = await fetch(`/api/settings/youtube-channel/${channelId}/credentials`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': '<%= csrfToken %>'
+        },
+        body: JSON.stringify({
+          clientId: clientId,
+          clientSecret: clientSecret
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showToast('success', 'Kredensial channel berhasil diperbarui!');
+        closeEditChannelModal();
+        setTimeout(() => {
+          window.location.hash = 'integration';
+          window.location.reload();
+        }, 1000);
+      } else {
+        showToast('error', data.error || 'Gagal menyimpan kredensial channel');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    } catch (err) {
+      console.error('Error saving channel credentials:', err);
+      showToast('error', 'Terjadi kesalahan saat menyimpan kredensial');
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
   }
   </script>
