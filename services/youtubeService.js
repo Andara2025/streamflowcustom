@@ -151,18 +151,71 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     return { success: true, message: 'Not a YouTube API stream' };
   }
 
+  // REUSE KEY SAMA: jangan bikin broadcast/VOD baru kalau yang lama masih
+  // live/testing/upcoming. Ini yang bikin smooth: putus 5-10 detik ->
+  // reconnect ke RTMP yang sama, 1 jadwal = 1 VOD.
+  // Verifikasi lifecycle dulu (1 quota unit, hanya saat retry/start, murah).
   if (stream.youtube_broadcast_id && stream.rtmp_url && stream.stream_key) {
-    if (!loggedAlreadyHasBroadcast.has(streamId)) {
-      console.log(`[YouTubeService] Stream ${streamId} already has YouTube broadcast & RTMP info, skipping creation`);
-      loggedAlreadyHasBroadcast.add(streamId);
+    try {
+      // Butuh kredensial untuk verifikasi -> resolve cepat tanpa log berisik
+      const _user = await User.findById(stream.user_id);
+      let _ch = null;
+      if (stream.youtube_channel_id) {
+        _ch = await YoutubeChannel.findById(stream.youtube_channel_id);
+      }
+      if (!_ch) {
+        _ch = await YoutubeChannel.findDefault(stream.user_id);
+      }
+      if (_user && _ch && _ch.access_token) {
+        const _sec = decrypt(_ch.youtube_client_secret || _user.youtube_client_secret);
+        const _tok = decrypt(_ch.access_token);
+        const _ref = _ch.refresh_token ? decrypt(_ch.refresh_token) : null;
+        if (_sec && _tok) {
+          const _redir = `${baseUrl}/auth/youtube/callback`;
+          const _oauth = getYouTubeOAuth2Client(_ch.youtube_client_id || _user.youtube_client_id, _sec, _redir);
+          _oauth.setCredentials({ access_token: _tok, refresh_token: _ref });
+          const _yt = google.youtube({ version: 'v3', auth: _oauth });
+          const _chk = await _yt.liveBroadcasts.list({ part: 'status', id: stream.youtube_broadcast_id });
+          const _lc = _chk.data.items?.[0]?.status?.lifeCycleStatus;
+          if (_lc === 'live' || _lc === 'testing' || _lc === 'upcoming' || _lc === 'created' || _lc === 'ready') {
+            if (!loggedAlreadyHasBroadcast.has(streamId)) {
+              console.log(`[YouTubeService] Reuse key sama ${streamId} (yt:${stream.youtube_broadcast_id}, status:${_lc})`);
+              loggedAlreadyHasBroadcast.add(streamId);
+            }
+            return {
+              success: true,
+              rtmpUrl: stream.rtmp_url,
+              streamKey: stream.stream_key,
+              broadcastId: stream.youtube_broadcast_id,
+              streamId: stream.youtube_stream_id
+            };
+          }
+          // Broadcast sudah complete/deleted -> jatuh ke bawah bikin baru
+          // HANYA jika jadwal masih ada. Kalau jadwal habis, jangan bikin VOD baru.
+          if (_lc === 'complete' || _lc === 'revoked') {
+            if (stream.end_time && new Date(stream.end_time).getTime() <= Date.now()) {
+              throw new Error('Jadwal sudah berakhir, tidak bikin broadcast baru');
+            }
+            console.log(`[YouTubeService] Broadcast lama ${_lc}, bikin baru karena jadwal masih ada (stream ${streamId})`);
+            loggedAlreadyHasBroadcast.delete(streamId);
+          }
+        }
+      }
+    } catch (reuseErr) {
+      if (reuseErr.message && reuseErr.message.includes('Jadwal sudah berakhir')) {
+        throw reuseErr;
+      }
+      // Gagal verifikasi (network/quota) -> fallback aman: pakai key lama
+      // agar tidak banjir VOD baru tiap jitter.
+      console.log(`[YouTubeService] Verifikasi reuse gagal (${reuseErr.message}), pakai key lama untuk ${streamId}`);
+      return {
+        success: true,
+        rtmpUrl: stream.rtmp_url,
+        streamKey: stream.stream_key,
+        broadcastId: stream.youtube_broadcast_id,
+        streamId: stream.youtube_stream_id
+      };
     }
-    return { 
-      success: true, 
-      rtmpUrl: stream.rtmp_url, 
-      streamKey: stream.stream_key,
-      broadcastId: stream.youtube_broadcast_id,
-      streamId: stream.youtube_stream_id
-    };
   }
 
   const user = await User.findById(stream.user_id);
@@ -332,7 +385,9 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
       // 24/7 streamcopy: JANGAN autoStop. Dengan autoStop=true, YouTube
       // mengakhiri broadcast (jadi VOD) setiap ada jeda data sesaat
       // (jitter Jerman -> YouTube), padahal FFmpeg retry dan app masih live.
-      enableAutoStop: true,
+      // Stop sepenuhnya dikendalikan scheduler (checkStreamDurations 15s +
+      // scheduleByEndTime + sync kill FFmpeg + completeYouTubeBroadcast).
+      enableAutoStop: false,
       monitorStream: {
         enableMonitorStream: false
       }

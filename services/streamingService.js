@@ -51,10 +51,58 @@ const startingStreams = new Set();
 const MAX_LOG_LINES = 50;
 const MAX_RETRY_ATTEMPTS = 15;
 const BASE_RETRY_DELAY = 2000;
-const MAX_RETRY_DELAY = 30000;
+const MAX_RETRY_DELAY = 10000;
 const HEALTH_CHECK_INTERVAL = 30000;
 const SYNC_INTERVAL = 60000;
 const STREAM_START_TIMEOUT = 15000;
+// Kebijakan reconnect, simpel dan diterima YouTube API:
+// 1) Putus -> coba key/broadcast SAMA dulu (tanpa insert baru, tanpa quota besar).
+//    Diterima YouTube selama broadcast masih live/testing (autoStop=false).
+// 2) Kalau key sama ditolak / retry habis / putus >10 mnt, baru bikin
+//    broadcast BARU judul+data sama, HANYA jika sisa jadwal layak (proporsional).
+//    Tidak explicit 30 mnt: threshold = min(30mnt, 30% total durasi), floor 3mnt.
+//    Contoh: jadwal 15mnt -> butuh sisa >4.5mnt; 60mnt -> >18mnt; 120mnt+ -> >30mnt.
+// 3) Lewat end_time -> tidak ada reconnect, langsung complete.
+//    START_EARLY 60 detik sudah dihandle scheduler.
+const END_GRACE_MS = 0;
+const SAME_KEY_WINDOW_MS = 10 * 60 * 1000;
+const NEW_BROADCAST_MIN_FRACTION = 0.3;
+const NEW_BROADCAST_MAX_THRESHOLD_MS = 30 * 60 * 1000;
+const NEW_BROADCAST_MIN_ABSOLUTE_MS = 3 * 60 * 1000;
+const disconnectStartedAt = new Map();
+
+function getScheduleTimes(stream) {
+  const now = Date.now();
+  const endMs = stream && stream.end_time ? new Date(stream.end_time).getTime() : NaN;
+  if (isNaN(endMs)) {
+    return { totalMs: NaN, remainMs: Infinity, endMs: NaN };
+  }
+  const startRaw = (stream && (stream.start_time || stream.schedule_time)) || null;
+  let startMs = startRaw ? new Date(startRaw).getTime() : NaN;
+  if (isNaN(startMs)) {
+    startMs = now; // fallback: anggap total = sisa (tidak menghukum)
+  }
+  const totalMs = Math.max(0, endMs - startMs);
+  const remainMs = endMs - now;
+  return { totalMs, remainMs, endMs };
+}
+
+function shouldCreateNewBroadcast(stream) {
+  const { totalMs, remainMs } = getScheduleTimes(stream);
+  if (!isFinite(remainMs) || remainMs <= 0) {
+    return { ok: false, reason: 'jadwal habis' };
+  }
+  if (remainMs < NEW_BROADCAST_MIN_ABSOLUTE_MS) {
+    return { ok: false, reason: `sisa ${Math.round(remainMs / 60000)}mnt < floor 3mnt` };
+  }
+  const thresholdMs = isFinite(totalMs) && totalMs > 0
+    ? Math.min(NEW_BROADCAST_MAX_THRESHOLD_MS, totalMs * NEW_BROADCAST_MIN_FRACTION)
+    : NEW_BROADCAST_MAX_THRESHOLD_MS;
+  if (remainMs <= thresholdMs) {
+    return { ok: false, reason: `sisa ${Math.round(remainMs / 60000)}mnt <= threshold ${Math.round(thresholdMs / 60000)}mnt (30% total)` };
+  }
+  return { ok: true, reason: `sisa ${Math.round(remainMs / 60000)}mnt > threshold ${Math.round(thresholdMs / 60000)}mnt` };
+}
 
 const YOUTUBE_COPY_ALLOWED_VIDEO_CODECS = new Set(['h264']);
 const YOUTUBE_COPY_ALLOWED_AUDIO_CODECS = new Set(['aac', 'mp3']);
@@ -111,6 +159,7 @@ function cleanupStreamData(streamId) {
   streamRetryCount.delete(streamId);
   manuallyStoppingStreams.delete(streamId);
   startingStreams.delete(streamId);
+  disconnectStartedAt.delete(streamId);
 }
 
 function getRetryDelay(retryCount) {
@@ -940,11 +989,18 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
       if (currentStream && currentStream.end_time) {
         const endTime = new Date(currentStream.end_time);
         const now = new Date();
-        if (endTime.getTime() <= now.getTime()) {
+        if (endTime.getTime() <= now.getTime() + END_GRACE_MS) {
           addStreamLog(streamId, 'Stream ended - scheduled end time reached');
           if (wasActive) {
             try {
+              // Pakai jalur resmi agar YouTube di-complete + history tersimpan.
+              // Jangan cuma updateStatus offline (itu sisakan broadcast live = nodata berjam-jam).
+              const youtubeService = require('./youtubeService');
+              if (currentStream.is_youtube_api && currentStream.youtube_broadcast_id) {
+                await youtubeService.completeYouTubeBroadcast(streamId).catch(() => {});
+              }
               await Stream.updateStatus(streamId, 'offline', currentStream.user_id);
+              await saveStreamHistory(currentStream);
               if (schedulerService) {
                 schedulerService.handleStreamStopped(streamId);
               }
@@ -960,12 +1016,20 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
 
       if (shouldRetry && currentStream && currentStream.status !== 'offline') {
         const retryCount = streamRetryCount.get(streamId) || 0;
+        if (!disconnectStartedAt.has(streamId)) {
+          disconnectStartedAt.set(streamId, Date.now());
+        }
+        const downMs = Date.now() - disconnectStartedAt.get(streamId);
+        const endMs = currentStream.end_time ? new Date(currentStream.end_time).getTime() : null;
+        const remainMs = endMs ? endMs - Date.now() : Infinity;
 
-        if (retryCount < MAX_RETRY_ATTEMPTS) {
+        // Fase 1: reconnect key/broadcast SAMA (0-10 mnt, max 15x).
+        // Ini diterima YouTube selama broadcast masih live/testing.
+        if (retryCount < MAX_RETRY_ATTEMPTS && downMs < SAME_KEY_WINDOW_MS) {
           streamRetryCount.set(streamId, retryCount + 1);
           const delay = getRetryDelay(retryCount);
 
-          addStreamLog(streamId, `Retry #${retryCount + 1} in ${Math.round(delay / 1000)}s`);
+          addStreamLog(streamId, `Terputus, reconnect key SAMA #${retryCount + 1} dalam ${Math.round(delay / 1000)}s (down ${Math.round(downMs / 1000)}s, sisa ${remainMs === Infinity ? '-' : Math.round(remainMs / 60000) + 'mnt'})`);
 
           setTimeout(async () => {
             try {
@@ -974,14 +1038,43 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
                 if (latestStream.end_time) {
                   const endTime = new Date(latestStream.end_time);
                   const now = new Date();
-                  if (endTime.getTime() <= now.getTime()) {
+                  if (endTime.getTime() <= now.getTime() + END_GRACE_MS) {
+                    const youtubeService = require('./youtubeService');
+                    if (latestStream.is_youtube_api && latestStream.youtube_broadcast_id) {
+                      await youtubeService.completeYouTubeBroadcast(streamId).catch(() => {});
+                    }
                     await Stream.updateStatus(streamId, 'offline', latestStream.user_id);
+                    await saveStreamHistory(latestStream);
                     cleanupStreamData(streamId);
+                    disconnectStartedAt.delete(streamId);
                     return;
                   }
                 }
+                // startStream(true) otomatis reuse key sama via youtubeService
                 const result = await startStream(streamId, true, baseUrl);
-                if (!result.success) {
+                if (result.success) {
+                  disconnectStartedAt.delete(streamId);
+                } else if (/complete|revoked|not found|Jadwal sudah berakhir/i.test(result.error || '')) {
+                  // Fase 2: key sama ditolak YouTube -> broadcast BARU judul+data sama
+                  // Proporsional: layak hanya jika sisa > threshold (30% total, max 30mnt, floor 3mnt).
+                  const chk = shouldCreateNewBroadcast(latestStream);
+                  if (chk.ok) {
+                    addStreamLog(streamId, `Key lama ditolak (${result.error}), buat broadcast BARU data sama (${chk.reason})`);
+                    await Stream.update(streamId, { youtube_broadcast_id: null, youtube_stream_id: null, rtmp_url: '', stream_key: '' });
+                    streamRetryCount.set(streamId, 0);
+                    disconnectStartedAt.delete(streamId);
+                    const r2 = await startStream(streamId, true, baseUrl);
+                    if (!r2.success) {
+                      await Stream.updateStatus(streamId, 'offline', latestStream.user_id);
+                      cleanupStreamData(streamId);
+                    }
+                  } else {
+                    addStreamLog(streamId, `Key ditolak tapi ${chk.reason}, stop saja (hemat quota)`);
+                    await Stream.updateStatus(streamId, 'offline', latestStream.user_id);
+                    cleanupStreamData(streamId);
+                    disconnectStartedAt.delete(streamId);
+                  }
+                } else {
                   await Stream.updateStatus(streamId, 'offline', latestStream.user_id);
                   cleanupStreamData(streamId);
                 }
@@ -994,7 +1087,28 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
           }, delay);
           return;
         } else {
-          addStreamLog(streamId, `Max retries (${MAX_RETRY_ATTEMPTS}) reached`);
+          // Fase 2: putus >10 mnt / retry habis -> 1x percobaan broadcast baru
+          // jika sisa proporsional layak. Kalau tidak, stop hemat quota.
+          const chk2 = shouldCreateNewBroadcast(currentStream);
+          if (chk2.ok) {
+            addStreamLog(streamId, `Down ${Math.round(downMs / 60000)}mnt, coba broadcast BARU 1x (${chk2.reason})`);
+            try {
+              await Stream.update(streamId, { youtube_broadcast_id: null, youtube_stream_id: null, rtmp_url: '', stream_key: '' });
+              streamRetryCount.set(streamId, 0);
+              disconnectStartedAt.delete(streamId);
+              const r = await startStream(streamId, true, baseUrl);
+              if (!r.success) {
+                await Stream.updateStatus(streamId, 'offline', currentStream.user_id);
+                cleanupStreamData(streamId);
+              }
+              return;
+            } catch (e) {
+              addStreamLog(streamId, `Broadcast baru gagal: ${e.message}`);
+            }
+          } else {
+            addStreamLog(streamId, `Max retries / down ${Math.round(downMs / 60000)}mnt, ${chk2.reason} -> stop`);
+          }
+          disconnectStartedAt.delete(streamId);
         }
       }
 
@@ -1070,10 +1184,20 @@ async function stopStream(streamId) {
     const stream = await Stream.findById(streamId);
 
     if (!streamData) {
+      // Tidak ada FFmpeg di memori (misal habis restart) tapi DB masih live:
+      // tetap offline-kan DB + complete YouTube agar tidak molor sampai siang.
       if (stream) {
         await Stream.updateStatus(streamId, 'offline', stream.user_id);
         if (schedulerService) {
           schedulerService.handleStreamStopped(streamId);
+        }
+        if (stream.is_youtube_api && stream.youtube_broadcast_id) {
+          try {
+            const youtubeService = require('./youtubeService');
+            await youtubeService.completeYouTubeBroadcast(streamId);
+          } catch (e) {
+            console.error(`[StreamingService] YouTube cleanup (no-proc) error for ${streamId}:`, e.message);
+          }
         }
         cleanupStreamData(streamId);
         return { success: true, message: 'Stream stopped successfully' };
@@ -1083,42 +1207,39 @@ async function stopStream(streamId) {
 
     addStreamLog(streamId, 'Stopping stream...');
     manuallyStoppingStreams.add(streamId);
-    
-    // Update memory and DB status immediately so UI updates fast
+
+    // KILL DULU, BARU UPDATE DB. Urutan lama (delete + offline dulu, kill
+    // belakangan di background) bikin DB offline padahal FFmpeg masih hidup
+    // -> YouTube tetap live berjam-jam (kasus jam 10-11 molor sampai siang).
+    try {
+      await killFFmpegProcess(streamId, streamData);
+    } catch (killErr) {
+      console.error(`[StreamingService] kill FFmpeg ${streamId} gagal:`, killErr.message);
+    }
+    cleanupTempFiles(streamId);
+
     activeStreams.delete(streamId);
     if (stream) {
       await Stream.updateStatus(streamId, 'offline', stream.user_id);
       await saveStreamHistory(stream);
     }
-    
+
     if (schedulerService) {
       schedulerService.handleStreamStopped(streamId);
     }
 
-    // Perform heavy cleanup (killing process, YouTube API) in background
-    (async () => {
+    if (stream && stream.is_youtube_api && stream.youtube_broadcast_id) {
       try {
-        await killFFmpegProcess(streamId, streamData);
-        cleanupTempFiles(streamId);
-
-        if (stream && stream.is_youtube_api && stream.youtube_broadcast_id) {
-          try {
-            const youtubeService = require('./youtubeService');
-            await youtubeService.completeYouTubeBroadcast(streamId);
-          } catch (e) {
-            console.error(`[StreamingService] Background YouTube cleanup error for ${streamId}:`, e.message);
-          }
-        }
-        
-        cleanupStreamData(streamId);
-        console.log(`[StreamingService] Background stop completed for stream ${streamId}`);
-      } catch (bgError) {
-        console.error(`[StreamingService] Background cleanup failed for stream ${streamId}:`, bgError.message);
-        cleanupStreamData(streamId);
+        const youtubeService = require('./youtubeService');
+        await youtubeService.completeYouTubeBroadcast(streamId);
+      } catch (e) {
+        console.error(`[StreamingService] YouTube cleanup error for ${streamId}:`, e.message);
       }
-    })();
+    }
 
-    return { success: true, message: 'Stream stop initiated' };
+    cleanupStreamData(streamId);
+    console.log(`[StreamingService] Stop completed for stream ${streamId}`);
+    return { success: true, message: 'Stream stopped successfully' };
   } catch (error) {
     console.error(`[StreamingService] Error in stopStream:`, error.message);
     manuallyStoppingStreams.delete(streamId);

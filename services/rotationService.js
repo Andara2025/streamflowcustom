@@ -259,8 +259,8 @@ async function checkRotations() {
       }
 
       if (now >= scheduledEnd) {
-        console.log(`[RotationService] Rotation ${rotation.name} time window has ended`);
-        
+        console.log(`[RotationService] Rotation ${rotation.name} time window has ended (end: ${rotation.end_time}, now: ${now.toLocaleString()})`);
+
         const currentItem = items[currentIndex];
         if (currentItem) {
           const streamKey = `${rotation.id}_${currentItem.id}`;
@@ -269,6 +269,23 @@ async function checkRotations() {
             activeRotationStreams.delete(streamKey);
             loggedAlreadyRunning.delete(streamKey);
             await Rotation.update(rotation.id, { status: 'active' }, rotation.user_id);
+          } else {
+            // Map memori bisa hilang habis restart PM2: sapu DB agar tidak molor
+            // berjam-jam (kasus jam 10-11 molor sampai siang).
+            try {
+              const { db } = require('../db/database');
+              const liveRotStreams = await new Promise((resolve) => {
+                db.all('SELECT * FROM streams WHERE user_id = ? AND is_rotation = 1 AND status = ?', [rotation.user_id, 'live'], (err, rows) => {
+                  resolve(rows || []);
+                });
+              });
+              for (const ls of liveRotStreams) {
+                console.log(`[RotationService] Sweep overdue rotation stream ${ls.id} ("${ls.title}")`);
+                await streamingService.stopStream(ls.id);
+              }
+            } catch (sweepErr) {
+              console.error(`[RotationService] Sweep overdue gagal: ${sweepErr.message}`);
+            }
           }
           failedRotationStarts.delete(streamKey);
         }
@@ -522,60 +539,11 @@ async function stopRotationStream(rotation, item) {
     }
 
     if (streamId) {
-      const stream = await Stream.findById(streamId);
+      // stopStream sudah handle kill FFmpeg + complete YouTube via youtubeService
+      // (per-channel Client ID + cek lifecycle). Jangan transition manual di sini
+      // agar tidak double-complete (Redundant transition) dan tidak
+      // unauthorized_client (token channel A dipakai dengan Client-B).
       await streamingService.stopStream(streamId);
-
-      if (stream && stream.youtube_broadcast_id) {
-        try {
-          const YoutubeChannel = require('../models/YoutubeChannel');
-          let selectedChannel = null;
-          
-          if (stream.youtube_channel_id) {
-            selectedChannel = await YoutubeChannel.findById(stream.youtube_channel_id);
-          }
-          
-          if (!selectedChannel || selectedChannel.user_id !== user.id) {
-            console.error(`[RotationService] [WARN] Cannot complete YouTube broadcast: Channel not found or unauthorized for stream ${stream.id}`);
-            return { success: true }; // Still return success for the local stop operation
-          }
-
-          if (selectedChannel && selectedChannel.access_token) {
-            const oauth2Client = new google.auth.OAuth2(
-              user.youtube_client_id,
-              decrypt(user.youtube_client_secret),
-              getRedirectUri(user)
-            );
-
-            oauth2Client.setCredentials({
-              access_token: decrypt(selectedChannel.access_token),
-              refresh_token: decrypt(selectedChannel.refresh_token)
-            });
-
-            oauth2Client.on('tokens', async (tokens) => {
-              if (tokens.access_token) {
-                await YoutubeChannel.update(selectedChannel.id, {
-                  access_token: encrypt(tokens.access_token)
-                });
-              }
-              if (tokens.refresh_token) {
-                await YoutubeChannel.update(selectedChannel.id, {
-                  refresh_token: encrypt(tokens.refresh_token)
-                });
-              }
-            });
-
-            const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
-
-            await youtube.liveBroadcasts.transition({
-              part: ['status'],
-              id: stream.youtube_broadcast_id,
-              broadcastStatus: 'complete'
-            });
-          }
-        } catch (ytError) {
-          console.error('[RotationService] Error completing YouTube broadcast:', ytError.message);
-        }
-      }
     }
 
     // Clean up tracking maps

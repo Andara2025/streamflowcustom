@@ -2,7 +2,7 @@ const Stream = require('../models/Stream');
 
 const scheduledTerminations = new Map();
 const SCHEDULE_CHECK_INTERVAL = 15000;
-const DURATION_CHECK_INTERVAL = 30000;
+const DURATION_CHECK_INTERVAL = 15000;
 
 let streamingService = null;
 let initialized = false;
@@ -79,16 +79,37 @@ async function checkStreamDurations() {
       }
 
       const endTime = new Date(stream.end_time);
+      if (isNaN(endTime.getTime())) {
+        console.error(`[Scheduler] Stream ${stream.id} ("${stream.title}") end_time tidak valid: ${stream.end_time}`);
+        continue;
+      }
       const now = new Date();
       const timeUntilEnd = endTime.getTime() - now.getTime();
+      const overdueMin = Math.round(-timeUntilEnd / 60000);
 
       if (timeUntilEnd <= 0) {
+        // HARD STOP: jadwal sudah lewat -> wajib mati sekarang, bukan besok.
+        // Kasus "start jam 10 end jam 11 molor sampai siang" terjadi karena
+        // stop lama cuma fire-and-forget + status langsung offline padahal
+        // FFmpeg masih hidup.
+        console.log(`[Scheduler] STOP ${stream.id} ("${stream.title}") overdue ${overdueMin} mnt (end: ${stream.end_time}, now: ${now.toISOString()})`);
         scheduledTerminations.delete(stream.id);
 
         try {
-          await streamingService.stopStream(stream.id);
+          const res = await streamingService.stopStream(stream.id);
+          // Verifikasi FFmpeg benar-benar mati, kalau masih aktif paksa sekali lagi
+          if (streamingService.isStreamActive(stream.id)) {
+            console.error(`[Scheduler] Stream ${stream.id} masih aktif setelah stop, paksa stop kedua...`);
+            await streamingService.stopStream(stream.id);
+          }
+          if (!res || !res.success) {
+            console.error(`[Scheduler] stopStream ${stream.id} gagal: ${res && res.error}`);
+          }
         } catch (e) {
-          await Stream.updateStatus(stream.id, 'offline', stream.user_id);
+          console.error(`[Scheduler] stopStream ${stream.id} exception: ${e.message}`);
+          try {
+            await Stream.updateStatus(stream.id, 'offline', stream.user_id);
+          } catch (_) {}
         }
       } else if (timeUntilEnd <= 60000 && !scheduledTerminations.has(stream.id)) {
         scheduleStreamTermination(stream.id, timeUntilEnd / 60000, stream.user_id);
@@ -167,6 +188,33 @@ function handleStreamStopped(streamId) {
   return cancelStreamTermination(streamId);
 }
 
+function scheduleStreamTerminationByEndTime(streamId, endTimeIso, userId = null) {
+  if (!streamingService) {
+    return;
+  }
+  if (!endTimeIso) {
+    return;
+  }
+  const endTime = new Date(endTimeIso);
+  if (isNaN(endTime.getTime())) {
+    console.error(`[Scheduler] scheduleByEndTime ${streamId}: end_time tidak valid: ${endTimeIso}`);
+    return;
+  }
+  const msUntilEnd = endTime.getTime() - Date.now();
+  if (msUntilEnd <= 0) {
+    // Sudah lewat -> stop sekarang via polling berikutnya, plus coba langsung
+    console.log(`[Scheduler] scheduleByEndTime ${streamId}: end_time sudah lewat, stop langsung`);
+    streamingService.stopStream(streamId).catch(e => {
+      console.error(`[Scheduler] immediate stop ${streamId} gagal: ${e.message}`);
+    });
+    return;
+  }
+  // Node setTimeout max ~24.8 hari, jadwal stream selalu < itu. Cap aman.
+  const cappedMs = Math.min(msUntilEnd, 2147483647);
+  console.log(`[Scheduler] scheduleByEndTime ${streamId}: stop dalam ${Math.round(cappedMs / 60000)} mnt (end: ${endTime.toISOString()})`);
+  scheduleStreamTermination(streamId, cappedMs / 60000, userId);
+}
+
 function shutdown() {
   if (scheduleIntervalId) {
     clearInterval(scheduleIntervalId);
@@ -186,6 +234,7 @@ function shutdown() {
 module.exports = {
   init,
   scheduleStreamTermination,
+  scheduleStreamTerminationByEndTime,
   cancelStreamTermination,
   getScheduledTermination,
   handleStreamStopped,
