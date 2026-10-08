@@ -159,6 +159,15 @@ function getNextSchedule(rotation, baseDate = null) {
     const futureRef = new Date(refDate.getTime() + 60 * 1000);
     return calculateRotationWindow(rotation, futureRef);
   }
+  // Window yang ditemukan SUDAH di masa depan (start > ref) -> itulah jadwal
+  // berikutnya, langsung pakai. Jangan hitung sekali lagi (bug lama: tiap
+  // reschedule weekly lompat +14 hari karena menghitung window sesudah
+  // window berikutnya, sehingga slot live kosong seminggu).
+  if (window.start > refDate) {
+    return window;
+  }
+  // Dipanggil di tengah window berjalan (item habis lebih awal) -> jadwal
+  // berikutnya adalah window sesudah window ini.
   const afterWindowRef = new Date(window.end.getTime() + 60 * 1000);
   return calculateRotationWindow(rotation, afterWindowRef);
 }
