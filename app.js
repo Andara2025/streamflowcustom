@@ -2161,6 +2161,10 @@ app.post('/settings/password', isAuthenticated, [
 
 app.get('/api/settings/logs', isAuthenticated, async (req, res) => {
   try {
+    const viewer = await User.findById(req.session.userId);
+    if (!viewer || viewer.user_role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
     const logPath = path.join(__dirname, 'logs', 'app.log');
     const lines = parseInt(req.query.lines) || 200;
     const filter = req.query.filter || '';
@@ -2207,6 +2211,10 @@ app.get('/api/settings/logs', isAuthenticated, async (req, res) => {
 
 app.post('/api/settings/logs/clear', isAuthenticated, async (req, res) => {
   try {
+    const viewer = await User.findById(req.session.userId);
+    if (!viewer || viewer.user_role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
     const logPath = path.join(__dirname, 'logs', 'app.log');
     fs.writeFileSync(logPath, '');
     res.json({ success: true, message: 'Logs cleared successfully' });
