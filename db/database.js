@@ -253,6 +253,8 @@ function createTables() {
         FOREIGN KEY (user_id) REFERENCES users(id)
       )`);
 
+      // NOTE: rotation_items.start_time/end_time DEPRECATED, tidak dipakai.
+      // Window jadwal hidup di stream_rotations.start_time/end_time + streams.schedule_time/end_time (is_rotation=1).
       db.run(`CREATE TABLE IF NOT EXISTS rotation_items (
         id TEXT PRIMARY KEY,
         rotation_id TEXT NOT NULL,

@@ -65,6 +65,27 @@ function cleanTitle(title) {
   }
   return cleaned;
 }
+function parseUniversalScheduleDate(dateTimeString, clientOffset = null) {
+  if (!dateTimeString) return null;
+  const str = String(dateTimeString).trim();
+  if (!str) return null;
+  if (str.includes('Z') || /[+-]\d{2}(:?\d{2})?$/.test(str)) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const [datePart, timePart] = str.split('T');
+  if (!datePart) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = (timePart || '00:00').split(':').map(Number);
+  if (clientOffset !== null && clientOffset !== undefined && !isNaN(Number(clientOffset))) {
+    const utcMs = Date.UTC(year, month - 1, day, hours || 0, minutes || 0) + (Number(clientOffset) * 60000);
+    return new Date(utcMs);
+  }
+  return new Date(year, month - 1, day, hours || 0, minutes || 0);
+}
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const streamingService = require('./services/streamingService');
 const schedulerService = require('./services/schedulerService');
@@ -4839,29 +4860,6 @@ app.post('/api/streams', isAuthenticated, [
       use_advanced_settings: false,
       user_id: req.session.userId
     };
-    function parseUniversalScheduleDate(dateTimeString, clientOffset = null) {
-      if (!dateTimeString) return null;
-      const str = String(dateTimeString).trim();
-      if (!str) return null;
-      if (str.includes('Z') || /[+-]\d{2}(:?\d{2})?$/.test(str)) {
-        const d = new Date(str);
-        return isNaN(d.getTime()) ? null : d;
-      }
-      const [datePart, timePart] = str.split('T');
-      if (!datePart) {
-        const d = new Date(str);
-        return isNaN(d.getTime()) ? null : d;
-      }
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [hours, minutes] = (timePart || '00:00').split(':').map(Number);
-
-      if (clientOffset !== null && !isNaN(clientOffset)) {
-        const utcMs = Date.UTC(year, month - 1, day, hours || 0, minutes || 0) + (Number(clientOffset) * 60000);
-        return new Date(utcMs);
-      }
-      return new Date(year, month - 1, day, hours || 0, minutes || 0);
-    }
-
     const clientTzOffset = req.body.timezoneOffset !== undefined ? Number(req.body.timezoneOffset) : null;
 
     if (req.body.scheduleStartTime) {
@@ -5027,17 +5025,28 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
       if (scheduleDate) {
         streamData.schedule_time = scheduleDate.toISOString();
         streamData.status = 'scheduled';
+        if (scheduleEndTime) {
+          const endDate = parseUniversalScheduleDate(scheduleEndTime, clientTzOffset);
+          if (endDate) {
+            if (endDate <= scheduleDate) {
+              return res.status(400).json({ success: false, error: 'End time must be after start time' });
+            }
+            streamData.end_time = endDate.toISOString();
+            const durationMs = endDate - scheduleDate;
+            const durationMinutes = Math.round(durationMs / (1000 * 60));
+            streamData.duration = durationMinutes > 0 ? durationMinutes : null;
+          }
+        }
       } else {
         streamData.status = 'offline';
       }
     } else {
       streamData.status = 'offline';
-    }
-
-    if (scheduleEndTime) {
-      const endDate = parseUniversalScheduleDate(scheduleEndTime, clientTzOffset);
-      if (endDate) {
-        streamData.end_time = endDate.toISOString();
+      if (scheduleEndTime) {
+        const endDate = parseUniversalScheduleDate(scheduleEndTime, clientTzOffset);
+        if (endDate) {
+          streamData.end_time = endDate.toISOString();
+        }
       }
     }
 
@@ -5378,23 +5387,19 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
     } catch (vErr) {
       console.error('Stream update package validation error:', vErr.message);
     }
-    const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    function parseLocalDateTime(dateTimeString) {
-      const [datePart, timePart] = dateTimeString.split('T');
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [hours, minutes] = timePart.split(':').map(Number);
-
-      return new Date(year, month - 1, day, hours, minutes);
-    }
-
     if (req.body.scheduleStartTime) {
-      const scheduleStartDate = parseLocalDateTime(req.body.scheduleStartTime);
+      const scheduleStartDate = parseUniversalScheduleDate(req.body.scheduleStartTime, clientTzOffset);
+      if (!scheduleStartDate) {
+        return res.status(400).json({ success: false, error: 'Invalid start time' });
+      }
       updateData.schedule_time = scheduleStartDate.toISOString();
       updateData.status = 'scheduled';
 
       if (req.body.scheduleEndTime) {
-        const scheduleEndDate = parseLocalDateTime(req.body.scheduleEndTime);
+        const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
+        if (!scheduleEndDate) {
+          return res.status(400).json({ success: false, error: 'Invalid end time' });
+        }
 
         if (scheduleEndDate <= scheduleStartDate) {
           return res.status(400).json({
@@ -5416,15 +5421,15 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
       updateData.status = 'offline';
 
       if (req.body.scheduleEndTime) {
-        const scheduleEndDate = parseLocalDateTime(req.body.scheduleEndTime);
-        updateData.end_time = scheduleEndDate.toISOString();
+        const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
+        if (scheduleEndDate) updateData.end_time = scheduleEndDate.toISOString();
       } else if ('scheduleEndTime' in req.body && req.body.scheduleEndTime === '') {
         updateData.end_time = null;
         updateData.duration = null;
       }
     } else if (req.body.scheduleEndTime) {
-      const scheduleEndDate = parseLocalDateTime(req.body.scheduleEndTime);
-      updateData.end_time = scheduleEndDate.toISOString();
+      const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
+      if (scheduleEndDate) updateData.end_time = scheduleEndDate.toISOString();
     } else if ('scheduleEndTime' in req.body && req.body.scheduleEndTime === '') {
       updateData.end_time = null;
       updateData.duration = null;

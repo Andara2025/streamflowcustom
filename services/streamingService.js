@@ -807,8 +807,43 @@ async function killFFmpegProcess(streamId, streamData) {
       }
     }, 3000);
 
-    setTimeout(cleanup, 5000);
+    // BACKUP: kalau handle Node macet (exit tak kunjung fire), bunuh via OS by pid.
+    // Hanya untuk pid milik stream ini, tidak menyapu proses lain -> tidak ada risiko stop prematur.
+    setTimeout(() => {
+      if (!resolved && proc.exitCode === null && proc.pid) {
+        try {
+          const { execSync } = require('child_process');
+          if (process.platform === 'win32') {
+            execSync(`taskkill /F /PID ${proc.pid} /T`, { stdio: 'ignore' });
+          } else {
+            try { process.kill(proc.pid, 'SIGKILL'); } catch (e) { }
+          }
+        } catch (e) { }
+      }
+    }, 4500);
+
+    setTimeout(cleanup, 6000);
   });
+}
+
+// BACKUP: complete YT dengan retry, agar broadcast benar-benar complete.
+// Hanya dipanggil untuk stream yang end_time-nya sudah lewat / sedang di-stop,
+// tidak pernah untuk stream yang jadwalnya masih valid -> aman dari stop prematur.
+async function completeYtWithRetry(streamId, attempts = 3) {
+  const youtubeService = require('./youtubeService');
+  let lastErr = null;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const r = await youtubeService.completeYouTubeBroadcast(streamId);
+      if (r && r.success) return r;
+      lastErr = (r && r.error) || 'complete returned false';
+    } catch (e) {
+      lastErr = e.message;
+    }
+    if (i < attempts) await new Promise(res => setTimeout(res, 4000));
+  }
+  console.error(`[StreamingService] YT complete ${streamId} gagal ${attempts}x: ${lastErr}`);
+  return { success: false, error: lastErr };
 }
 
 async function startStream(streamId, isRetry = false, baseUrl = null) {
@@ -1193,8 +1228,7 @@ async function stopStream(streamId) {
         }
         if (stream.is_youtube_api && stream.youtube_broadcast_id) {
           try {
-            const youtubeService = require('./youtubeService');
-            await youtubeService.completeYouTubeBroadcast(streamId);
+            await completeYtWithRetry(streamId, 3);
           } catch (e) {
             console.error(`[StreamingService] YouTube cleanup (no-proc) error for ${streamId}:`, e.message);
           }
@@ -1230,8 +1264,7 @@ async function stopStream(streamId) {
 
     if (stream && stream.is_youtube_api && stream.youtube_broadcast_id) {
       try {
-        const youtubeService = require('./youtubeService');
-        await youtubeService.completeYouTubeBroadcast(streamId);
+        await completeYtWithRetry(streamId, 3);
       } catch (e) {
         console.error(`[StreamingService] YouTube cleanup error for ${streamId}:`, e.message);
       }

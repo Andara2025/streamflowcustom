@@ -676,12 +676,25 @@ async function completeYouTubeBroadcast(streamId) {
           id: stream.youtube_broadcast_id,
           part: 'id,status'
         });
+        // Verifikasi benar-benar complete, bukan asumsi sukses.
+        try {
+          const verifyRes = await youtube.liveBroadcasts.list({
+            part: 'status',
+            id: stream.youtube_broadcast_id
+          });
+          const afterStatus = verifyRes.data.items?.[0]?.status?.lifeCycleStatus;
+          if (afterStatus === 'live' || afterStatus === 'testing') {
+            console.warn(`[YouTubeService] Broadcast ${stream.youtube_broadcast_id} masih '${afterStatus}' setelah complete, akan di-retry`);
+            return { success: false, error: `broadcast still ${afterStatus}` };
+          }
+        } catch (vErr) { /* verifikasi gagal = anggap perlu retry via status awal */ }
         console.log(`[YouTubeService] Successfully transitioned broadcast ${stream.youtube_broadcast_id} to complete`);
       } else {
         console.log(`[YouTubeService] Broadcast ${stream.youtube_broadcast_id} status is '${lifeCycleStatus}', no transition needed`);
       }
     } catch (transitionErr) {
       console.warn(`[YouTubeService] Transition broadcast error for ${stream.youtube_broadcast_id}:`, transitionErr.message);
+      return { success: false, error: transitionErr.message };
     }
 
     await Stream.update(streamId, {

@@ -97,18 +97,33 @@ async function checkStreamDurations() {
 
         try {
           const res = await streamingService.stopStream(stream.id);
-          // Verifikasi FFmpeg benar-benar mati, kalau masih aktif paksa sekali lagi
+          // BACKUP 1: verifikasi FFmpeg benar-benar mati, kalau masih aktif paksa sekali lagi.
+          // BACKUP 2: verifikasi DB benar-benar offline (stop bisa sukses kill tapi gagal update DB).
+          // Hanya untuk yang sudah overdue (timeUntilEnd <= 0) -> tidak ada risiko stop prematur.
           if (streamingService.isStreamActive(stream.id)) {
             console.error(`[Scheduler] Stream ${stream.id} masih aktif setelah stop, paksa stop kedua...`);
             await streamingService.stopStream(stream.id);
           }
+          try {
+            const fresh = await Stream.findById(stream.id);
+            if (fresh && fresh.status === 'live') {
+              const freshEnd = fresh.end_time ? new Date(fresh.end_time).getTime() : NaN;
+              if (!isNaN(freshEnd) && freshEnd <= Date.now()) {
+                console.error(`[Scheduler] Stream ${stream.id} DB masih live setelah stop, paksa stop kedua...`);
+                await streamingService.stopStream(stream.id);
+              }
+            }
+          } catch (_) {}
           if (!res || !res.success) {
             console.error(`[Scheduler] stopStream ${stream.id} gagal: ${res && res.error}`);
           }
         } catch (e) {
           console.error(`[Scheduler] stopStream ${stream.id} exception: ${e.message}`);
           try {
-            await Stream.updateStatus(stream.id, 'offline', stream.user_id);
+            const fresh = await Stream.findById(stream.id);
+            if (fresh && fresh.end_time && new Date(fresh.end_time).getTime() <= Date.now()) {
+              await Stream.updateStatus(stream.id, 'offline', stream.user_id);
+            }
           } catch (_) {}
         }
       } else if (timeUntilEnd <= 60000 && !scheduledTerminations.has(stream.id)) {
