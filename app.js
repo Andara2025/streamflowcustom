@@ -5984,6 +5984,110 @@ app.get('/api/server-time', (req, res) => {
   });
 });
 
+// --- User Notification Endpoints ---
+const Notification = require('./models/Notification');
+
+app.get('/api/notifications', isAuthenticated, async (req, res) => {
+  try {
+    const notifications = await Notification.findByUserId(req.session.userId, 30);
+    const unreadCount = await Notification.countUnread(req.session.userId);
+    res.json({ success: true, notifications, unreadCount });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch notifications' });
+  }
+});
+
+app.post('/api/notifications/read-all', isAuthenticated, async (req, res) => {
+  try {
+    await Notification.markAllAsRead(req.session.userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking notifications as read:', error);
+    res.status(500).json({ success: false, error: 'Failed to mark notifications' });
+  }
+});
+
+app.delete('/api/notifications/:id', isAuthenticated, async (req, res) => {
+  try {
+    await Notification.delete(req.params.id, req.session.userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete notification' });
+  }
+});
+
+// --- Channel OAuth Health Check Endpoint ---
+app.post('/api/settings/youtube-channel/:id/check', isAuthenticated, async (req, res) => {
+  try {
+    const YoutubeChannel = require('./models/YoutubeChannel');
+    const channel = await YoutubeChannel.findById(req.params.id);
+    if (!channel || channel.user_id !== req.session.userId) {
+      return res.status(404).json({ success: false, error: 'Channel not found' });
+    }
+
+    const user = await User.findById(req.session.userId);
+    const effectiveClientId = channel.youtube_client_id || user.youtube_client_id;
+    const rawClientSecret = channel.youtube_client_secret || user.youtube_client_secret;
+
+    if (!effectiveClientId || !rawClientSecret) {
+      return res.status(400).json({ success: false, error: 'API credentials not configured' });
+    }
+
+    const clientSecret = decrypt(rawClientSecret);
+    const refreshToken = decrypt(channel.refresh_token);
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
+
+    const oauth2Client = getYouTubeOAuth2Client(effectiveClientId, clientSecret, redirectUri);
+    if (refreshToken) {
+      oauth2Client.setCredentials({ refresh_token: refreshToken });
+    } else if (channel.access_token) {
+      oauth2Client.setCredentials({ access_token: decrypt(channel.access_token) });
+    }
+
+    const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+    const response = await youtube.channels.list({
+      part: 'snippet,statistics',
+      mine: true
+    });
+
+    if (response.data.items && response.data.items.length > 0) {
+      const liveData = response.data.items[0];
+      await YoutubeChannel.update(channel.id, {
+        channel_name: liveData.snippet.title,
+        subscriber_count: liveData.statistics?.subscriberCount || '0',
+        oauth_status: 'valid',
+        last_error: null,
+        last_checked_at: new Date().toISOString()
+      });
+      return res.json({ success: true, status: 'valid', message: 'Channel OAuth is active & valid!' });
+    } else {
+      await YoutubeChannel.update(channel.id, {
+        oauth_status: 'expired',
+        last_error: 'No channel found for authenticated token',
+        last_checked_at: new Date().toISOString()
+      });
+      return res.json({ success: false, status: 'expired', error: 'No channel found for token' });
+    }
+  } catch (err) {
+    console.error('Channel health check error:', err.message);
+    const YoutubeChannel = require('./models/YoutubeChannel');
+    let status = 'expired';
+    if (err.message && err.message.includes('suspended')) {
+      status = 'suspended';
+    }
+    await YoutubeChannel.update(req.params.id, {
+      oauth_status: status,
+      last_error: err.message,
+      last_checked_at: new Date().toISOString()
+    });
+    return res.json({ success: false, status: status, error: err.message });
+  }
+});
+
 app.get('/api/backup/export', isAuthenticated, async (req, res) => {
   try {
     const dbPath = path.join(__dirname, 'db', 'PEJUANG MONET.db');

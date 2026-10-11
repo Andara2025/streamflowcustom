@@ -426,9 +426,17 @@
                                 <span class="px-2 py-0.5 bg-emerald-600/20 text-emerald-400 text-xs rounded-sm flex items-center gap-1" title="Menggunakan Client ID Khusus (Kuota Terpisah)">
                                   <i class="ti ti-key text-[10px]"></i> Custom Project (<%= channel.youtube_client_id.substring(0, 8) %>...)
                                 </span>
+                              <% if (channel.oauth_status === 'suspended') { %>
+                                <span class="px-2 py-0.5 bg-rose-600/20 text-rose-400 text-xs rounded-sm flex items-center gap-1" title="<%= channel.last_error || 'Akun YouTube tersuspend oleh Google' %>">
+                                  <i class="ti ti-alert-octagon text-[10px]"></i> Suspended
+                                </span>
+                              <% } else if (channel.oauth_status === 'expired') { %>
+                                <span class="px-2 py-0.5 bg-amber-600/20 text-amber-400 text-xs rounded-sm flex items-center gap-1" title="<%= channel.last_error || 'Token expired / Unauthorized' %>">
+                                  <i class="ti ti-alert-triangle text-[10px]"></i> Token Expired
+                                </span>
                               <% } else { %>
-                                <span class="px-2 py-0.5 bg-gray-700/50 text-gray-400 text-xs rounded-sm" title="Menggunakan Client ID bawaan akun">
-                                  Default Account Key
+                                <span class="px-2 py-0.5 bg-emerald-600/20 text-emerald-400 text-xs rounded-sm flex items-center gap-1" title="OAuth aktif dan token valid">
+                                  <i class="ti ti-circle-check text-[10px]"></i> Active
                                 </span>
                               <% } %>
                             </div>
@@ -436,6 +444,10 @@
                           </div>
                         </div>
                         <div class="flex items-center gap-2">
+                          <button type="button" onclick="checkChannelOAuthHealth('<%= channel.id %>', this)"
+                            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm" title="Tes Status Koneksi OAuth Channel">
+                            <i class="ti ti-activity"></i>
+                          </button>
                           <button type="button" onclick="openChannelCredentialsModal('<%= channel.id %>', '<%= channel.channel_name %>', '<%= channel.youtube_client_id || '' %>')"
                             class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm" title="Edit Client ID Channel ini">
                             <i class="ti ti-key"></i>
@@ -1728,6 +1740,40 @@
       showToast('error', 'Terjadi kesalahan saat menyimpan kredensial');
       btn.disabled = false;
       btn.innerHTML = originalText;
+    }
+  }
+
+  async function checkChannelOAuthHealth(channelId, btn) {
+    const icon = btn.querySelector('i');
+    const originalClass = icon.className;
+    icon.className = 'ti ti-loader animate-spin';
+    btn.disabled = true;
+
+    try {
+      const response = await fetch(`/api/settings/youtube-channel/${channelId}/check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': '<%= csrfToken %>'
+        }
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        showToast('success', 'Status Token: AKTIF & VALID (Siap Streaming)!');
+      } else if (data.status === 'suspended') {
+        showToast('error', 'Akun YouTube ini DITANGGUHKAN / SUSPEND oleh Google!');
+      } else {
+        showToast('error', `Status Token: ${data.error || 'Kadaluarsa / Perlu Disambung Ulang'}`);
+      }
+      setTimeout(() => {
+        window.location.hash = 'integration';
+        window.location.reload();
+      }, 1500);
+    } catch (err) {
+      showToast('error', 'Gagal memeriksa status koneksi channel');
+      icon.className = originalClass;
+      btn.disabled = false;
     }
   }
   </script>

@@ -1,12 +1,16 @@
 const Rotation = require('../models/Rotation');
 const Stream = require('../models/Stream');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
+const YoutubeChannel = require('../models/YoutubeChannel');
 const streamingService = require('./streamingService');
 const { google } = require('googleapis');
 const { encrypt, decrypt } = require('../utils/encryption');
 const path = require('path');
 const fs = require('fs');
 const { syncBroadcastMonetization, sanitizeYouTubeTags } = require('./youtubeService');
+
+const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
 function getRedirectUri(user) {
   // PERMANENT FIX: prioritas BASE_URL (my.id), abaikan cloud lama
@@ -351,8 +355,53 @@ async function checkRotations() {
         } else {
           failedRotationStarts.set(streamKey, windowKey);
           console.error(`[RotationService] Failed to start item ${currentIndex + 1}/${items.length}: ${result.error}`);
+
+          // Kirim notifikasi kegagalan khusus ke user bersangkutan
+          try {
+            let userFriendlyMsg = result.error || 'Terjadi kesalahan saat memulai broadcast.';
+            let errorType = 'error';
+
+            if (userFriendlyMsg.includes('suspended')) {
+              userFriendlyMsg = `Akun YouTube dari channel ditangguhkan (suspended) oleh Google. Silakan periksa akun YouTube Anda.`;
+              if (rotation.youtube_channel_id) {
+                await YoutubeChannel.update(rotation.youtube_channel_id, {
+                  oauth_status: 'suspended',
+                  last_error: 'YouTube account suspended by Google',
+                  last_checked_at: new Date().toISOString()
+                });
+              }
+            } else if (userFriendlyMsg.includes('unauthorized') || userFriendlyMsg.includes('not connected') || userFriendlyMsg.includes('invalid_grant')) {
+              userFriendlyMsg = `Izin token YouTube channel kadaluarsa atau dicabut. Silakan sambungkan ulang channel di menu Settings.`;
+              if (rotation.youtube_channel_id) {
+                await YoutubeChannel.update(rotation.youtube_channel_id, {
+                  oauth_status: 'expired',
+                  last_error: 'OAuth token invalid/expired',
+                  last_checked_at: new Date().toISOString()
+                });
+              }
+            } else if (userFriendlyMsg.includes('Video not found')) {
+              userFriendlyMsg = `File video "${currentItem.title}" tidak ditemukan di server. Pastikan video belum terhapus dari galeri.`;
+            } else if (userFriendlyMsg.includes('already in progress')) {
+              userFriendlyMsg = `Siaran sedang dalam proses inisialisasi / terjadi tabrakan jadwal bersamaan. Disarankan beri jeda minimal 15 menit.`;
+              errorType = 'warning';
+            } else if (userFriendlyMsg.includes('quota') || userFriendlyMsg.includes('rateLimit') || userFriendlyMsg.includes('403')) {
+              userFriendlyMsg = `Kuota YouTube API habis atau terkena batas rate-limit Google. Disarankan gunakan Project Client ID terpisah.`;
+            }
+
+            await Notification.create({
+              user_id: rotation.user_id,
+              type: errorType,
+              title: `Gagal Memulai Rotasi: ${rotation.name}`,
+              message: `Item #${currentIndex + 1} ("${currentItem.title}"): ${userFriendlyMsg}`,
+              metadata: { rotationId: rotation.id, itemId: currentItem.id, rawError: result.error }
+            });
+          } catch (notifErr) {
+            console.error('[RotationService] Gagal membuat notifikasi user:', notifErr.message);
+          }
         }
         loggedAlreadyRunning.delete(streamKey);
+        // Beri jeda kecil antar start rotasi agar request API teratur
+        await delay(3000);
       } else {
         if (!loggedAlreadyRunning.has(streamKey)) {
           console.log(`[RotationService] Rotation item ${currentIndex + 1}/${items.length} already running: ${currentItem.title}`);

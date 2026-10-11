@@ -671,8 +671,72 @@
     }
   });
 
-  function loadNotifications() {
+  async function loadNotifications() {
+    await loadUserNotifications();
     checkGitHubUpdates();
+  }
+
+  async function loadUserNotifications() {
+    try {
+      const response = await fetch('/api/notifications');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.success) return;
+
+      const notificationList = document.getElementById('notification-list');
+      const mobileNotificationList = document.getElementById('mobile-notification-list');
+
+      if (notificationList) {
+        const oldUserItems = notificationList.querySelectorAll('[data-user-notification]');
+        oldUserItems.forEach(el => el.remove());
+      }
+      if (mobileNotificationList) {
+        const oldUserItems = mobileNotificationList.querySelectorAll('[data-user-notification]');
+        oldUserItems.forEach(el => el.remove());
+      }
+
+      if (data.unreadCount > 0) {
+        showNotificationBadge();
+      }
+
+      if (data.notifications && data.notifications.length > 0) {
+        data.notifications.forEach(item => {
+          let iconClass = 'ti-info-circle text-blue-400';
+          let borderClass = 'border-blue-500/30';
+          if (item.type === 'error') {
+            iconClass = 'ti-alert-circle text-rose-500';
+            borderClass = 'border-rose-500/30 bg-rose-500/5';
+          } else if (item.type === 'warning') {
+            iconClass = 'ti-alert-triangle text-amber-400';
+            borderClass = 'border-amber-500/30 bg-amber-500/5';
+          } else if (item.type === 'success') {
+            iconClass = 'ti-circle-check text-emerald-400';
+            borderClass = 'border-emerald-500/30 bg-emerald-500/5';
+          }
+
+          const timeStr = getTimeAgo(item.created_at);
+          const html = `
+            <div class="p-3 border-b border-gray-700/60 hover:bg-gray-700/40 transition-colors ${borderClass} ${item.is_read ? 'opacity-70' : ''}" data-user-notification>
+              <div class="flex items-start gap-2.5">
+                <i class="ti ${iconClass} text-lg flex-shrink-0 mt-0.5"></i>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between gap-1 mb-0.5">
+                    <h4 class="text-xs font-semibold text-white truncate">${item.title}</h4>
+                    <span class="text-[10px] text-gray-400 flex-shrink-0">${timeStr}</span>
+                  </div>
+                  <p class="text-xs text-gray-300 leading-snug break-words">${item.message}</p>
+                </div>
+              </div>
+            </div>
+          `;
+
+          if (notificationList) notificationList.insertAdjacentHTML('afterbegin', html);
+          if (mobileNotificationList) mobileNotificationList.insertAdjacentHTML('afterbegin', html);
+        });
+      }
+    } catch (e) {
+      console.error('Error loading user notifications:', e);
+    }
   }
 
   function hideNotificationBadge() {
@@ -681,6 +745,8 @@
 
     if (badge) badge.classList.add('hidden');
     if (mobileBadge) mobileBadge.classList.add('hidden');
+
+    fetch('/api/notifications/read-all', { method: 'POST' }).catch(() => {});
 
     const latestCommitSha = localStorage.getItem('latestCommitSha');
     if (latestCommitSha) {

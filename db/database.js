@@ -496,6 +496,40 @@ function createTables() {
         if (err && !err.message.includes('already exists')) {
           console.error('Error creating app_settings table:', err.message);
         }
+      });
+
+      db.run(`CREATE TABLE IF NOT EXISTS user_notifications (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        type TEXT DEFAULT 'info',
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0,
+        metadata TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`, (err) => {
+        if (err && !err.message.includes('already exists')) {
+          console.error('Error creating user_notifications table:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE youtube_channels ADD COLUMN oauth_status TEXT DEFAULT 'valid'`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding oauth_status column to youtube_channels:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE youtube_channels ADD COLUMN last_error TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding last_error column to youtube_channels:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE youtube_channels ADD COLUMN last_checked_at DATETIME`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding last_checked_at column to youtube_channels:', err.message);
+        }
         resolve();
       });
     });

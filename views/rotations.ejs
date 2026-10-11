@@ -425,6 +425,22 @@
             </div>
           </div>
 
+          <!-- Peringatan Benturan Jadwal & OAuth (< 15 Menit) -->
+          <div id="scheduleConflictWarning" class="hidden p-3.5 bg-amber-500/10 border border-amber-500/40 rounded-lg text-xs space-y-2">
+            <div class="flex items-start gap-2.5">
+              <i class="ti ti-alert-triangle text-amber-400 text-base flex-shrink-0 mt-0.5"></i>
+              <div class="flex-1">
+                <h5 class="font-semibold text-amber-300 mb-1" id="conflictWarningTitle">Peringatan Benturan Jadwal & OAuth</h5>
+                <p class="text-gray-300 leading-relaxed" id="conflictWarningMessage"></p>
+              </div>
+            </div>
+            <div class="pt-2 border-t border-amber-500/20 text-gray-300 space-y-1 pl-6">
+              <p class="font-medium text-amber-200">💡 Rekomendasi Solusi:</p>
+              <p>• <strong>Opsi 1:</strong> Beri jeda minimal <strong>15 menit</strong> dari siaran channel tersebut.</p>
+              <p>• <strong>Opsi 2:</strong> Berikan <strong>Project Google / Client ID terpisah</strong> untuk channel ini di menu Settings agar tidak berebut kuota & rate-limit.</p>
+            </div>
+          </div>
+
           <div id="youtubeMetadataSection">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
@@ -574,11 +590,15 @@
 <div id="rotations-ejs-data" class="hidden">
   <script id="videos-json" type="application/json"><%- JSON.stringify(typeof videos !== 'undefined' ? videos : []) %></script>
   <script id="playlists-json" type="application/json"><%- JSON.stringify(typeof playlists !== 'undefined' ? playlists : []) %></script>
+  <script id="existing-rotations-json" type="application/json"><%- JSON.stringify(typeof rotations !== 'undefined' ? rotations : []) %></script>
+  <script id="channels-json" type="application/json"><%- JSON.stringify(typeof youtubeChannels !== 'undefined' ? youtubeChannels : []) %></script>
 </div>
 
 <script>
 const videos = JSON.parse(document.getElementById('videos-json').textContent);
 const playlists = JSON.parse(document.getElementById('playlists-json').textContent);
+const existingRotationsList = JSON.parse(document.getElementById('existing-rotations-json')?.textContent || '[]');
+const userChannelsList = JSON.parse(document.getElementById('channels-json')?.textContent || '[]');
 const csrfToken = '<%= csrfToken %>';
 let rotationItemCount = 0;
 
@@ -596,6 +616,87 @@ function updateRotationServerTime() {
 
 updateRotationServerTime();
 setInterval(updateRotationServerTime, 1000);
+
+function checkScheduleConflict() {
+  const destType = document.getElementById('rotationDestinationType')?.value || 'youtube';
+  const warningBox = document.getElementById('scheduleConflictWarning');
+  if (!warningBox) return;
+
+  if (destType !== 'youtube') {
+    warningBox.classList.add('hidden');
+    return;
+  }
+
+  const selectedChannelId = document.getElementById('rotationChannelId')?.value;
+  const startTime = document.getElementById('rotationStartTime')?.value;
+  const currentRotationId = document.getElementById('rotationId')?.value || '';
+
+  if (!selectedChannelId || !startTime) {
+    warningBox.classList.add('hidden');
+    return;
+  }
+
+  const selectedChannel = userChannelsList.find(c => c.id === selectedChannelId);
+  const currentOauthKey = (selectedChannel && selectedChannel.youtube_client_id) ? selectedChannel.youtube_client_id : '__DEFAULT_ACCOUNT_KEY__';
+
+  const [currH, currM] = startTime.split(':').map(Number);
+  const currTotalMinutes = currH * 60 + currM;
+
+  let conflictFound = null;
+
+  for (const rot of existingRotationsList) {
+    if (rot.id === currentRotationId) continue;
+    if (rot.status === 'paused' || rot.status === 'completed') continue;
+    if (!rot.start_time) continue;
+
+    const rotTimePart = rot.start_time.includes('T') ? rot.start_time.split('T')[1].slice(0, 5) : '';
+    if (!rotTimePart) continue;
+
+    const [rotH, rotM] = rotTimePart.split(':').map(Number);
+    const rotTotalMinutes = rotH * 60 + rotM;
+
+    let diff = Math.abs(currTotalMinutes - rotTotalMinutes);
+    if (diff > 720) diff = 1440 - diff; // perhitungkan lintas tengah malam
+
+    if (diff < 15) {
+      // Cek apakah channel sama atau berbagi Client ID / OAuth yang sama
+      const rotChannel = userChannelsList.find(c => c.id === rot.youtube_channel_id);
+      const rotOauthKey = (rotChannel && rotChannel.youtube_client_id) ? rotChannel.youtube_client_id : '__DEFAULT_ACCOUNT_KEY__';
+
+      const isSameChannel = rot.youtube_channel_id === selectedChannelId;
+      const isSameOauth = rotOauthKey === currentOauthKey;
+
+      if (isSameChannel || isSameOauth) {
+        conflictFound = {
+          rotationName: rot.name,
+          channelName: rotChannel ? rotChannel.channel_name : (rot.youtube_channel_name || 'Channel Lain'),
+          startTime: rotTimePart,
+          diffMinutes: diff,
+          isSameChannel,
+          isSameOauth
+        };
+        break;
+      }
+    }
+  }
+
+  if (conflictFound) {
+    const titleEl = document.getElementById('conflictWarningTitle');
+    const msgEl = document.getElementById('conflictWarningMessage');
+
+    if (conflictFound.isSameChannel) {
+      titleEl.textContent = 'Peringatan: Jadwal Sangat Berdekatan pada Channel yang Sama!';
+      msgEl.innerHTML = `Channel ini sudah memiliki jadwal rotasi <strong>"${conflictFound.rotationName}"</strong> pada jam <strong>${conflictFound.startTime}</strong> (selisih hanya <strong>${conflictFound.diffMinutes} menit</strong>). YouTube membatasi siaran yang terlalu mepet pada channel yang sama.`;
+    } else {
+      titleEl.textContent = 'Peringatan: 2 Channel Menggunakan 1 OAuth / Google Project yang Sama!';
+      msgEl.innerHTML = `Channel ini dan channel <strong>"${conflictFound.channelName}"</strong> (rotasi: <em>"${conflictFound.rotationName}"</em> jam <strong>${conflictFound.startTime}</strong>) menggunakan Google Project / Client ID yang sama dengan selisih waktu <strong>${conflictFound.diffMinutes} menit</strong>. Memulai live serentak pada 1 OAuth berisiko terkena rate-limit / gagal start.`;
+    }
+
+    warningBox.classList.remove('hidden');
+  } else {
+    warningBox.classList.add('hidden');
+  }
+}
 
 function calculateDuration() {
   const startTime = document.getElementById('rotationStartTime').value;
@@ -622,10 +723,12 @@ function calculateDuration() {
   const minutes = diffMinutes % 60;
   
   badge.textContent = `Duration: ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  checkScheduleConflict();
 }
 
 document.getElementById('rotationStartTime').addEventListener('change', calculateDuration);
 document.getElementById('rotationEndTime').addEventListener('change', calculateDuration);
+document.getElementById('rotationStartTime').addEventListener('input', checkScheduleConflict);
 
 function showToast(type, message) {
   const toast = document.getElementById('toast');
@@ -1333,6 +1436,9 @@ function selectRotationChannel(channelId, channelName, channelThumbnail) {
   document.getElementById('rotationChannelThumb').src = channelThumbnail;
   document.getElementById('rotationChannelName').textContent = channelName;
   toggleRotationChannelDropdown();
+  if (typeof checkScheduleConflict === 'function') {
+    checkScheduleConflict();
+  }
 }
 
 async function saveRotation() {
