@@ -212,10 +212,18 @@ async function moveRotationToNextScheduledItem(rotation, items, currentIndex, re
   console.log(`[RotationService] ${reason} Lanjut ke item ${nextIndex + 1}/${items.length} (${rotation.start_time})`);
 }
 
+// Track antrian stagger per channel agar tidak bersamaan
+// channelKey -> timestamp kapan channel ini boleh start berikutnya
+const channelStartQueue = new Map();
+const STAGGER_DELAY_MS = 30 * 1000; // 30 detik jeda per channel
+
 async function checkRotations() {
   try {
     const activeRotations = await Rotation.findActiveRotations();
     const now = new Date();
+
+    // Kumpulkan rotasi yang butuh START di tick ini (belum running, belum gagal)
+    const rotationsToStart = [];
 
     for (const rotation of activeRotations) {
       if (!rotation.start_time || !rotation.end_time) continue;
@@ -333,80 +341,128 @@ async function checkRotations() {
         continue;
       }
 
-      if (!activeRotationStreams.has(streamKey)) {
-        console.log(`[RotationService] Starting rotation item ${currentIndex + 1}/${items.length}: ${currentItem.title}`);
-        const result = await startRotationStream(rotation, currentItem);
-        if (result.success) {
-          failedRotationStarts.delete(streamKey);
-          activeRotationStreams.set(streamKey, { 
-            rotationId: rotation.id, 
-            itemId: currentItem.id,
-            streamId: result.streamId 
-          });
-          await Rotation.update(rotation.id, { status: 'live' }, rotation.user_id);
-        } else if (result.code === 'UNSUPPORTED_COPY_MODE_MEDIA') {
-          failedRotationStarts.delete(streamKey);
-          await moveRotationToNextScheduledItem(
-            rotation,
-            items,
-            currentIndex,
-            `Item "${currentItem.title}" di-skip karena media tidak kompatibel dengan copy mode YouTube.`
-          );
-        } else {
-          failedRotationStarts.set(streamKey, windowKey);
-          console.error(`[RotationService] Failed to start item ${currentIndex + 1}/${items.length}: ${result.error}`);
-
-          // Kirim notifikasi kegagalan khusus ke user bersangkutan
-          try {
-            let userFriendlyMsg = result.error || 'Terjadi kesalahan saat memulai broadcast.';
-            let errorType = 'error';
-
-            if (userFriendlyMsg.includes('suspended')) {
-              userFriendlyMsg = `Akun YouTube dari channel ditangguhkan (suspended) oleh Google. Silakan periksa akun YouTube Anda.`;
-              if (rotation.youtube_channel_id) {
-                await YoutubeChannel.update(rotation.youtube_channel_id, {
-                  oauth_status: 'suspended',
-                  last_error: 'YouTube account suspended by Google',
-                  last_checked_at: new Date().toISOString()
-                });
-              }
-            } else if (userFriendlyMsg.includes('unauthorized') || userFriendlyMsg.includes('not connected') || userFriendlyMsg.includes('invalid_grant')) {
-              userFriendlyMsg = `Izin token YouTube channel kadaluarsa atau dicabut. Silakan sambungkan ulang channel di menu Settings.`;
-              if (rotation.youtube_channel_id) {
-                await YoutubeChannel.update(rotation.youtube_channel_id, {
-                  oauth_status: 'expired',
-                  last_error: 'OAuth token invalid/expired',
-                  last_checked_at: new Date().toISOString()
-                });
-              }
-            } else if (userFriendlyMsg.includes('Video not found')) {
-              userFriendlyMsg = `File video "${currentItem.title}" tidak ditemukan di server. Pastikan video belum terhapus dari galeri.`;
-            } else if (userFriendlyMsg.includes('already in progress')) {
-              userFriendlyMsg = `Siaran sedang dalam proses inisialisasi / terjadi tabrakan jadwal bersamaan. Disarankan beri jeda minimal 15 menit.`;
-              errorType = 'warning';
-            } else if (userFriendlyMsg.includes('quota') || userFriendlyMsg.includes('rateLimit') || userFriendlyMsg.includes('403')) {
-              userFriendlyMsg = `Kuota YouTube API habis atau terkena batas rate-limit Google. Disarankan gunakan Project Client ID terpisah.`;
-            }
-
-            await Notification.create({
-              user_id: rotation.user_id,
-              type: errorType,
-              title: `Gagal Memulai Rotasi: ${rotation.name}`,
-              message: `Item #${currentIndex + 1} ("${currentItem.title}"): ${userFriendlyMsg}`,
-              metadata: { rotationId: rotation.id, itemId: currentItem.id, rawError: result.error }
-            });
-          } catch (notifErr) {
-            console.error('[RotationService] Gagal membuat notifikasi user:', notifErr.message);
-          }
-        }
-        loggedAlreadyRunning.delete(streamKey);
-        // Beri jeda kecil antar start rotasi agar request API teratur
-        await delay(3000);
-      } else {
+      if (activeRotationStreams.has(streamKey)) {
         if (!loggedAlreadyRunning.has(streamKey)) {
           console.log(`[RotationService] Rotation item ${currentIndex + 1}/${items.length} already running: ${currentItem.title}`);
           loggedAlreadyRunning.add(streamKey);
         }
+        continue;
+      }
+
+      // Rotasi ini butuh start — kumpulkan dulu
+      rotationsToStart.push({ rotation, items, currentIndex, currentItem, streamKey, windowKey });
+    }
+
+    // ── SMART STAGGERED QUEUE ──────────────────────────────────────────────
+    // Urutkan berdasarkan channel agar channel yang sama tidak dobel-start
+    // Tiap channel unik mendapat jeda STAGGER_DELAY_MS dari channel sebelumnya
+    if (rotationsToStart.length > 0) {
+      console.log(`[RotationService] ${rotationsToStart.length} rotasi perlu start. Mengantre dengan stagger per channel...`);
+
+      // Hitung kapan setiap channel boleh start berikutnya
+      // channelStartQueue berisi Promise<void> yang resolve saat giliran tiba
+      const channelSlots = new Map(); // channelKey -> slotIndex (berapa banyak sudah terjadwal untuk channel ini)
+      const nowMs = Date.now();
+
+      // Bersihkan entri lama (> 10 menit) di channelStartQueue
+      for (const [key, ts] of channelStartQueue.entries()) {
+        if (nowMs - ts > 10 * 60 * 1000) channelStartQueue.delete(key);
+      }
+
+      // Hitung slot index global (bukan per-channel) untuk beri delay kumulatif
+      let globalSlot = 0;
+
+      for (const entry of rotationsToStart) {
+        const { rotation, items, currentIndex, currentItem, streamKey, windowKey } = entry;
+
+        // channelKey: per user + per youtube channel (atau rtmp url sebagai fallback)
+        const channelKey = `${rotation.user_id}|${rotation.youtube_channel_id || rotation.rtmp_url || 'default'}`;
+
+        // Cari slot berikutnya untuk channel ini
+        const lastQueuedTs = channelStartQueue.get(channelKey) || 0;
+        const minStartTs = Math.max(lastQueuedTs + STAGGER_DELAY_MS, nowMs + globalSlot * STAGGER_DELAY_MS);
+        channelStartQueue.set(channelKey, minStartTs);
+
+        const waitMs = Math.max(0, minStartTs - Date.now());
+        globalSlot++;
+
+        if (waitMs > 0) {
+          console.log(`[RotationService] Rotasi "${rotation.name}" (channel ${channelKey.split('|')[1]}) antre: mulai dalam ${Math.round(waitMs / 1000)}s`);
+        }
+
+        // Jalankan start dengan delay yang dihitung (non-blocking agar semua terjadwal dulu)
+        (async () => {
+          if (waitMs > 0) await delay(waitMs);
+
+          console.log(`[RotationService] Starting rotation item ${currentIndex + 1}/${items.length}: ${currentItem.title}`);
+          const result = await startRotationStream(rotation, currentItem);
+          if (result.success) {
+            failedRotationStarts.delete(streamKey);
+            activeRotationStreams.set(streamKey, { 
+              rotationId: rotation.id, 
+              itemId: currentItem.id,
+              streamId: result.streamId 
+            });
+            await Rotation.update(rotation.id, { status: 'live' }, rotation.user_id);
+          } else if (result.code === 'UNSUPPORTED_COPY_MODE_MEDIA') {
+            failedRotationStarts.delete(streamKey);
+            await moveRotationToNextScheduledItem(
+              rotation,
+              items,
+              currentIndex,
+              `Item "${currentItem.title}" di-skip karena media tidak kompatibel dengan copy mode YouTube.`
+            );
+          } else {
+            failedRotationStarts.set(streamKey, windowKey);
+            console.error(`[RotationService] Failed to start item ${currentIndex + 1}/${items.length}: ${result.error}`);
+
+            // Kirim notifikasi kegagalan khusus ke user bersangkutan
+            try {
+              let userFriendlyMsg = result.error || 'Terjadi kesalahan saat memulai broadcast.';
+              let errorType = 'error';
+
+              if (userFriendlyMsg.includes('suspended')) {
+                userFriendlyMsg = `Akun YouTube dari channel ditangguhkan (suspended) oleh Google. Silakan periksa akun YouTube Anda.`;
+                if (rotation.youtube_channel_id) {
+                  await YoutubeChannel.update(rotation.youtube_channel_id, {
+                    oauth_status: 'suspended',
+                    last_error: 'YouTube account suspended by Google',
+                    last_checked_at: new Date().toISOString()
+                  });
+                }
+              } else if (userFriendlyMsg.includes('unauthorized') || userFriendlyMsg.includes('not connected') || userFriendlyMsg.includes('invalid_grant')) {
+                userFriendlyMsg = `Izin token YouTube channel kadaluarsa atau dicabut. Silakan sambungkan ulang channel di menu Settings.`;
+                if (rotation.youtube_channel_id) {
+                  await YoutubeChannel.update(rotation.youtube_channel_id, {
+                    oauth_status: 'expired',
+                    last_error: 'OAuth token invalid/expired',
+                    last_checked_at: new Date().toISOString()
+                  });
+                }
+              } else if (userFriendlyMsg.includes('Video not found')) {
+                userFriendlyMsg = `File video "${currentItem.title}" tidak ditemukan di server. Pastikan video belum terhapus dari galeri.`;
+              } else if (userFriendlyMsg.includes('already in progress')) {
+                userFriendlyMsg = `Siaran sedang dalam proses inisialisasi. Stagger otomatis aktif — coba tunggu giliran antrian berikutnya.`;
+                errorType = 'warning';
+              } else if (userFriendlyMsg.includes('quota') || userFriendlyMsg.includes('rateLimit') || userFriendlyMsg.includes('403')) {
+                userFriendlyMsg = `Kuota YouTube API habis atau terkena batas rate-limit Google. Disarankan gunakan Project Client ID terpisah.`;
+              }
+
+              await Notification.create({
+                user_id: rotation.user_id,
+                type: errorType,
+                title: `Gagal Memulai Rotasi: ${rotation.name}`,
+                message: `Item #${currentIndex + 1} ("${currentItem.title}"): ${userFriendlyMsg}`,
+                metadata: { rotationId: rotation.id, itemId: currentItem.id, rawError: result.error }
+              });
+            } catch (notifErr) {
+              console.error('[RotationService] Gagal membuat notifikasi user:', notifErr.message);
+            }
+          }
+          loggedAlreadyRunning.delete(streamKey);
+        })().catch(err => {
+          console.error(`[RotationService] Stagger async error untuk "${rotation.name}":`, err.message);
+        });
       }
     }
   } catch (error) {

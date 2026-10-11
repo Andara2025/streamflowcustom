@@ -876,6 +876,8 @@
   document.addEventListener('DOMContentLoaded', function () {
     loadNotifications();
     initServerTime();
+    // Polling notifikasi user setiap 30 detik agar update realtime jika ada rotasi gagal
+    setInterval(loadUserNotifications, 30 * 1000);
   });
 
   let serverTimeOffset = 0;
