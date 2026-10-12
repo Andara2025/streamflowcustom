@@ -426,6 +426,11 @@
                                 <span class="px-2 py-0.5 bg-emerald-600/20 text-emerald-400 text-xs rounded-sm flex items-center gap-1" title="Menggunakan Client ID Khusus (Kuota Terpisah)">
                                   <i class="ti ti-key text-[10px]"></i> Custom Project (<%= channel.youtube_client_id.substring(0, 8) %>...)
                                 </span>
+                              <% } else { %>
+                                <span class="px-2 py-0.5 bg-gray-700/50 text-gray-400 text-xs rounded-sm" title="Menggunakan Client ID bawaan akun">
+                                  Default Account Key
+                                </span>
+                              <% } %>
                               <% if (channel.oauth_status === 'suspended') { %>
                                 <span class="px-2 py-0.5 bg-rose-600/20 text-rose-400 text-xs rounded-sm flex items-center gap-1" title="<%= channel.last_error || 'Akun YouTube tersuspend oleh Google' %>">
                                   <i class="ti ti-alert-octagon text-[10px]"></i> Suspended
