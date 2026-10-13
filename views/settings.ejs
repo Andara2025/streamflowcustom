@@ -308,13 +308,69 @@
                 <div class="relative flex-1">
                   <input type="text" id="redirect-uri" readonly
                     class="bg-dark-900 text-gray-400 pl-4 pr-12 py-2 rounded-lg block w-full focus:outline-none border border-gray-700 cursor-not-allowed font-mono text-sm"
-                    value="<%= typeof redirectUri !== 'undefined' ? redirectUri : '' %>">
+                    value="<%= typeof redirectUri !== 'undefined' && redirectUri ? redirectUri : '' %>">
                   <button type="button" id="copy-redirect-uri"
+                    onclick="copyRedirectUriToClipboard()"
                     class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-primary transition-colors"
                     title="Copy to clipboard">
-                    <i class="ti ti-copy"></i>
+                    <i class="ti ti-copy" id="copy-redirect-icon"></i>
                   </button>
                 </div>
+                <script>
+                  (function() {
+                    function initRedirectUri() {
+                      var el = document.getElementById('redirect-uri');
+                      if (el) {
+                        var uri = window.location.origin + '/auth/youtube/callback';
+                        if (!el.value) {
+                          el.value = uri;
+                        }
+                      }
+                    }
+                    if (document.readyState === 'loading') {
+                      document.addEventListener('DOMContentLoaded', initRedirectUri);
+                    }
+                    initRedirectUri();
+                  })();
+
+                  function copyRedirectUriToClipboard() {
+                    var el = document.getElementById('redirect-uri');
+                    if (!el) return;
+                    var uri = el.value || (window.location.origin + '/auth/youtube/callback');
+                    el.value = uri;
+                    function onCopied() {
+                      if (typeof showToast === 'function') {
+                        showToast('success', 'Redirect URI copied to clipboard');
+                      }
+                      var icon = document.getElementById('copy-redirect-icon');
+                      if (icon) {
+                        icon.className = 'ti ti-check text-green-400';
+                        setTimeout(function() { icon.className = 'ti ti-copy'; }, 2000);
+                      }
+                    }
+                    if (navigator.clipboard && window.isSecureContext) {
+                      navigator.clipboard.writeText(uri).then(onCopied).catch(function() {
+                        fallbackCopy(el, onCopied);
+                      });
+                    } else {
+                      fallbackCopy(el, onCopied);
+                    }
+                  }
+
+                  function fallbackCopy(el, cb) {
+                    el.removeAttribute('readonly');
+                    el.select();
+                    el.setSelectionRange(0, 99999);
+                    try {
+                      document.execCommand('copy');
+                    } catch (e) {}
+                    el.setAttribute('readonly', 'readonly');
+                    if (window.getSelection) {
+                      window.getSelection().removeAllRanges();
+                    }
+                    if (cb) cb();
+                  }
+                </script>
               </div>
             </div>
 
