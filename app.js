@@ -5167,18 +5167,29 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
         if (scheduleStartDate) {
           updateData.schedule_time = scheduleStartDate.toISOString();
           updateData.status = 'scheduled';
-        }
 
-        if (req.body.scheduleEndTime) {
-          const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
-          updateData.end_time = scheduleEndDate ? scheduleEndDate.toISOString() : null;
-        } else if ('scheduleEndTime' in req.body && !req.body.scheduleEndTime) {
-          updateData.end_time = null;
+          if (req.body.scheduleEndTime) {
+            const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
+            if (scheduleEndDate) {
+              if (scheduleEndDate <= scheduleStartDate) {
+                return res.status(400).json({ success: false, error: 'End time must be after start time' });
+              }
+              updateData.end_time = scheduleEndDate.toISOString();
+              const durationMs = scheduleEndDate - scheduleStartDate;
+              const durationMinutes = Math.round(durationMs / (1000 * 60));
+              updateData.duration = durationMinutes > 0 ? durationMinutes : null;
+            }
+          } else if ('scheduleEndTime' in req.body && !req.body.scheduleEndTime) {
+            updateData.end_time = null;
+            updateData.duration = null;
+          }
         }
       } else if ('scheduleStartTime' in req.body && !req.body.scheduleStartTime) {
         updateData.schedule_time = null;
+        updateData.status = 'offline';
         if ('scheduleEndTime' in req.body && !req.body.scheduleEndTime) {
           updateData.end_time = null;
+          updateData.duration = null;
         } else if (req.body.scheduleEndTime) {
           const scheduleEndDate = parseUniversalScheduleDate(req.body.scheduleEndTime, clientTzOffset);
           updateData.end_time = scheduleEndDate ? scheduleEndDate.toISOString() : null;
@@ -6408,6 +6419,64 @@ app.get('/api/rotations/:id', isAuthenticated, async (req, res) => {
   }
 });
 
+async function checkRotationScheduleConflict(userId, youtubeChannelId, startTimeStr, excludeRotationId = null) {
+  if (!youtubeChannelId || !startTimeStr) return null;
+
+  let timePart = '';
+  if (startTimeStr.includes('T')) {
+    timePart = startTimeStr.split('T')[1].slice(0, 5);
+  } else if (startTimeStr.includes(' ')) {
+    timePart = startTimeStr.split(' ')[1].slice(0, 5);
+  } else if (startTimeStr.length >= 5) {
+    timePart = startTimeStr.slice(0, 5);
+  }
+  if (!timePart || !timePart.includes(':')) return null;
+
+  const [currH, currM] = timePart.split(':').map(Number);
+  if (isNaN(currH) || isNaN(currM)) return null;
+  const currTotalMinutes = currH * 60 + currM;
+
+  const existingRotations = await Rotation.findAll(userId);
+  if (!existingRotations || existingRotations.length === 0) return null;
+
+  for (const rot of existingRotations) {
+    if (excludeRotationId && String(rot.id) === String(excludeRotationId)) continue;
+    if (rot.status === 'paused' || rot.status === 'completed') continue;
+    if (!rot.start_time) continue;
+
+    // Check if on the same YouTube channel
+    if (String(rot.youtube_channel_id || '') !== String(youtubeChannelId)) continue;
+
+    let rotTimePart = '';
+    if (rot.start_time.includes('T')) {
+      rotTimePart = rot.start_time.split('T')[1].slice(0, 5);
+    } else if (rot.start_time.includes(' ')) {
+      rotTimePart = rot.start_time.split(' ')[1].slice(0, 5);
+    } else if (rot.start_time.length >= 5) {
+      rotTimePart = rot.start_time.slice(0, 5);
+    }
+    if (!rotTimePart || !rotTimePart.includes(':')) continue;
+
+    const [rotH, rotM] = rotTimePart.split(':').map(Number);
+    if (isNaN(rotH) || isNaN(rotM)) continue;
+    const rotTotalMinutes = rotH * 60 + rotM;
+
+    let diff = Math.abs(currTotalMinutes - rotTotalMinutes);
+    if (diff > 720) diff = 1440 - diff; // perhitungkan lintas tengah malam
+
+    if (diff < 15) {
+      return {
+        conflict: true,
+        rotationName: rot.name,
+        startTime: rotTimePart,
+        diffMinutes: diff
+      };
+    }
+  }
+
+  return null;
+}
+
 app.post('/api/rotations', isAuthenticated, uploadThumbnail.any(), async (req, res) => {
   try {
     const { name, repeat_mode, start_time, end_time, items, youtube_channel_id, global_youtube_altered_content, global_youtube_made_for_kids, rtmp_url, stream_key } = req.body;
@@ -6427,6 +6496,14 @@ app.post('/api/rotations', isAuthenticated, uploadThumbnail.any(), async (req, r
       const channel = await YoutubeChannel.findById(youtube_channel_id);
       if (!channel || channel.user_id !== req.session.userId) {
         return res.status(403).json({ success: false, error: 'Unauthorized or invalid YouTube channel selected' });
+      }
+
+      const conflict = await checkRotationScheduleConflict(req.session.userId, youtube_channel_id, start_time, null);
+      if (conflict) {
+        return res.status(400).json({
+          success: false,
+          error: `Jadwal bentrok: Channel ini sudah memiliki jadwal rotasi "${conflict.rotationName}" pada jam ${conflict.startTime} (selisih hanya ${conflict.diffMinutes} menit). Beri jeda minimal 15 menit.`
+        });
       }
     }
 
@@ -6453,8 +6530,8 @@ app.post('/api/rotations', isAuthenticated, uploadThumbnail.any(), async (req, r
       const item = parsedItems[i];
       const thumbnailFile = uploadedFileMap.get(`thumbnail_${item.thumbnail_upload_index}`);
 
-      let thumbnailPath = null;
-      let originalThumbnailPath = null;
+      let thumbnailPath = item.thumbnail_path && item.thumbnail_path !== 'rotations' ? item.thumbnail_path : null;
+      let originalThumbnailPath = item.original_thumbnail_path || null;
       if (thumbnailFile && thumbnailFile.size > 0) {
         const originalFilename = thumbnailFile.filename;
         const thumbFilename = `thumb-${path.parse(originalFilename).name}.jpg`;
@@ -6513,6 +6590,14 @@ app.put('/api/rotations/:id', isAuthenticated, uploadThumbnail.any(), async (req
       const channel = await YoutubeChannel.findById(youtube_channel_id);
       if (!channel || channel.user_id !== req.session.userId) {
         return res.status(403).json({ success: false, error: 'Unauthorized or invalid YouTube channel selected' });
+      }
+
+      const conflict = await checkRotationScheduleConflict(req.session.userId, youtube_channel_id, start_time, req.params.id);
+      if (conflict) {
+        return res.status(400).json({
+          success: false,
+          error: `Jadwal bentrok: Channel ini sudah memiliki jadwal rotasi "${conflict.rotationName}" pada jam ${conflict.startTime} (selisih hanya ${conflict.diffMinutes} menit). Beri jeda minimal 15 menit.`
+        });
       }
     }
 

@@ -2053,6 +2053,14 @@
         if (enableSchedule) {
           const scheduleStart = document.getElementById('ytScheduleStart').value;
           const scheduleEnd = document.getElementById('ytScheduleEnd').value;
+          if (scheduleStart && scheduleEnd) {
+            const startDate = new Date(scheduleStart);
+            const endDate = new Date(scheduleEnd);
+            if (endDate <= startDate) {
+              showToast('error', 'End stream must be after start stream');
+              return;
+            }
+          }
           if (scheduleStart) ytFormData.scheduleStartTime = new Date(scheduleStart).toISOString();
           if (scheduleEnd) ytFormData.scheduleEndTime = new Date(scheduleEnd).toISOString();
           ytFormData.timezoneOffset = new Date().getTimezoneOffset();
@@ -4344,6 +4352,14 @@
             if (enableSchedule) {
               const startVal = document.getElementById('editYtScheduleStart').value;
               const endVal = document.getElementById('editYtScheduleEnd').value;
+              if (startVal && endVal) {
+                const startDate = new Date(startVal);
+                const endDate = new Date(endVal);
+                if (endDate <= startDate) {
+                  showToast('error', 'End stream must be after start stream');
+                  return;
+                }
+              }
               ytFormDataObj.scheduleStartTime = startVal ? new Date(startVal).toISOString() : '';
               ytFormDataObj.scheduleEndTime = endVal ? new Date(endVal).toISOString() : '';
               ytFormDataObj.timezoneOffset = new Date().getTimezoneOffset();

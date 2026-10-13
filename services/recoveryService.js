@@ -26,12 +26,18 @@ const Stream = require('../models/Stream');
  */
 function parseLocalDateTime(dateStr) {
   if (!dateStr) return null;
-  const str = String(dateStr).replace('Z', '').split('.')[0];
-  const [datePart, timePart] = str.split('T');
+  const str = String(dateStr).trim().replace('Z', '').split('.')[0];
+  const separator = str.includes('T') ? 'T' : (str.includes(' ') ? ' ' : null);
+  if (!separator) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const [datePart, timePart] = str.split(separator);
   if (!datePart) return null;
   const [year, month, day] = datePart.split('-').map(Number);
   const [hours = 0, minutes = 0, seconds = 0] = (timePart || '00:00:00').split(':').map(Number);
-  return new Date(year, month - 1, day, hours, minutes, seconds);
+  const d = new Date(year, month - 1, day, hours, minutes, seconds);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 /**

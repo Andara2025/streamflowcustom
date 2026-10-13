@@ -636,23 +636,35 @@ function checkScheduleConflict() {
     return;
   }
 
-  const selectedChannel = userChannelsList.find(c => c.id === selectedChannelId);
+  const selectedChannel = userChannelsList.find(c => String(c.id) === String(selectedChannelId));
   const currentOauthKey = (selectedChannel && selectedChannel.youtube_client_id) ? selectedChannel.youtube_client_id : '__DEFAULT_ACCOUNT_KEY__';
 
   const [currH, currM] = startTime.split(':').map(Number);
+  if (isNaN(currH) || isNaN(currM)) {
+    warningBox.classList.add('hidden');
+    return;
+  }
   const currTotalMinutes = currH * 60 + currM;
 
   let conflictFound = null;
 
   for (const rot of existingRotationsList) {
-    if (rot.id === currentRotationId) continue;
+    if (String(rot.id) === String(currentRotationId)) continue;
     if (rot.status === 'paused' || rot.status === 'completed') continue;
     if (!rot.start_time) continue;
 
-    const rotTimePart = rot.start_time.includes('T') ? rot.start_time.split('T')[1].slice(0, 5) : '';
-    if (!rotTimePart) continue;
+    let rotTimePart = '';
+    if (rot.start_time.includes('T')) {
+      rotTimePart = rot.start_time.split('T')[1].slice(0, 5);
+    } else if (rot.start_time.includes(' ')) {
+      rotTimePart = rot.start_time.split(' ')[1].slice(0, 5);
+    } else if (rot.start_time.length >= 5) {
+      rotTimePart = rot.start_time.slice(0, 5);
+    }
+    if (!rotTimePart || !rotTimePart.includes(':')) continue;
 
     const [rotH, rotM] = rotTimePart.split(':').map(Number);
+    if (isNaN(rotH) || isNaN(rotM)) continue;
     const rotTotalMinutes = rotH * 60 + rotM;
 
     let diff = Math.abs(currTotalMinutes - rotTotalMinutes);
@@ -660,10 +672,10 @@ function checkScheduleConflict() {
 
     if (diff < 15) {
       // Cek apakah channel sama atau berbagi Client ID / OAuth yang sama
-      const rotChannel = userChannelsList.find(c => c.id === rot.youtube_channel_id);
+      const rotChannel = userChannelsList.find(c => String(c.id) === String(rot.youtube_channel_id));
       const rotOauthKey = (rotChannel && rotChannel.youtube_client_id) ? rotChannel.youtube_client_id : '__DEFAULT_ACCOUNT_KEY__';
 
-      const isSameChannel = rot.youtube_channel_id === selectedChannelId;
+      const isSameChannel = String(rot.youtube_channel_id || '') === String(selectedChannelId || '');
       const isSameOauth = rotOauthKey === currentOauthKey;
 
       if (isSameChannel || isSameOauth) {
@@ -696,6 +708,7 @@ function checkScheduleConflict() {
   } else {
     warningBox.classList.add('hidden');
   }
+  return conflictFound;
 }
 
 function calculateDuration() {
@@ -705,6 +718,7 @@ function calculateDuration() {
   
   if (!startTime || !endTime) {
     badge.textContent = 'Duration: 00:00';
+    checkScheduleConflict();
     return;
   }
   
@@ -728,7 +742,9 @@ function calculateDuration() {
 
 document.getElementById('rotationStartTime').addEventListener('change', calculateDuration);
 document.getElementById('rotationEndTime').addEventListener('change', calculateDuration);
-document.getElementById('rotationStartTime').addEventListener('input', checkScheduleConflict);
+document.getElementById('rotationStartTime').addEventListener('input', calculateDuration);
+document.getElementById('rotationEndTime').addEventListener('input', calculateDuration);
+document.getElementById('rotationDestinationType')?.addEventListener('change', checkScheduleConflict);
 
 function showToast(type, message) {
   const toast = document.getElementById('toast');
@@ -1528,12 +1544,8 @@ async function saveRotation() {
       return;
     }
     
-    let thumbnailPath = null;
-    let originalThumbnailPath = null;
-    if (rotationId) {
-      thumbnailPath = item.dataset.thumbnailPath || null;
-      originalThumbnailPath = item.dataset.originalThumbnail || null;
-    }
+    let thumbnailPath = item.dataset.thumbnailPath || null;
+    let originalThumbnailPath = item.dataset.originalThumbnail || null;
     
     items.push({
       order_index: i,
@@ -1566,6 +1578,15 @@ async function saveRotation() {
     showToast('error', 'Please fill in RTMP URL and Stream Key');
     resetSaveBtn();
     return;
+  }
+
+  if (destinationType === 'youtube' && typeof checkScheduleConflict === 'function') {
+    const conflict = checkScheduleConflict();
+    if (conflict && conflict.isSameChannel) {
+      showToast('error', `Jadwal bentrok: Channel ini sudah memiliki rotasi "${conflict.rotationName}" pada jam ${conflict.startTime} (selisih ${conflict.diffMinutes} menit). Beri jeda minimal 15 menit.`);
+      resetSaveBtn();
+      return;
+    }
   }
   
   formData.append('name', name);
@@ -1643,15 +1664,31 @@ async function editRotation(id) {
           if (rotation.repeat_mode === 'monthly') document.getElementById('rotationDayOfMonth').value = String(d.getDate());
         } catch (e) {}
         
-        const startTime = new Date(rotation.start_time).toTimeString().slice(0, 5);
+        let startTime = '';
+        if (rotation.start_time.includes('T')) {
+          startTime = rotation.start_time.split('T')[1].slice(0, 5);
+        } else if (rotation.start_time.includes(' ')) {
+          startTime = rotation.start_time.split(' ')[1].slice(0, 5);
+        } else {
+          try {
+            startTime = new Date(rotation.start_time).toTimeString().slice(0, 5);
+          } catch (e) {}
+        }
         document.getElementById('rotationStartTime').value = startTime;
       }
       if (rotation.end_time) {
-        const endTime = new Date(rotation.end_time).toTimeString().slice(0, 5);
+        let endTime = '';
+        if (rotation.end_time.includes('T')) {
+          endTime = rotation.end_time.split('T')[1].slice(0, 5);
+        } else if (rotation.end_time.includes(' ')) {
+          endTime = rotation.end_time.split(' ')[1].slice(0, 5);
+        } else {
+          try {
+            endTime = new Date(rotation.end_time).toTimeString().slice(0, 5);
+          } catch (e) {}
+        }
         document.getElementById('rotationEndTime').value = endTime;
       }
-      
-      calculateDuration();
       
       if (rotation.items && rotation.items.length > 0) {
         document.getElementById('globalPrivacy').value = rotation.items[0].privacy || 'unlisted';
@@ -1790,6 +1827,9 @@ async function editRotation(id) {
         addRotationItem();
       }
       
+      calculateDuration();
+      checkScheduleConflict();
+
       const modal = document.getElementById('createRotationModal');
       document.body.style.overflow = 'hidden';
       modal.classList.remove('hidden');
@@ -1954,15 +1994,31 @@ async function duplicateRotation(id) {
       } catch (e) {}
       
       if (rotation.start_time) {
-        const startTime = new Date(rotation.start_time).toTimeString().slice(0, 5);
+        let startTime = '';
+        if (rotation.start_time.includes('T')) {
+          startTime = rotation.start_time.split('T')[1].slice(0, 5);
+        } else if (rotation.start_time.includes(' ')) {
+          startTime = rotation.start_time.split(' ')[1].slice(0, 5);
+        } else {
+          try {
+            startTime = new Date(rotation.start_time).toTimeString().slice(0, 5);
+          } catch (e) {}
+        }
         document.getElementById('rotationStartTime').value = startTime;
       }
       if (rotation.end_time) {
-        const endTime = new Date(rotation.end_time).toTimeString().slice(0, 5);
+        let endTime = '';
+        if (rotation.end_time.includes('T')) {
+          endTime = rotation.end_time.split('T')[1].slice(0, 5);
+        } else if (rotation.end_time.includes(' ')) {
+          endTime = rotation.end_time.split(' ')[1].slice(0, 5);
+        } else {
+          try {
+            endTime = new Date(rotation.end_time).toTimeString().slice(0, 5);
+          } catch (e) {}
+        }
         document.getElementById('rotationEndTime').value = endTime;
       }
-      
-      calculateDuration();
       
       if (rotation.items && rotation.items.length > 0) {
         document.getElementById('globalPrivacy').value = rotation.items[0].privacy || 'unlisted';
@@ -2070,7 +2126,10 @@ async function duplicateRotation(id) {
           }
         });
       }
-      
+
+      calculateDuration();
+      checkScheduleConflict();
+
       showToast('success', 'Rotation settings copied! Please set your new schedule.');
     } else {
       showToast('error', 'Failed to load rotation data');
@@ -2258,6 +2317,9 @@ async function duplicateRotation(id) {
         if (ytMetaSection) ytMetaSection.classList.add('hidden');
         customSection.classList.remove('hidden');
         customSection.classList.add('grid');
+      }
+      if (typeof checkScheduleConflict === 'function') {
+        checkScheduleConflict();
       }
     };
   </script>
