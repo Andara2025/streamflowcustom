@@ -1216,11 +1216,18 @@ app.get('/settings', isAuthenticated, async (req, res) => {
     const geminiApiKeys = await AppSettings.get('gemini_api_keys') || '';
     const pricingSettings = await AppSettings.getPricingSettings();
 
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
+    const baseUrl = `${protocol}://${host}`;
+
     res.render('settings', {
       title: 'Settings',
       active: 'settings',
       user: user,
       appVersion: packageJson.version,
+      baseUrl: baseUrl,
+      redirectUri: redirectUri,
       youtubeClientId: user.youtube_client_id || '',
       youtubeClientSecret: user.youtube_client_secret ? '••••••••••••••••' : '',
       youtubeConnected: isYoutubeConnected,

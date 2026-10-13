@@ -308,7 +308,7 @@
                 <div class="relative flex-1">
                   <input type="text" id="redirect-uri" readonly
                     class="bg-dark-900 text-gray-400 pl-4 pr-12 py-2 rounded-lg block w-full focus:outline-none border border-gray-700 cursor-not-allowed font-mono text-sm"
-                    value="">
+                    value="<%= typeof redirectUri !== 'undefined' ? redirectUri : '' %>">
                   <button type="button" id="copy-redirect-uri"
                     class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-primary transition-colors"
                     title="Copy to clipboard">
@@ -1342,29 +1342,35 @@
         }
       }
 
-      refreshLogsBtn.addEventListener('click', loadLogs);
-      clearLogsBtn.addEventListener('click', clearLogs);
-      logLines.addEventListener('change', loadLogs);
+      if (refreshLogsBtn) refreshLogsBtn.addEventListener('click', loadLogs);
+      if (clearLogsBtn) clearLogsBtn.addEventListener('click', clearLogs);
+      if (logLines) logLines.addEventListener('change', loadLogs);
       
       let filterTimeout;
-      logFilter.addEventListener('input', () => {
-        clearTimeout(filterTimeout);
-        filterTimeout = setTimeout(loadLogs, 300);
-      });
+      if (logFilter) {
+        logFilter.addEventListener('input', () => {
+          clearTimeout(filterTimeout);
+          filterTimeout = setTimeout(loadLogs, 300);
+        });
+      }
 
-      autoRefreshCheckbox.addEventListener('change', () => {
-        if (autoRefreshCheckbox.checked) {
-          autoRefreshInterval = setInterval(loadLogs, 10000);
-        } else {
-          clearInterval(autoRefreshInterval);
-          autoRefreshInterval = null;
-        }
-      });
+      if (autoRefreshCheckbox) {
+        autoRefreshCheckbox.addEventListener('change', () => {
+          if (autoRefreshCheckbox.checked) {
+            autoRefreshInterval = setInterval(loadLogs, 10000);
+          } else {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+          }
+        });
+      }
 
       const logsTab = document.querySelector('.settings-tab[data-tab="logs"]');
-      logsTab.addEventListener('click', () => {
-        setTimeout(loadLogs, 100);
-      });
+      if (logsTab) {
+        logsTab.addEventListener('click', () => {
+          setTimeout(loadLogs, 100);
+        });
+      }
 
       const redirectUriInput = document.getElementById('redirect-uri');
       const copyRedirectUriBtn = document.getElementById('copy-redirect-uri');
