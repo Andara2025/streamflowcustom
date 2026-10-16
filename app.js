@@ -445,7 +445,7 @@ app.use('/uploads/avatars', (req, res, next) => {
     next();
   }
 });
-const adminLoginAttempts = new Map();
+
 const loginDelayMiddleware = async (req, res, next) => {
   await new Promise(resolve => setTimeout(resolve, 1000));
   next();
@@ -526,37 +526,13 @@ app.post('/login', loginDelayMiddleware, async (req, res) => {
       });
     }
 
-    if (user.user_role === 'admin') {
-      const attempts = adminLoginAttempts.get(username) || { count: 0, lockUntil: 0 };
-      if (attempts.lockUntil > Date.now()) {
-        return res.render('login', {
-          title: 'Login',
-          error: 'Terlalu banyak percobaan. Silakan coba lagi dalam 1 menit.',
-          recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
-        });
-      }
-    }
-
     const passwordMatch = await User.verifyPassword(password, user.password);
     if (!passwordMatch) {
-      if (user.user_role === 'admin') {
-        const attempts = adminLoginAttempts.get(username) || { count: 0, lockUntil: 0 };
-        attempts.count += 1;
-        if (attempts.count >= 5) {
-          attempts.lockUntil = Date.now() + 60 * 1000;
-          attempts.count = 0;
-        }
-        adminLoginAttempts.set(username, attempts);
-      }
       return res.render('login', {
         title: 'Login',
         error: 'Invalid username or password',
         recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
       });
-    }
-
-    if (user.user_role === 'admin') {
-      adminLoginAttempts.delete(username);
     }
 
     if (user.status === 'trial') {
