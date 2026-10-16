@@ -446,6 +446,19 @@ app.use('/uploads/avatars', (req, res, next) => {
   }
 });
 
+function getPublicProtocol(req) {
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  if (forwardedProto) {
+    const proto = forwardedProto.split(',')[0].trim();
+    if (proto) return proto;
+  }
+  const host = (req.headers['x-forwarded-host'] || req.get('host') || '').toLowerCase();
+  if (host && !host.includes('localhost') && !host.startsWith('127.') && !host.startsWith('192.168.') && !host.startsWith('10.')) {
+    return 'https';
+  }
+  return req.protocol || 'http';
+}
+
 const loginDelayMiddleware = async (req, res, next) => {
   await new Promise(resolve => setTimeout(resolve, 1000));
   next();
@@ -1192,7 +1205,7 @@ app.get('/settings', isAuthenticated, async (req, res) => {
     const geminiApiKeys = await AppSettings.get('gemini_api_keys') || '';
     const pricingSettings = await AppSettings.getPricingSettings();
 
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const protocol = getPublicProtocol(req);
     const host = req.headers['x-forwarded-host'] || req.get('host');
     const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
     const baseUrl = `${protocol}://${host}`;
@@ -3685,7 +3698,7 @@ app.get('/auth/youtube', isAuthenticated, async (req, res) => {
       return res.redirect('/settings?error=Please save your YouTube API credentials first&activeTab=integration');
     }
 
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const protocol = getPublicProtocol(req);
     const host = req.headers['x-forwarded-host'] || req.get('host');
     // PERMANENT FIX: selalu pakai host yang sedang diakses (my.id), abaikan BASE_URL lama yang masih cloud
     const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
@@ -3747,7 +3760,7 @@ app.get('/auth/youtube/callback', isAuthenticated, async (req, res) => {
       return res.redirect('/settings?error=YouTube credentials not found&activeTab=integration');
     }
 
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const protocol = getPublicProtocol(req);
     const host = req.headers['x-forwarded-host'] || req.get('host');
     // PERMANENT FIX: sama seperti di /auth/youtube - pakai host request
     const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
@@ -5078,7 +5091,7 @@ app.get('/api/streams/:id', isAuthenticated, async (req, res) => {
 
           if (accessToken && refreshToken) {
             const clientSecret = decrypt(user.youtube_client_secret);
-            const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+            const protocol = getPublicProtocol(req);
             const host = req.headers['x-forwarded-host'] || req.get('host');
             const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
 
@@ -5208,7 +5221,7 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
               const accessToken = decrypt(selectedChannel.access_token);
               const refreshToken = decrypt(selectedChannel.refresh_token);
 
-              const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+              const protocol = getPublicProtocol(req);
               const host = req.headers['x-forwarded-host'] || req.get('host');
               const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
 
@@ -5603,7 +5616,7 @@ app.post('/api/streams/:id/status', isAuthenticated, [
           stream
         });
       }
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const protocol = getPublicProtocol(req);
       const host = req.headers['x-forwarded-host'] || req.get('host');
       const baseUrl = `${protocol}://${host}`;
       const result = await streamingService.startStream(streamId, false, baseUrl);
@@ -6031,7 +6044,7 @@ app.post('/api/settings/youtube-channel/:id/check', isAuthenticated, async (req,
 
     const clientSecret = decrypt(rawClientSecret);
     const refreshToken = decrypt(channel.refresh_token);
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const protocol = getPublicProtocol(req);
     const host = req.headers['x-forwarded-host'] || req.get('host');
     const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
 

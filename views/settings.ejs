@@ -320,11 +320,11 @@
                   (function() {
                     function initRedirectUri() {
                       var el = document.getElementById('redirect-uri');
-                      if (el) {
-                        var uri = window.location.origin + '/auth/youtube/callback';
-                        if (!el.value) {
-                          el.value = uri;
-                        }
+                      var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                      var proto = isLocal ? window.location.protocol : 'https:';
+                      var uri = proto + '//' + window.location.host + '/auth/youtube/callback';
+                      if (!el.value || el.value.startsWith('http://')) {
+                        el.value = uri;
                       }
                     }
                     if (document.readyState === 'loading') {
@@ -1437,8 +1437,9 @@
       const disconnectYoutubeBtn = document.getElementById('disconnect-youtube');
 
       function generateRedirectUri() {
-        const protocol = window.location.protocol;
         const host = window.location.host;
+        const isLocal = host.includes('localhost') || host.startsWith('127.') || host.startsWith('192.168.');
+        const protocol = isLocal ? window.location.protocol : 'https:';
         return `${protocol}//${host}/auth/youtube/callback`;
       }
       
