@@ -554,6 +554,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
         '-c:v', 'copy',
         '-c:a', 'copy',
         '-bsf:a', 'aac_adtstoasc',
+        '-max_muxing_queue_size', '4096',
+        '-rtmp_buffer', '3000',
         '-f', 'flv',
         '-flvflags', 'no_duration_filesize',
         rtmpUrl
@@ -592,6 +594,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
       '-b:a', '128k',
       '-ar', '44100',
       '-ac', '2',
+      '-max_muxing_queue_size', '4096',
+      '-rtmp_buffer', '3000',
       '-f', 'flv',
       '-flvflags', 'no_duration_filesize',
       rtmpUrl
@@ -637,6 +641,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
       '-map', '1:a:0',
       '-c:v', 'copy',
       '-c:a', 'copy',
+      '-max_muxing_queue_size', '4096',
+      '-rtmp_buffer', '3000',
       '-f', 'flv',
       '-flvflags', 'no_duration_filesize',
       rtmpUrl
@@ -678,6 +684,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     '-s', resolution,
     '-r', String(fps),
     '-c:a', 'copy',
+    '-max_muxing_queue_size', '4096',
+    '-rtmp_buffer', '3000',
     '-f', 'flv',
     '-flvflags', 'no_duration_filesize',
     rtmpUrl
@@ -724,6 +732,8 @@ async function buildFFmpegArgs(stream) {
       '-c:v', 'copy',
       '-c:a', 'copy',
       '-bsf:a', 'aac_adtstoasc',
+      '-max_muxing_queue_size', '4096',
+      '-rtmp_buffer', '3000',
       '-f', 'flv',
       '-flvflags', 'no_duration_filesize',
       rtmpUrl
@@ -761,6 +771,8 @@ async function buildFFmpegArgs(stream) {
     '-b:a', '128k',
     '-ar', '44100',
     '-ac', '2',
+    '-max_muxing_queue_size', '4096',
+    '-rtmp_buffer', '3000',
     '-f', 'flv',
     '-flvflags', 'no_duration_filesize',
     rtmpUrl
