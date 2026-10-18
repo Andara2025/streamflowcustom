@@ -2043,8 +2043,10 @@
           if (memTotalMobile) memTotalMobile.textContent = '/ ' + formatMemory(data.memory.total).replace(' ', '');
 
           if (data.network) {
-            document.getElementById('upload-speed').textContent = data.network.uploadFormatted;
-            document.getElementById('download-speed').textContent = data.network.downloadFormatted;
+            const uploadEl = document.getElementById('upload-speed');
+            if (uploadEl) uploadEl.textContent = data.network.uploadFormatted;
+            const downloadEl = document.getElementById('download-speed');
+            if (downloadEl) downloadEl.textContent = data.network.downloadFormatted;
             const uploadMobile = document.getElementById('upload-speed-mobile');
             const downloadMobile = document.getElementById('download-speed-mobile');
             if (uploadMobile) uploadMobile.textContent = data.network.uploadFormatted.replace(' Mbps', '');
