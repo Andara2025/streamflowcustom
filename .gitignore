@@ -10,3 +10,4 @@ db/streamflow.db
 database.sqlite
 keys.json
 license_generator.js
+scratch/

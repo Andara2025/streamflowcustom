@@ -5,9 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>
-    <%= title %> - PEJUANG MONET
+    <%= title %> - LIVORA
   </title>
-  <link rel="icon" href="/images/logopejuang.png" type="image/png">
+  <link rel="icon" href="/images/livora-icon.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -27,30 +27,58 @@
         },
         extend: {
           colors: {
-            'primary': '#E11D48',
-            'secondary': '#BE123C',
+            'primary': '#c53030',
+            'secondary': '#991b1b',
+            'rose': {
+              '50': '#fef2f2',
+              '100': '#fee2e2',
+              '200': '#fecaca',
+              '300': '#fca5a5',
+              '400': '#ef4444',
+              '500': '#dc2626',
+              '600': '#b91c1c',
+              '700': '#991b1b',
+              '800': '#7f1d1d',
+              '900': '#450a0a',
+            },
+            'red': {
+              '50': '#fef2f2',
+              '100': '#fee2e2',
+              '200': '#fecaca',
+              '300': '#fca5a5',
+              '400': '#ef4444',
+              '500': '#dc2626',
+              '600': '#c53030',
+              '700': '#a82323',
+              '800': '#8b1b1b',
+              '900': '#450a0a',
+            },
             'dark': {
-              '900': '#0B0B0F',
-              '800': '#161622',
-              '700': '#222235',
-              '600': '#33334d',
-              '500': '#6E6E6E',
-              '400': '#8F8F8F',
-              '300': '#AFAFAF',
-              '200': '#CFCFCF',
-              '100': '#E5E5E5',
+              '950': '#0d0d0f',
+              '900': '#121214',
+              '850': '#161619',
+              '800': '#19191d',
+              '700': '#242429',
+              '600': '#33333b',
+              '500': '#6b6b78',
+              '400': '#9898a4',
+              '300': '#c2c2cb',
+              '200': '#dedee3',
+              '100': '#f0f0f3',
             },
             'gray': {
-              '900': '#0B0B0F',
-              '800': '#161622',
-              '700': '#222235',
-              '600': '#33334d',
-              '500': '#6E6E6E',
-              '400': '#8F8F8F',
-              '300': '#AFAFAF',
-              '200': '#CFCFCF',
-              '100': '#E5E5E5',
-              '50': '#F5F5F5',
+              '950': '#0d0d0f',
+              '900': '#121214',
+              '850': '#161619',
+              '800': '#19191d',
+              '700': '#242429',
+              '600': '#33333b',
+              '500': '#6b6b78',
+              '400': '#9898a4',
+              '300': '#c2c2cb',
+              '200': '#dedee3',
+              '100': '#f0f0f3',
+              '50': '#f7f7f9',
             }
           }
         }
@@ -77,7 +105,7 @@
   <div
     class="lg:hidden fixed top-0 left-0 right-0 h-16 bg-dark-800 shadow-lg flex items-center justify-between px-6 z-30">
     <div class="flex items-center">
-      <img src="/images/logopejuang.png" alt="PEJUANG MONET Logo" class="h-8">
+      <img src="/images/livora-logo.png" alt="Livora Logo" class="h-8 w-auto">
     </div>
     <div class="flex items-center gap-1">
       <div id="mobile-server-time" class="hidden items-center gap-1.5 text-gray-400 text-sm mr-2">
@@ -96,7 +124,7 @@
   <div class="flex">
     <div class="hidden lg:flex lg:fixed lg:flex-col w-20 h-screen pt-2 bg-dark-800 shadow-lg overflow-hidden">
       <div class="flex items-center justify-center h-14 w-14 mx-auto mb-4">
-        <img src="/images/logopejuang.png" alt="PEJUANG MONET Logo" class="h-9 w-auto">
+        <img src="/images/livora-icon.png" alt="Livora Logo" class="h-10 w-auto">
       </div>
       <div class="flex-1">
         <a href="/dashboard" class="sidebar-icon group <%= active === 'dashboard' ? 'bg-primary' : '' %>">
@@ -146,6 +174,28 @@
         <% } %>
       </div>
       <div class="mt-auto">
+        <!-- Storage Quota Mini Widget -->
+        <div class="relative px-2 py-2.5 text-center group cursor-pointer border-t border-gray-700/60" id="sidebar-storage-widget" onclick="window.location.href='/gallery'">
+          <div class="flex flex-col items-center justify-center">
+            <i class="ti ti-database text-lg text-gray-400 group-hover:text-primary transition-colors"></i>
+            <div class="w-10 bg-dark-900 rounded-full h-1.5 mt-1.5 overflow-hidden border border-gray-700/40">
+              <div id="sidebar-storage-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <span id="sidebar-storage-percent" class="text-[9px] text-gray-400 mt-1 font-medium">0%</span>
+          </div>
+          <!-- Detailed Tooltip on Hover -->
+          <div class="sidebar-tooltip group-hover:scale-100 z-50 text-left min-w-[170px] p-2.5">
+            <div class="text-[11px] font-semibold text-white mb-1.5 flex items-center justify-between border-b border-gray-700/60 pb-1">
+              <span>Penyimpanan</span>
+              <span id="sidebar-storage-plan" class="text-[10px] text-primary font-medium">Paket</span>
+            </div>
+            <div class="text-[10px] text-gray-300 space-y-1">
+              <div class="flex justify-between"><span>Terpakai:</span> <span id="sidebar-storage-used" class="font-semibold text-white">0 GB</span></div>
+              <div class="flex justify-between"><span>Batas:</span> <span id="sidebar-storage-limit" class="font-semibold text-white">0 GB</span></div>
+              <div class="flex justify-between"><span>Sisa:</span> <span id="sidebar-storage-remaining" class="font-semibold text-emerald-400">0 GB</span></div>
+            </div>
+          </div>
+        </div>
         <div class="h-px bg-gray-700 w-full"></div>
         <div class="relative" id="profile-menu-container">
           <div class="h-20 flex items-center justify-center px-3 py-4 hover:bg-dark-700/50 transition-colors">
@@ -157,10 +207,20 @@
         </div>
       </div>
     </div>
-    <div id="profile-dropdown" class="fixed bg-dark-800 shadow-xl border border-gray-700 hidden">
+    <div id="profile-dropdown" class="fixed bg-dark-800 shadow-xl border border-gray-700 hidden min-w-[200px] rounded-lg">
       <div class="px-4 py-2 border-b border-gray-700">
         <div class="font-medium">
           <%= helpers.getUsername(req) %>
+        </div>
+      </div>
+      <!-- Storage Status in Profile Dropdown -->
+      <div class="px-4 py-2.5 border-b border-gray-700">
+        <div class="flex items-center justify-between text-xs mb-1">
+          <span class="text-gray-400 text-[11px]">Storage</span>
+          <span id="profile-storage-text" class="text-white text-[11px] font-medium">--</span>
+        </div>
+        <div class="w-full bg-dark-900 rounded-full h-1.5 overflow-hidden border border-gray-700/40">
+          <div id="profile-storage-bar" class="bg-emerald-500 h-full rounded-full transition-all" style="width: 0%"></div>
         </div>
       </div>
       <a href="/settings"
@@ -209,7 +269,7 @@
           </a>
           <span class="text-gray-700 text-xs">•</span>
           <div class="text-xs text-gray-500">
-            PEJUANG MONET <span class="text-xs font-medium bg-gray-700 px-1 rounded">v<%= appVersion %></span>
+            LIVORA <span class="text-xs font-medium bg-gray-700 px-1 rounded">v<%= appVersion %></span>
           </div>
         </div>
       </div>
@@ -425,11 +485,11 @@
   }
 
   .text-logout {
-    color: #FF5555;
+    color: #ef4444;
   }
 
   .text-logout:hover {
-    color: #FF7777;
+    color: #c53030;
   }
 
   .saweria-button {
@@ -494,7 +554,7 @@
     flex: 1;
     text-align: center;
     padding: 8px 0;
-    color: #8F8F8F;
+    color: #9898a4;
     position: relative;
     transition: color 0.2s ease;
   }
@@ -509,11 +569,11 @@
   }
 
   .bottom-nav-item:hover {
-    color: #E5E5E5;
+    color: #f0f0f3;
   }
 
   .bottom-nav-active {
-    color: #E11D48;
+    color: #c53030;
   }
 
   .bottom-nav-active::before {
@@ -524,7 +584,7 @@
     transform: translateX(-50%);
     width: 24px;
     height: 3px;
-    background-color: #E11D48;
+    background-color: #c53030;
     border-radius: 0 0 4px 4px;
   }
 
@@ -971,4 +1031,70 @@
       closePEJUANGMONETUpdateModal();
     }
   });
+
+  // Global User Storage Indicator Loader
+  async function loadGlobalUserStorage() {
+    try {
+      const res = await fetch('/api/user/disk-usage');
+      const data = await res.json();
+      if (!data || !data.success) return;
+
+      const usedBytes = data.diskUsage || 0;
+      const limitBytes = data.diskLimit || 0;
+      const packageName = data.userRole === 'admin' ? 'Server VPS' : (data.packageName || 'Paket Aktif');
+      const isUnlimited = limitBytes === 0;
+
+      const formatBytes = (bytes) => {
+        if (!bytes || bytes === 0) return '0 MB';
+        const gb = bytes / (1024 * 1024 * 1024);
+        if (gb < 0.1) {
+          const mb = bytes / (1024 * 1024);
+          return mb.toFixed(1) + ' MB';
+        }
+        return gb.toFixed(2) + ' GB';
+      };
+
+      const usedFormatted = formatBytes(usedBytes);
+      const limitFormatted = isUnlimited ? 'Unlimited (∞)' : formatBytes(limitBytes);
+      const remainingBytes = (data.remaining !== undefined && data.remaining !== null) ? data.remaining : Math.max(0, limitBytes - usedBytes);
+      const remainingFormatted = isUnlimited ? 'Unlimited' : formatBytes(remainingBytes);
+      const percent = (data.percent !== undefined) ? data.percent : (isUnlimited ? 0 : Math.min(100, Math.round((usedBytes / limitBytes) * 100)));
+
+      const barColor = isUnlimited ? 'bg-primary' : (percent >= 90 ? 'bg-red-500' : (percent >= 70 ? 'bg-yellow-500' : 'bg-emerald-500'));
+
+      // Sidebar widget elements
+      const barEl = document.getElementById('sidebar-storage-bar');
+      const percentEl = document.getElementById('sidebar-storage-percent');
+      const usedEl = document.getElementById('sidebar-storage-used');
+      const limitEl = document.getElementById('sidebar-storage-limit');
+      const remEl = document.getElementById('sidebar-storage-remaining');
+      const planEl = document.getElementById('sidebar-storage-plan');
+
+      if (barEl) {
+        barEl.style.width = (isUnlimited ? 100 : Math.max(percent, 4)) + '%';
+        barEl.className = `h-full rounded-full transition-all duration-300 ${barColor}`;
+      }
+      if (percentEl) percentEl.textContent = isUnlimited ? '∞' : (percent + '%');
+      if (usedEl) usedEl.textContent = usedFormatted;
+      if (limitEl) limitEl.textContent = limitFormatted;
+      if (remEl) remEl.textContent = remainingFormatted;
+      if (planEl) planEl.textContent = packageName;
+
+      // Profile dropdown elements
+      const profTextEl = document.getElementById('profile-storage-text');
+      const profBarEl = document.getElementById('profile-storage-bar');
+      if (profTextEl) {
+        profTextEl.textContent = `Sisa: ${remainingFormatted} • Total: ${limitFormatted}`;
+      }
+      if (profBarEl) {
+        profBarEl.style.width = (isUnlimited ? 100 : Math.max(percent, 4)) + '%';
+        profBarEl.className = `h-full rounded-full transition-all duration-300 ${barColor}`;
+      }
+    } catch (e) {
+      console.error('Error loading global storage indicator:', e);
+    }
+  }
+
+  window.loadGlobalUserStorage = loadGlobalUserStorage;
+  loadGlobalUserStorage();
 </script>

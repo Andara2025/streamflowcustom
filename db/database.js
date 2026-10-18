@@ -347,6 +347,54 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN auto_extend INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend column to stream_rotations:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN auto_extend_min_viewers INTEGER DEFAULT 10`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend_min_viewers column to stream_rotations:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN auto_extend_duration INTEGER DEFAULT 60`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend_duration column to stream_rotations:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN auto_extend_count INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend_count column to stream_rotations:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN auto_extend_max INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend_max column to stream_rotations:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN auto_redirect INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_redirect column to stream_rotations:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN auto_redirect_min_viewers INTEGER DEFAULT 10`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_redirect_min_viewers column to stream_rotations:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN auto_redirect_target_stream_id TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_redirect_target_stream_id column to stream_rotations:', err.message);
+        }
+      });
+
       db.run(`ALTER TABLE users ADD COLUMN youtube_redirect_uri TEXT`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding youtube_redirect_uri column:', err.message);
@@ -435,6 +483,54 @@ function createTables() {
       db.run(`ALTER TABLE streams ADD COLUMN is_rotation INTEGER DEFAULT 0`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding is_rotation column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN auto_extend INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN auto_extend_min_viewers INTEGER DEFAULT 10`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend_min_viewers column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN auto_extend_duration INTEGER DEFAULT 60`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend_duration column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN auto_extend_count INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend_count column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN auto_extend_max INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_extend_max column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN auto_redirect INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_redirect column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN auto_redirect_min_viewers INTEGER DEFAULT 10`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_redirect_min_viewers column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN auto_redirect_target_stream_id TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_redirect_target_stream_id column to streams:', err.message);
         }
       });
 

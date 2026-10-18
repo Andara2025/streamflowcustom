@@ -24,15 +24,6 @@ function formatDuration(seconds) {
     <h2 class="text-2xl font-bold">Media Gallery</h2>
     <p class="text-gray-400 text-sm mt-1">
       <span>Manage your videos and audio for streaming</span>
-      <span id="diskUsageInfoDesktop" class="hidden">
-        <span class="text-gray-500 mx-1">•</span>
-        <i class="ti ti-database text-xs"></i>
-        <span id="diskUsageTextDesktop" class="text-gray-400"></span>
-      </span>
-    </p>
-    <p id="diskUsageInfoMobile" class="hidden text-gray-400 text-sm mt-1">
-      <i class="ti ti-database text-xs mr-1"></i>
-      <span id="diskUsageTextMobile"></span>
     </p>
   </div>
   <div class="flex gap-3">
@@ -67,6 +58,38 @@ function formatDuration(seconds) {
           <i class="ti ti-device-floppy text-lg text-primary"></i>
           <span>Local Path (RDP/PC)</span>
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Storage Quota Indicator Banner in Gallery -->
+<div class="bg-dark-800 border border-gray-700/80 rounded-xl p-4 mb-6 shadow-md transition-all">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex items-center gap-3.5">
+      <div class="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary flex-shrink-0">
+        <i class="ti ti-database text-2xl"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <h3 class="text-sm font-semibold text-white">Kapasitas Penyimpanan Galeri</h3>
+          <span id="galleryStorageBadge" class="text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-700 text-gray-300">Memuat...</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">
+          TOTAL: <span id="galleryStorageTotal" class="text-white font-medium">0 MB</span> 
+          • TERPAKAI: <span id="galleryStorageUsed" class="text-white font-medium">0 MB</span> 
+          • <span id="galleryStorageRemaining" class="text-emerald-400 font-semibold">SISA: 0 MB</span>
+        </p>
+      </div>
+    </div>
+    
+    <div class="w-full sm:w-72 flex flex-col items-end gap-1.5 flex-shrink-0">
+      <div class="flex items-center justify-between w-full text-xs">
+        <span class="text-gray-400 text-[11px]" id="galleryStoragePercentText">0% terpakai</span>
+        <span id="galleryStorageStatus" class="text-[11px] font-semibold text-emerald-400">Tersedia</span>
+      </div>
+      <div class="w-full bg-dark-900 rounded-full h-2.5 overflow-hidden border border-gray-700/50">
+        <div id="galleryStorageBar" class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width: 0%"></div>
       </div>
     </div>
   </div>
@@ -168,7 +191,7 @@ function formatDuration(seconds) {
         onclick="playMedia('<%= video.id %>', '<%= video.title %>', '<%= mediaType %>')">
         <div class="aspect-video relative overflow-hidden bg-dark-900">
           <% if (isAudio) { %>
-          <div class="w-full h-full flex items-center justify-center bg-[#181818]">
+          <div class="w-full h-full flex items-center justify-center bg-dark-800">
             <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
               <i class="ti ti-music text-3xl text-primary"></i>
             </div>
@@ -264,7 +287,7 @@ function formatDuration(seconds) {
               onclick="playMedia('<%= video.id %>', '<%= video.title %>', '<%= mediaType %>')">
               <td class="px-4 py-3">
                 <div class="flex items-center gap-3">
-                  <div class="w-12 h-8 rounded overflow-hidden bg-[#181818] flex-shrink-0 relative flex items-center justify-center">
+                  <div class="w-12 h-8 rounded overflow-hidden bg-dark-800 flex-shrink-0 relative flex items-center justify-center">
                     <% if (isAudio) { %>
                     <i class="ti ti-music text-primary"></i>
                     <% } else { %>
@@ -502,14 +525,22 @@ function formatDuration(seconds) {
   let galleryCurrentFolderState = JSON.parse(initData.currentFolder);
   const userRoles = initData.userRole;
 
+let userPackageName = 'Custom';
+let userCurrentRole = 'member';
+
 async function loadDiskUsage() {
   try {
     const response = await fetch('/api/user/disk-usage');
     const data = await response.json();
-    if (data.success) {
-      userDiskUsage = data.diskUsage;
-      userDiskLimit = data.diskLimit;
+    if (data && data.success) {
+      userDiskUsage = data.diskUsage || 0;
+      userDiskLimit = data.diskLimit || 0;
+      userPackageName = data.packageName || 'Custom';
+      userCurrentRole = data.userRole || 'member';
       updateDiskUsageDisplay();
+      if (typeof window.loadGlobalUserStorage === 'function') {
+        window.loadGlobalUserStorage();
+      }
     }
   } catch (error) {
     console.error('Error loading disk usage:', error);
@@ -517,30 +548,55 @@ async function loadDiskUsage() {
 }
 
 function updateDiskUsageDisplay() {
-  const infoDesktop = document.getElementById('diskUsageInfoDesktop');
-  const textDesktop = document.getElementById('diskUsageTextDesktop');
-  const infoMobile = document.getElementById('diskUsageInfoMobile');
-  const textMobile = document.getElementById('diskUsageTextMobile');
-  
-  if (userDiskLimit > 0) {
-    const usedText = formatFileSize(userDiskUsage);
-    const limitText = formatFileSize(userDiskLimit);
-    const displayText = `${usedText} / ${limitText}`;
-    
-    textDesktop.textContent = displayText;
-    textMobile.textContent = displayText;
-    
-    const isMobile = window.innerWidth < 768;
-    if (isMobile) {
-      infoDesktop.classList.add('hidden');
-      infoMobile.classList.remove('hidden');
-    } else {
-      infoDesktop.classList.remove('hidden');
-      infoMobile.classList.add('hidden');
+  const isUnlimited = userDiskLimit === 0;
+  const usedText = formatFileSize(userDiskUsage);
+  const limitText = isUnlimited ? 'Unlimited (∞)' : formatFileSize(userDiskLimit);
+  const remainingBytes = Math.max(0, userDiskLimit - userDiskUsage);
+  const remainingText = isUnlimited ? 'Tanpa Batas' : formatFileSize(remainingBytes);
+  const percent = isUnlimited ? 0 : Math.min(100, Math.round((userDiskUsage / userDiskLimit) * 100));
+
+  // Update Gallery Storage Banner Elements
+  const usedEl = document.getElementById('galleryStorageUsed');
+  const totalEl = document.getElementById('galleryStorageTotal');
+  const remEl = document.getElementById('galleryStorageRemaining');
+  const badgeEl = document.getElementById('galleryStorageBadge');
+  const statusEl = document.getElementById('galleryStorageStatus');
+  const barEl = document.getElementById('galleryStorageBar');
+  const percentTextEl = document.getElementById('galleryStoragePercentText');
+
+  if (usedEl) usedEl.textContent = usedText;
+  if (totalEl) totalEl.textContent = limitText;
+  if (remEl) remEl.textContent = `SISA: ${remainingText}`;
+  if (badgeEl) badgeEl.textContent = userCurrentRole === 'admin' ? 'Server VPS' : `Paket: ${userPackageName}`;
+  if (percentTextEl) percentTextEl.textContent = `${percent}% terpakai`;
+
+  let barColor = 'bg-emerald-500';
+  let statusText = 'Tersedia';
+  let statusColor = 'text-emerald-400 font-semibold';
+
+  if (!isUnlimited) {
+    if (percent >= 100) {
+      barColor = 'bg-red-500';
+      statusText = 'Penuh (Upload Dinonaktifkan)';
+      statusColor = 'text-red-400 font-bold';
+    } else if (percent >= 85) {
+      barColor = 'bg-red-500';
+      statusText = 'Hampir Penuh';
+      statusColor = 'text-red-400 font-medium';
+    } else if (percent >= 70) {
+      barColor = 'bg-yellow-500';
+      statusText = 'Mulai Menipis';
+      statusColor = 'text-yellow-400 font-medium';
     }
-  } else {
-    infoDesktop.classList.add('hidden');
-    infoMobile.classList.add('hidden');
+  }
+
+  if (barEl) {
+    barEl.style.width = (isUnlimited ? 100 : Math.max(percent, 3)) + '%';
+    barEl.className = `h-full rounded-full transition-all duration-300 ${barColor}`;
+  }
+  if (statusEl) {
+    statusEl.textContent = statusText;
+    statusEl.className = `text-[11px] ${statusColor}`;
   }
 }
 
@@ -974,6 +1030,10 @@ function createModalDialog(options) {
 }
 
 function openUploadModal() {
+  if (userDiskLimit > 0 && userDiskUsage >= userDiskLimit) {
+    showToast('error', `Kapasitas penyimpanan galeri Anda sudah penuh (${formatFileSize(userDiskUsage)} / ${formatFileSize(userDiskLimit)}). Silakan hapus beberapa video lama atau hubungi Admin untuk menambah kuota.`);
+    return;
+  }
   const modal = document.getElementById('uploadModal');
   modal.classList.remove('hidden');
   document.body.classList.add('overflow-hidden');
@@ -1797,7 +1857,7 @@ document.addEventListener('DOMContentLoaded', function() {
         data-media-type="${mediaType}" data-media-title="${title}" draggable="true">
         <div class="aspect-video relative overflow-hidden bg-dark-900">
           ${isAudio ? `
-          <div class="w-full h-full flex items-center justify-center bg-[#181818]">
+          <div class="w-full h-full flex items-center justify-center bg-dark-800">
             <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
               <i class="ti ti-music text-3xl text-primary"></i>
             </div>
@@ -1870,7 +1930,7 @@ document.addEventListener('DOMContentLoaded', function() {
         data-media-type="${mediaType}" data-media-title="${title}" draggable="true">
         <td class="px-4 py-3">
           <div class="flex items-center gap-3">
-            <div class="w-12 h-8 rounded overflow-hidden bg-[#181818] flex-shrink-0 relative flex items-center justify-center">
+            <div class="w-12 h-8 rounded overflow-hidden bg-dark-800 flex-shrink-0 relative flex items-center justify-center">
               ${isAudio ? `<i class="ti ti-music text-primary"></i>` : `<img src="${thumbnail}" alt="" class="w-full h-full object-cover">`}
             </div>
             <div class="flex items-center gap-2">

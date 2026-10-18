@@ -101,8 +101,10 @@
             <span class="text-[10px] text-green-400">↓<span id="download-speed-mobile" class="font-bold">0</span></span>
           </div>
           <div id="disk-content-mobile" class="items-center gap-1" style="display: none;">
+            <span class="text-[10px] text-emerald-400 font-semibold">SISA:</span>
             <span id="disk-used-mobile" class="text-xs font-bold text-white">0</span>
-            <span id="disk-total-mobile" class="text-[10px] text-gray-400">/ 0</span>
+            <span class="text-[10px] text-gray-400 font-semibold">/ TOTAL:</span>
+            <span id="disk-total-mobile" class="text-xs font-medium text-gray-300">0</span>
           </div>
         </div>
       </div>
@@ -196,18 +198,32 @@
     <% } %>
     <div class="bg-gray-800 rounded-lg p-6 shadow-md">
       <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold"><%= user.user_role === 'admin' ? 'Disk Usage (VPS)' : 'Storage Quota' %></h3>
+        <div>
+          <h3 class="text-lg font-semibold">Storage Quota</h3>
+          <p id="storage-plan-subtitle" class="text-xs text-gray-400 mt-0.5"><%= user.user_role === 'admin' ? 'Server Storage' : (user.package_name ? 'Paket: ' + user.package_name.toUpperCase() : 'Penyimpanan Akun') %></p>
+        </div>
         <div class="w-10 h-10 bg-dark-700 rounded-lg flex items-center justify-center">
           <i class="ti ti-database text-xl text-white font-loaded"></i>
         </div>
       </div>
-      <div class="mt-2">
-        <p class="text-3xl font-bold">
-          <span id="disk-used-wide">0 GB</span><span id="disk-total-wide" class="text-sm text-gray-400"> / 0 GB</span>
-        </p>
-        <div class="w-full bg-gray-700 rounded-full h-2.5 mt-2">
-          <div id="disk-bar-wide" class="bg-primary h-2.5 rounded-full transition-colors duration-300"
+      <div class="mt-3">
+        <div class="flex items-baseline justify-between gap-2">
+          <div>
+            <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">SISA:</span>
+            <span id="disk-remaining-wide" class="text-2xl font-bold text-emerald-400">0 MB</span>
+          </div>
+          <div class="text-right">
+            <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">TOTAL:</span>
+            <span id="disk-total-wide" class="text-lg font-bold text-gray-200">0 MB</span>
+          </div>
+        </div>
+        <div class="w-full bg-gray-700 rounded-full h-2 mt-2.5">
+          <div id="disk-bar-wide" class="bg-emerald-500 h-2 rounded-full transition-all duration-300"
             style="width: 0%"></div>
+        </div>
+        <div class="flex justify-between items-center text-xs text-gray-400 mt-2">
+          <span>Terpakai: <strong id="disk-used-wide" class="text-gray-200 font-medium">0 MB</strong></span>
+          <span id="disk-percent-wide" class="font-medium text-gray-300">0%</span>
         </div>
       </div>
     </div>
@@ -509,6 +525,62 @@
                         </label>
                         <input type="datetime-local" id="scheduleEndTime" name="scheduleEndTime"
                           class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Smart Audience Automation -->
+                  <div class="mt-4 p-4 rounded-xl bg-dark-900 border border-gray-700/80 space-y-3">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <i class="ti ti-flame text-primary text-base"></i>
+                        <span class="text-sm font-medium text-white">Smart Audience Automation</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-rose-300 border border-primary/30 font-medium">Auto-Extend</span>
+                      </div>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="autoExtendCheckbox" name="autoExtend" class="sr-only peer" onchange="toggleAutoExtendFields('autoExtendCheckbox', 'autoExtendOptionsGroup')">
+                        <div class="w-11 h-6 bg-dark-700 rounded-full peer peer-checked:bg-primary"></div>
+                        <div class="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition-all peer-checked:translate-x-5"></div>
+                      </label>
+                    </div>
+                    <p class="text-xs text-gray-400">Otomatis memperpanjang durasi live streaming jika jumlah penonton masih ramai saat jadwal mau habis.</p>
+
+                    <div id="autoExtendOptionsGroup" class="hidden space-y-3 pt-2 border-t border-gray-800">
+                      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label class="text-xs text-gray-400 block mb-1">Minimal Penonton</label>
+                          <div class="relative">
+                            <input type="number" id="autoExtendMinViewers" name="autoExtendMinViewers" min="1" value="10"
+                              class="w-full h-[38px] pl-8 pr-3 bg-dark-700 border border-gray-600 rounded-lg text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary">
+                            <i class="ti ti-users absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                          </div>
+                        </div>
+                        <div>
+                          <label class="text-xs text-gray-400 block mb-1">Perpanjang Durasi</label>
+                          <div class="relative">
+                            <input type="number" id="autoExtendDuration" name="autoExtendDuration" min="15" step="15" value="60"
+                              class="w-full h-[38px] pl-8 pr-12 bg-dark-700 border border-gray-600 rounded-lg text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary">
+                            <i class="ti ti-clock absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">menit</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label class="text-xs text-gray-400 block mb-1">Batas Maks Perpanjang</label>
+                          <select id="autoExtendMax" name="autoExtendMax"
+                            class="w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary">
+                            <option value="0" selected>Tanpa Batas (Looping)</option>
+                            <option value="1">Maks. 1x Perpanjang</option>
+                            <option value="2">Maks. 2x Perpanjang</option>
+                            <option value="3">Maks. 3x Perpanjang</option>
+                            <option value="5">Maks. 5x Perpanjang</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="pt-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" id="autoRedirectCheckbox" name="autoRedirect" class="rounded border-gray-600 text-primary focus:ring-primary bg-dark-700">
+                          <span class="text-xs text-gray-300">Kirim notifikasi otomatis di Live Chat saat siaran live berakhir</span>
+                        </label>
                       </div>
                     </div>
                   </div>
@@ -879,6 +951,62 @@
                           </label>
                           <input type="datetime-local" id="ytScheduleEnd" name="ytScheduleEnd"
                             class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                        </div>
+
+                        <!-- YouTube Smart Audience Automation -->
+                        <div class="p-3.5 rounded-xl bg-dark-900 border border-gray-700/80 space-y-2.5">
+                          <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                              <i class="ti ti-flame text-primary text-base"></i>
+                              <span class="text-sm font-medium text-white">Smart Audience Automation</span>
+                              <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-rose-300 border border-primary/30 font-medium">Auto-Extend</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                              <input type="checkbox" id="ytAutoExtendCheckbox" name="ytAutoExtend" class="sr-only peer" onchange="toggleAutoExtendFields('ytAutoExtendCheckbox', 'ytAutoExtendOptionsGroup')">
+                              <div class="w-11 h-6 bg-dark-700 rounded-full peer peer-checked:bg-primary"></div>
+                              <div class="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition-all peer-checked:translate-x-5"></div>
+                            </label>
+                          </div>
+                          <p class="text-xs text-gray-400">Deteksi penonton YouTube otomatis. Jika penonton masih ramai saat jadwal habis, siaran diperpanjang otomatis.</p>
+
+                          <div id="ytAutoExtendOptionsGroup" class="hidden space-y-3 pt-2 border-t border-gray-800">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label class="text-xs text-gray-400 block mb-1">Minimal Penonton</label>
+                                <div class="relative">
+                                  <input type="number" id="ytAutoExtendMinViewers" name="ytAutoExtendMinViewers" min="1" value="10"
+                                    class="w-full h-[38px] pl-8 pr-3 bg-dark-700 border border-gray-600 rounded-lg text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary">
+                                  <i class="ti ti-users absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                </div>
+                              </div>
+                              <div>
+                                <label class="text-xs text-gray-400 block mb-1">Perpanjang Durasi</label>
+                                <div class="relative">
+                                  <input type="number" id="ytAutoExtendDuration" name="ytAutoExtendDuration" min="15" step="15" value="60"
+                                    class="w-full h-[38px] pl-8 pr-12 bg-dark-700 border border-gray-600 rounded-lg text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary">
+                                  <i class="ti ti-clock absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">menit</span>
+                                </div>
+                              </div>
+                              <div>
+                                <label class="text-xs text-gray-400 block mb-1">Batas Maks Perpanjang</label>
+                                <select id="ytAutoExtendMax" name="ytAutoExtendMax"
+                                  class="w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary">
+                                  <option value="0" selected>Tanpa Batas (Looping)</option>
+                                  <option value="1">Maks. 1x Perpanjang</option>
+                                  <option value="2">Maks. 2x Perpanjang</option>
+                                  <option value="3">Maks. 3x Perpanjang</option>
+                                  <option value="5">Maks. 5x Perpanjang</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div class="pt-2">
+                              <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="ytAutoRedirectCheckbox" name="ytAutoRedirect" class="rounded border-gray-600 text-primary focus:ring-primary bg-dark-700">
+                                <span class="text-xs text-gray-300">Kirim notifikasi otomatis di YouTube Live Chat saat siaran live berakhir</span>
+                              </label>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1461,7 +1589,7 @@
     }
 
     .native-video-player {
-      background-color: #1f2937;
+      background-color: #121214;
       width: 100%;
       height: 100%;
       object-fit: contain;
@@ -1886,7 +2014,7 @@
         }
       });
       const titleElement = document.getElementById('network-disk-title');
-      const newTitle = showingNetwork ? 'Internet Speed' : ('<%= user.user_role %>' === 'admin' ? 'Disk Usage (VPS)' : 'Storage Quota');
+      const newTitle = showingNetwork ? 'Internet Speed' : 'Storage Quota';
       if (titleElement) {
         titleElement.textContent = newTitle;
       }
@@ -1926,93 +2054,65 @@
             if (uploadWide) uploadWide.textContent = data.network.uploadFormatted;
             if (downloadWide) downloadWide.textContent = data.network.downloadFormatted;
           }
-          const currentUserRole = '<%= user.user_role %>';
-          if (currentUserRole === 'admin' && data.disk) {
-            const diskUsagePercent = data.disk.usagePercent;
-
-            const diskUsed = document.getElementById('disk-used');
-            const diskTotal = document.getElementById('disk-total');
-            if (diskUsed) diskUsed.textContent = data.disk.used;
-            if (diskTotal) diskTotal.textContent = ' / ' + data.disk.total;
-            const diskUsedMobile = document.getElementById('disk-used-mobile');
-            const diskTotalMobile = document.getElementById('disk-total-mobile');
-            if (diskUsedMobile) diskUsedMobile.textContent = data.disk.used;
-            if (diskTotalMobile) diskTotalMobile.textContent = '/ ' + data.disk.total;
-
-            const diskUsedWide = document.getElementById('disk-used-wide');
-            const diskTotalWide = document.getElementById('disk-total-wide');
-            if (diskUsedWide) diskUsedWide.textContent = data.disk.used;
-            if (diskTotalWide) diskTotalWide.textContent = ' / ' + data.disk.total;
-
-            const diskBar = document.getElementById('disk-bar');
-            const diskBarWide = document.getElementById('disk-bar-wide');
-
-            let barColor;
-            if (diskUsagePercent >= 80) {
-              barColor = 'bg-red-500';
-            } else if (diskUsagePercent >= 60) {
-              barColor = 'bg-yellow-500';
-            } else {
-              barColor = 'bg-green-400';
-            }
-            const colorClasses = ['bg-primary', 'bg-green-400', 'bg-yellow-500', 'bg-red-500'];
-            colorClasses.forEach(cls => {
-              if (diskBar) diskBar.classList.remove(cls);
-              if (diskBarWide) diskBarWide.classList.remove(cls);
-            });
-
-            if (diskBar) {
-              diskBar.classList.add(barColor);
-              diskBar.style.width = diskUsagePercent + '%';
-            }
-            if (diskBarWide) {
-              diskBarWide.classList.add(barColor);
-              diskBarWide.style.width = diskUsagePercent + '%';
-            }
-          }
         })
         .catch(error => console.error('Error fetching system stats:', error));
     }
 
     function updateUserQuota() {
-      if ('<%= user.user_role %>' === 'admin') return;
       fetch('/api/user/disk-usage')
         .then(res => res.json())
         .then(data => {
           if (!data.success) return;
-          const usedBytes = data.diskUsage;
-          const limitBytes = data.diskLimit;
-          const usedGB = (usedBytes / (1024*1024*1024)).toFixed(2);
-          const limitGB = limitBytes > 0 ? Math.round(limitBytes / (1024*1024*1024)) : null;
-          const usedText = usedGB + ' GB';
-          const totalText = limitGB ? ' / ' + limitGB + ' GB' : ' / ∞';
-          const totalMobileText = limitGB ? '/ ' + limitGB + ' GB' : '/ ∞';
-          const percent = limitGB ? Math.min((usedBytes / limitBytes * 100), 100).toFixed(1) : 0;
-          const barColor = percent >= 80 ? 'bg-red-500' : percent >= 60 ? 'bg-yellow-500' : 'bg-green-400';
+          const usedBytes = data.diskUsage || 0;
+          const limitBytes = data.diskLimit || 0;
+          const remainingBytes = (data.remaining !== undefined && data.remaining !== null) ? data.remaining : Math.max(0, limitBytes - usedBytes);
+          const percent = (data.percent !== undefined) ? data.percent : (limitBytes > 0 ? Math.min(100, Math.round((usedBytes / limitBytes) * 100)) : 0);
 
-          const el = document.getElementById('disk-used');
-          const elTotal = document.getElementById('disk-total');
-          if (el) el.textContent = usedText;
-          if (elTotal) elTotal.textContent = totalText;
+          const formatBytes = (bytes) => {
+            if (!bytes || bytes === 0) return '0 MB';
+            const gb = bytes / (1024 * 1024 * 1024);
+            if (gb < 0.1) {
+              const mb = bytes / (1024 * 1024);
+              return mb.toFixed(1) + ' MB';
+            }
+            return gb.toFixed(2) + ' GB';
+          };
+
+          const usedText = formatBytes(usedBytes);
+          const totalText = limitBytes > 0 ? formatBytes(limitBytes) : '0 MB';
+          const remainingText = formatBytes(remainingBytes);
+          const barColor = percent >= 90 ? 'bg-red-500' : (percent >= 70 ? 'bg-yellow-500' : 'bg-emerald-500');
+
+          const subtitleEl = document.getElementById('storage-plan-subtitle');
+          if (subtitleEl) {
+            if (data.userRole === 'admin') {
+              subtitleEl.textContent = `Server VPS • Sisa ${remainingText}`;
+            } else {
+              subtitleEl.textContent = `Paket: ${(data.packageName || 'AKTIF').toUpperCase()} • Sisa ${remainingText}`;
+            }
+          }
 
           const diskUsedMobile = document.getElementById('disk-used-mobile');
           const diskTotalMobile = document.getElementById('disk-total-mobile');
-          if (diskUsedMobile) diskUsedMobile.textContent = usedText;
-          if (diskTotalMobile) diskTotalMobile.textContent = totalMobileText;
+          if (diskUsedMobile) diskUsedMobile.textContent = remainingText;
+          if (diskTotalMobile) diskTotalMobile.textContent = totalText;
 
           const diskUsedWide = document.getElementById('disk-used-wide');
           const diskTotalWide = document.getElementById('disk-total-wide');
           if (diskUsedWide) diskUsedWide.textContent = usedText;
           if (diskTotalWide) diskTotalWide.textContent = totalText;
 
-          ['disk-bar', 'disk-bar-wide'].forEach(id => {
-            const bar = document.getElementById(id);
-            if (bar) {
-              bar.style.width = percent + '%';
-              ['bg-primary','bg-green-400','bg-yellow-500','bg-red-500'].forEach(cls => bar.classList.remove(cls));
-              bar.classList.add(barColor);
-            }
-          });
+          const diskRemainingWide = document.getElementById('disk-remaining-wide');
+          const diskPercentWide = document.getElementById('disk-percent-wide');
+          if (diskRemainingWide) diskRemainingWide.textContent = remainingText;
+          if (diskPercentWide) diskPercentWide.textContent = percent + '% terpakai';
+
+          const barWide = document.getElementById('disk-bar-wide');
+          if (barWide) {
+            barWide.style.width = Math.max(percent, 3) + '%';
+            ['bg-primary', 'bg-green-400', 'bg-emerald-500', 'bg-yellow-500', 'bg-red-500'].forEach(cls => barWide.classList.remove(cls));
+            barWide.classList.add(barColor);
+          }
         })
         .catch(err => console.error('Error fetching user quota:', err));
     }
@@ -2067,6 +2167,11 @@
         }
 
         ytFormData.ytMonetization = document.getElementById('ytEnableMonetization').checked;
+        ytFormData.autoExtend = document.getElementById('ytAutoExtendCheckbox')?.checked || false;
+        ytFormData.autoExtendMinViewers = parseInt(document.getElementById('ytAutoExtendMinViewers')?.value) || 10;
+        ytFormData.autoExtendDuration = parseInt(document.getElementById('ytAutoExtendDuration')?.value) || 60;
+        ytFormData.autoExtendMax = parseInt(document.getElementById('ytAutoExtendMax')?.value) || 0;
+        ytFormData.autoRedirect = document.getElementById('ytAutoRedirectCheckbox')?.checked || false;
 
         const createBtn = document.querySelector('#newStreamModal button[type="submit"]');
         const originalBtnText = createBtn.innerHTML;
@@ -2168,7 +2273,12 @@
         loopVideo: document.querySelector('input[name="loopVideo"]').checked,
         orientation: currentOrientation,
         resolution: document.getElementById('currentResolution').textContent.split(' ')[0],
-        useAdvancedSettings: !document.getElementById('advancedSettingsContent').classList.contains('hidden')
+        useAdvancedSettings: !document.getElementById('advancedSettingsContent').classList.contains('hidden'),
+        autoExtend: document.getElementById('autoExtendCheckbox')?.checked || false,
+        autoExtendMinViewers: parseInt(document.getElementById('autoExtendMinViewers')?.value) || 10,
+        autoExtendDuration: parseInt(document.getElementById('autoExtendDuration')?.value) || 60,
+        autoExtendMax: parseInt(document.getElementById('autoExtendMax')?.value) || 0,
+        autoRedirect: document.getElementById('autoRedirectCheckbox')?.checked || false
       };
       const scheduleStartTime = document.getElementById('scheduleStartTime').value;
       const scheduleEndTime = document.getElementById('scheduleEndTime').value;
@@ -2404,12 +2514,14 @@
         settingsDisplay = `${videoRes} • ${videoBitrate}kbps`;
       }
       let statusBadge = '';
+      const autoExtendBadge = stream.auto_extend ? `<span class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] bg-emerald-950/80 text-emerald-400 border border-emerald-800 inline-flex items-center gap-0.5" title="Auto-Extend Aktif (Min. ${stream.auto_extend_min_viewers || 10} Penonton)"><i class="ti ti-flame text-[9px]"></i>Auto-Extend</span>` : '';
+      const viewerBadge = stream.status === 'live' ? `<span class="live-viewer-badge ml-1.5 px-1.5 py-0.5 rounded text-[9px] bg-dark-700/80 text-gray-300 border border-gray-600/70 hidden items-center gap-1" data-stream-id="${stream.id}"><i class="ti ti-users text-[9px] text-rose-400"></i><span class="live-viewer-count">...</span></span>` : '';
       if (stream.status === 'live') {
-        statusBadge = `<span class="flex items-center text-red-400"><span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse mr-1"></span><span class="text-[10px] font-medium">Live${durationDisplay ? ' • ' : ''}</span>${durationDisplay ? `<span class="text-[10px] font-medium tabular-nums live-duration" data-start-time="${stream.start_time}">${durationDisplay}</span>` : ''}</span>`;
+        statusBadge = `<div class="flex items-center flex-wrap gap-1"><span class="flex items-center text-red-400"><span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse mr-1"></span><span class="text-[10px] font-medium">Live${durationDisplay ? ' • ' : ''}</span>${durationDisplay ? `<span class="text-[10px] font-medium tabular-nums live-duration" data-start-time="${stream.start_time}">${durationDisplay}</span>` : ''}</span>${viewerBadge}${autoExtendBadge}</div>`;
       } else if (stream.status === 'scheduled') {
-        statusBadge = `<span class="flex items-center text-yellow-500"><i class="ti ti-clock text-[10px] mr-1"></i><span class="text-[10px] font-medium">Scheduled & Waiting</span></span>`;
+        statusBadge = `<div class="flex items-center flex-wrap gap-1"><span class="flex items-center text-yellow-500"><i class="ti ti-clock text-[10px] mr-1"></i><span class="text-[10px] font-medium">Scheduled & Waiting</span></span>${autoExtendBadge}</div>`;
       } else {
-        statusBadge = `<span class="flex items-center text-gray-400"><i class="ti ti-circle-dot text-[10px] mr-1"></i><span class="text-[10px] font-medium">Offline</span></span>`;
+        statusBadge = `<div class="flex items-center flex-wrap gap-1"><span class="flex items-center text-gray-400"><i class="ti ti-circle-dot text-[10px] mr-1"></i><span class="text-[10px] font-medium">Offline</span></span>${autoExtendBadge}</div>`;
       }
       let scheduleHTML = '';
       if (stream.status === 'scheduled' && scheduleDate) {
@@ -2510,6 +2622,8 @@
       }
       let durationDisplay = '';
       let statusBadge = '';
+      const autoExtendBadge = stream.auto_extend ? `<span class="ml-2 px-2 py-0.5 rounded-full text-xs bg-emerald-950/80 text-emerald-400 border border-emerald-800 inline-flex items-center gap-1" title="Auto-Extend: Perpanjang jika penonton >= ${stream.auto_extend_min_viewers || 10}"><i class="ti ti-flame text-xs"></i>Auto-Extend</span>` : '';
+      const viewerBadge = stream.status === 'live' ? `<span class="live-viewer-badge ml-2 px-2 py-0.5 rounded-full text-xs bg-dark-700/80 text-gray-300 border border-gray-600/70 hidden items-center gap-1" data-stream-id="${stream.id}"><i class="ti ti-users text-xs text-rose-400"></i><span class="live-viewer-count">...</span></span>` : '';
       if (stream.status === 'live' && stream.start_time) {
         const startTime = new Date(stream.start_time);
         const now = new Date();
@@ -2519,14 +2633,18 @@
         const seconds = Math.floor((durationMs % (1000 * 60)) / 1000).toString().padStart(2, '0');
         durationDisplay = `${hours}:${minutes}:${seconds}`;
         statusBadge = `
-          <span class="flex items-center bg-red-400/10 text-red-400 rounded-full px-2.5 py-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse mr-1.5"></span>
-            <span class="text-xs font-medium">Live • <span class="live-duration tabular-nums" data-start-time="${stream.start_time}">
-              ${durationDisplay}</span></span>
-          </span>
+          <div class="flex items-center">
+            <span class="flex items-center bg-red-400/10 text-red-400 rounded-full px-2.5 py-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse mr-1.5"></span>
+              <span class="text-xs font-medium">Live • <span class="live-duration tabular-nums" data-start-time="${stream.start_time}">
+                ${durationDisplay}</span></span>
+            </span>
+            ${viewerBadge}
+            ${autoExtendBadge}
+          </div>
         `;
       } else {
-        statusBadge = getStatusBadgeHTML(stream.status);
+        statusBadge = `<div class="flex items-center">${getStatusBadgeHTML(stream.status)}${autoExtendBadge}</div>`;
       }
       row.innerHTML = `
       <td class="px-6 py-4 whitespace-nowrap">
@@ -5406,4 +5524,37 @@
       modal.classList.add('hidden');
       document.body.style.overflow = '';
     }
+
+    function toggleAutoExtendFields(checkboxId, targetId) {
+      const cb = document.getElementById(checkboxId);
+      const target = document.getElementById(targetId);
+      if (cb && target) {
+        if (cb.checked) {
+          target.classList.remove('hidden');
+        } else {
+          target.classList.add('hidden');
+        }
+      }
+    }
+
+    function pollLiveViewers() {
+      const badges = document.querySelectorAll('.live-viewer-badge');
+      badges.forEach(badge => {
+        const streamId = badge.getAttribute('data-stream-id');
+        if (!streamId) return;
+        fetch(`/api/streams/${streamId}/viewers`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.viewers !== null && data.viewers !== undefined) {
+              badge.classList.remove('hidden');
+              badge.classList.add('inline-flex');
+              const countSpan = badge.querySelector('.live-viewer-count');
+              if (countSpan) countSpan.textContent = `${data.viewers} penonton`;
+            }
+          })
+          .catch(() => {});
+      });
+    }
+    setInterval(pollLiveViewers, 30000);
+    setTimeout(pollLiveViewers, 2500);
   </script>

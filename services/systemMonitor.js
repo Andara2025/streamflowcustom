@@ -160,7 +160,10 @@ async function getDiskUsage() {
       used: formatDisk(targetDisk.size - targetDisk.available),
       free: formatDisk(targetDisk.available),
       usagePercent: usagePercent,
-      drive: targetDisk.mount || targetDisk.fs || "Unknown"
+      drive: targetDisk.mount || targetDisk.fs || "Unknown",
+      totalBytes: targetDisk.size || 0,
+      usedBytes: (targetDisk.size && targetDisk.available) ? (targetDisk.size - targetDisk.available) : 0,
+      freeBytes: targetDisk.available || 0
     };
   } catch (error) {
     console.error('Error getting disk usage:', error);

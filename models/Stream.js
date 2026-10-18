@@ -33,7 +33,15 @@ class Stream {
       youtube_monetization = false,
       youtube_altered_content = false,
       youtube_made_for_kids = false,
-      is_rotation = false
+      is_rotation = false,
+      auto_extend = false,
+      auto_extend_min_viewers = 10,
+      auto_extend_duration = 60,
+      auto_extend_count = 0,
+      auto_extend_max = 0,
+      auto_redirect = false,
+      auto_redirect_min_viewers = 10,
+      auto_redirect_target_stream_id = null
     } = streamData;
     const loop_video_int = loop_video ? 1 : 0;
     const use_advanced_settings_int = use_advanced_settings ? 1 : 0;
@@ -42,6 +50,8 @@ class Stream {
     const youtube_altered_content_int = youtube_altered_content ? 1 : 0;
     const youtube_made_for_kids_int = youtube_made_for_kids ? 1 : 0;
     const is_rotation_int = is_rotation ? 1 : 0;
+    const auto_extend_int = auto_extend ? 1 : 0;
+    const auto_redirect_int = auto_redirect ? 1 : 0;
     const final_status = status || (schedule_time ? 'scheduled' : 'offline');
     const status_updated_at = new Date().toISOString();
     return new Promise((resolve, reject) => {
@@ -50,13 +60,15 @@ class Stream {
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video,
           schedule_time, end_time, duration, status, status_updated_at, use_advanced_settings, user_id,
-          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api, youtube_monetization, youtube_altered_content, youtube_made_for_kids, is_rotation
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api, youtube_monetization, youtube_altered_content, youtube_made_for_kids, is_rotation,
+          auto_extend, auto_extend_min_viewers, auto_extend_duration, auto_extend_count, auto_extend_max, auto_redirect, auto_redirect_min_viewers, auto_redirect_target_stream_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video_int,
           schedule_time, end_time, duration, final_status, status_updated_at, use_advanced_settings_int, user_id,
-          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api_int, youtube_monetization_int, youtube_altered_content_int, youtube_made_for_kids_int, is_rotation_int
+          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api_int, youtube_monetization_int, youtube_altered_content_int, youtube_made_for_kids_int, is_rotation_int,
+          auto_extend_int, parseInt(auto_extend_min_viewers) || 10, parseInt(auto_extend_duration) || 60, parseInt(auto_extend_count) || 0, parseInt(auto_extend_max) || 0, auto_redirect_int, parseInt(auto_redirect_min_viewers) || 10, auto_redirect_target_stream_id || null
         ],
         function (err) {
           if (err) {
@@ -83,6 +95,8 @@ class Stream {
           row.youtube_altered_content = row.youtube_altered_content === 1;
           row.youtube_made_for_kids = row.youtube_made_for_kids === 1;
           row.is_rotation = row.is_rotation === 1;
+          row.auto_extend = row.auto_extend === 1;
+          row.auto_redirect = row.auto_redirect === 1;
         }
         resolve(row);
       });
@@ -248,6 +262,8 @@ class Stream {
               row.youtube_monetization = row.youtube_monetization === 1;
               row.youtube_altered_content = row.youtube_altered_content === 1;
               row.youtube_made_for_kids = row.youtube_made_for_kids === 1;
+              row.auto_extend = row.auto_extend === 1;
+              row.auto_redirect = row.auto_redirect === 1;
             });
           }
           resolve({
@@ -268,6 +284,12 @@ class Stream {
     const values = [];
     Object.entries(streamData).forEach(([key, value]) => {
       if (key === 'loop_video' && typeof value === 'boolean') {
+        fields.push(`${key} = ?`);
+        values.push(value ? 1 : 0);
+      } else if (key === 'auto_extend' && typeof value === 'boolean') {
+        fields.push(`${key} = ?`);
+        values.push(value ? 1 : 0);
+      } else if (key === 'auto_redirect' && typeof value === 'boolean') {
         fields.push(`${key} = ?`);
         values.push(value ? 1 : 0);
       } else if (key === 'youtube_monetization' && typeof value === 'boolean') {

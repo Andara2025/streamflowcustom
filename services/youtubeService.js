@@ -359,6 +359,17 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
             rtmpUrl: rtmpUrl,
             streamKey: streamKey
           };
+        } else if (lifeCycleStatus === 'live' || lifeCycleStatus === 'testing') {
+          console.log(`[YouTubeService] Existing broadcast ${stream.youtube_broadcast_id} is still '${lifeCycleStatus}'. Completing it to avoid orphaned 'No Data' live...`);
+          try {
+            await youtube.liveBroadcasts.transition({
+              broadcastStatus: 'complete',
+              id: stream.youtube_broadcast_id,
+              part: 'id,status'
+            });
+          } catch (tErr) {
+            console.warn(`[YouTubeService] Failed to complete old broadcast ${stream.youtube_broadcast_id}:`, tErr.message);
+          }
         }
       }
     } catch (checkErr) {
@@ -709,6 +720,123 @@ async function completeYouTubeBroadcast(streamId) {
   }
 }
 
+async function getLiveViewerCount(streamId) {
+  try {
+    const stream = typeof streamId === 'object' ? streamId : await Stream.findById(streamId);
+    if (!stream || !stream.is_youtube_api || !stream.youtube_broadcast_id) {
+      return null;
+    }
+
+    const user = await User.findById(stream.user_id);
+    if (!user) return null;
+
+    let selectedChannel = stream.youtube_channel_id ? await YoutubeChannel.findById(stream.youtube_channel_id) : null;
+    if (!selectedChannel) selectedChannel = await YoutubeChannel.findDefault(stream.user_id);
+    if (!selectedChannel || selectedChannel.user_id !== stream.user_id) return null;
+
+    const effectiveClientId = selectedChannel.youtube_client_id || user.youtube_client_id;
+    const rawClientSecret = selectedChannel.youtube_client_secret || user.youtube_client_secret;
+    if (!effectiveClientId || !rawClientSecret) return null;
+
+    const clientSecret = decrypt(rawClientSecret);
+    const accessToken = decrypt(selectedChannel.access_token);
+    const refreshToken = decrypt(selectedChannel.refresh_token);
+    if (!clientSecret || !accessToken) return null;
+
+    const port = process.env.PORT || 7575;
+    const oauth2Client = getYouTubeOAuth2Client(effectiveClientId, clientSecret, `http://localhost:${port}/auth/youtube/callback`);
+    oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+
+    oauth2Client.on('tokens', async (tokens) => {
+      if (tokens.access_token) {
+        await YoutubeChannel.update(selectedChannel.id, { access_token: encrypt(tokens.access_token) });
+      }
+      if (tokens.refresh_token) {
+        await YoutubeChannel.update(selectedChannel.id, { refresh_token: encrypt(tokens.refresh_token) });
+      }
+    });
+
+    const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+    const res = await youtube.videos.list({
+      part: 'liveStreamingDetails',
+      id: stream.youtube_broadcast_id
+    });
+
+    const item = res.data.items?.[0];
+    if (!item || !item.liveStreamingDetails) {
+      return 0;
+    }
+
+    const concurrentViewers = parseInt(item.liveStreamingDetails.concurrentViewers || '0', 10);
+    return isNaN(concurrentViewers) ? 0 : concurrentViewers;
+  } catch (error) {
+    console.error(`[YouTubeService] Error getting viewer count for stream:`, error.message);
+    return null;
+  }
+}
+
+async function sendLiveChatMessage(streamId, messageText) {
+  try {
+    const stream = typeof streamId === 'object' ? streamId : await Stream.findById(streamId);
+    if (!stream || !stream.is_youtube_api || !stream.youtube_broadcast_id) {
+      return { success: false, error: 'Not a YouTube API stream' };
+    }
+
+    const user = await User.findById(stream.user_id);
+    if (!user) return { success: false, error: 'User not found' };
+
+    let selectedChannel = stream.youtube_channel_id ? await YoutubeChannel.findById(stream.youtube_channel_id) : null;
+    if (!selectedChannel) selectedChannel = await YoutubeChannel.findDefault(stream.user_id);
+    if (!selectedChannel || selectedChannel.user_id !== stream.user_id) {
+      return { success: false, error: 'Channel not found' };
+    }
+
+    const effectiveClientId = selectedChannel.youtube_client_id || user.youtube_client_id;
+    const rawClientSecret = selectedChannel.youtube_client_secret || user.youtube_client_secret;
+    if (!effectiveClientId || !rawClientSecret) return { success: false, error: 'Credentials missing' };
+
+    const clientSecret = decrypt(rawClientSecret);
+    const accessToken = decrypt(selectedChannel.access_token);
+    const refreshToken = decrypt(selectedChannel.refresh_token);
+    if (!clientSecret || !accessToken) return { success: false, error: 'Tokens missing' };
+
+    const port = process.env.PORT || 7575;
+    const oauth2Client = getYouTubeOAuth2Client(effectiveClientId, clientSecret, `http://localhost:${port}/auth/youtube/callback`);
+    oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+
+    const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+    
+    const broadcastRes = await youtube.liveBroadcasts.list({
+      part: 'snippet',
+      id: stream.youtube_broadcast_id
+    });
+    
+    const liveChatId = broadcastRes.data.items?.[0]?.snippet?.liveChatId;
+    if (!liveChatId) {
+      return { success: false, error: 'Live chat not active or not found' };
+    }
+
+    await youtube.liveChatMessages.insert({
+      part: 'snippet',
+      requestBody: {
+        snippet: {
+          liveChatId: liveChatId,
+          type: 'textMessageEvent',
+          textMessageDetails: {
+            messageText: messageText
+          }
+        }
+      }
+    });
+
+    console.log(`[YouTubeService] Live chat message posted to broadcast ${stream.youtube_broadcast_id}: "${messageText}"`);
+    return { success: true };
+  } catch (error) {
+    console.error(`[YouTubeService] Error sending live chat message:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   createYouTubeBroadcast,
   deleteYouTubeBroadcast,
@@ -716,6 +844,8 @@ module.exports = {
   completeYouTubeBroadcast,
   getYouTubeOAuth2Client,
   syncBroadcastMonetization,
-  sanitizeYouTubeTags
+  sanitizeYouTubeTags,
+  getLiveViewerCount,
+  sendLiveChatMessage
 };
 

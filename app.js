@@ -480,9 +480,14 @@ app.get('/login', async (req, res) => {
     if (req.query.error === 'expired') {
       errorMessage = 'Masa Trial Anda (1 Hari) telah habis. Silakan hubungi admin atau Purchase.';
     }
+    let successMessage = null;
+    if (req.query.registered === 'true') {
+      successMessage = 'Akun berhasil dibuat! Silakan hubungi admin untuk mengaktifkan akun Anda, lalu login.';
+    }
     res.render('login', {
       title: 'Login',
       error: errorMessage,
+      success: successMessage,
       recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
     });
   } catch (error) {
@@ -731,12 +736,7 @@ app.post('/signup', upload.single('avatar'), async (req, res) => {
     });
 
     if (newUser) {
-      return res.render('signup', {
-        title: 'Sign Up',
-        error: null,
-        success: 'Account created successfully! Silakan hubungi admin untuk mengaktifkan akun Anda.',
-        recaptchaSiteKey: recaptchaSettings.hasKeys && recaptchaSettings.enabled ? recaptchaSettings.siteKey : null
-      });
+      return res.redirect('/login?registered=true');
     } else {
       return res.render('signup', {
         title: 'Sign Up',
@@ -1824,11 +1824,53 @@ app.get('/api/users/:id/streams', isAdmin, async (req, res) => {
 app.get('/api/user/disk-usage', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
-    const diskUsage = await User.getDiskUsage(req.session.userId);
+    const userRole = user ? (user.user_role || 'member') : 'member';
+    let diskUsage = await User.getDiskUsage(req.session.userId);
+    let diskLimit = user ? (user.disk_limit || 0) : 0;
+    const packageName = user ? (user.package_name || 'Custom') : 'Custom';
+    let isServerDisk = false;
+
+    // For admin, use actual server drive storage for control if user.disk_limit is not specifically capped
+    if (userRole === 'admin' && diskLimit === 0) {
+      try {
+        const stats = await systemMonitor.getSystemStats();
+        if (stats && stats.disk && stats.disk.totalBytes > 0) {
+          diskLimit = stats.disk.totalBytes;
+          diskUsage = stats.disk.usedBytes;
+          isServerDisk = true;
+        }
+      } catch (err) {
+        console.error('Error fetching system disk for admin:', err);
+      }
+    } else if (diskLimit === 0 && userRole !== 'admin') {
+      // For members whose diskLimit in DB is 0, fetch default storage from package pricing
+      try {
+        const AppSettings = require('./models/AppSettings');
+        const pricing = await AppSettings.getPricingSettings();
+        const pkgKey = (packageName || '').toLowerCase();
+        if (pricing && pricing.packages && pricing.packages[pkgKey] && pricing.packages[pkgKey].storage) {
+          const gb = parseFloat(pricing.packages[pkgKey].storage);
+          if (gb > 0) {
+            diskLimit = Math.round(gb * 1024 * 1024 * 1024);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching package storage limit:', err);
+      }
+    }
+
+    const remaining = diskLimit > 0 ? Math.max(0, diskLimit - diskUsage) : 0;
+    const percent = diskLimit > 0 ? Math.min(100, Math.round((diskUsage / diskLimit) * 100)) : 0;
+
     res.json({
       success: true,
       diskUsage: diskUsage,
-      diskLimit: user.disk_limit || 0
+      diskLimit: diskLimit,
+      remaining: remaining,
+      percent: percent,
+      packageName: packageName,
+      userRole: userRole,
+      isServerDisk: isServerDisk
     });
   } catch (error) {
     console.error('Get disk usage error:', error);
@@ -3308,7 +3350,7 @@ app.post('/settings/pricing', isAuthenticated, isAdmin, async (req, res) => {
     };
     
     await AppSettings.setPricingSettings({
-      adminWa: req.body.adminWa || '6285262882706',
+      adminWa: req.body.adminWa || '6285259787016',
       packages: packages
     });
     
@@ -4861,6 +4903,13 @@ app.post('/api/streams', isAuthenticated, [
       fps: parseInt(req.body.fps) || 30,
       orientation: req.body.orientation || 'horizontal',
       loop_video: req.body.loopVideo === 'true' || req.body.loopVideo === true,
+      auto_extend: req.body.autoExtend === 'true' || req.body.autoExtend === true,
+      auto_extend_min_viewers: parseInt(req.body.autoExtendMinViewers) || 10,
+      auto_extend_duration: parseInt(req.body.autoExtendDuration) || 60,
+      auto_extend_max: parseInt(req.body.autoExtendMax) || 0,
+      auto_redirect: req.body.autoRedirect === 'true' || req.body.autoRedirect === true,
+      auto_redirect_min_viewers: parseInt(req.body.autoRedirectMinViewers) || 10,
+      auto_redirect_target_stream_id: req.body.autoRedirectTargetStreamId || null,
       use_advanced_settings: false,
       user_id: req.session.userId
     };
@@ -4943,7 +4992,7 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
         error: 'YouTube API credentials not configured.'
       });
     }
-    const { videoId, title, description, privacy, category, tags, loopVideo, scheduleStartTime, scheduleEndTime, repeat, ytChannelId, ytMonetization, ytAlteredContent, ytMadeForKids } = req.body;
+    const { videoId, title, description, privacy, category, tags, loopVideo, scheduleStartTime, scheduleEndTime, repeat, ytChannelId, ytMonetization, ytAlteredContent, ytMadeForKids, autoExtend, autoExtendMinViewers, autoExtendDuration, autoExtendMax, autoRedirect, autoRedirectMinViewers, autoRedirectTargetStreamId } = req.body;
 
     let selectedChannel;
     if (ytChannelId) {
@@ -5020,7 +5069,14 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
       is_youtube_api: true,
       youtube_monetization: ytMonetization === 'true' || ytMonetization === true,
       youtube_altered_content: ytAlteredContent === 'true' || ytAlteredContent === true,
-      youtube_made_for_kids: ytMadeForKids === 'true' || ytMadeForKids === true
+      youtube_made_for_kids: ytMadeForKids === 'true' || ytMadeForKids === true,
+      auto_extend: autoExtend === 'true' || autoExtend === true,
+      auto_extend_min_viewers: parseInt(autoExtendMinViewers) || 10,
+      auto_extend_duration: parseInt(autoExtendDuration) || 60,
+      auto_extend_max: parseInt(autoExtendMax) || 0,
+      auto_redirect: autoRedirect === 'true' || autoRedirect === true,
+      auto_redirect_min_viewers: parseInt(autoRedirectMinViewers) || 10,
+      auto_redirect_target_stream_id: autoRedirectTargetStreamId || null
     };
 
     const clientTzOffset = req.body.timezoneOffset !== undefined ? Number(req.body.timezoneOffset) : null;
@@ -5125,6 +5181,26 @@ app.get('/api/streams/:id', isAuthenticated, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch stream' });
   }
 });
+
+app.get('/api/streams/:id/viewers', isAuthenticated, async (req, res) => {
+  try {
+    const stream = await Stream.findById(req.params.id);
+    if (!stream) {
+      return res.status(404).json({ success: false, error: 'Stream not found' });
+    }
+    if (stream.user_id !== req.session.userId) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const { getLiveViewerCount } = require('./services/youtubeService');
+    const viewers = await getLiveViewerCount(stream);
+    res.json({ success: true, viewers, status: stream.status });
+  } catch (error) {
+    console.error('Error fetching stream viewers:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail'), async (req, res) => {
   try {
     const stream = await Stream.findById(req.params.id);
@@ -5148,6 +5224,12 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
       if (req.body.loopVideo !== undefined) {
         updateData.loop_video = req.body.loopVideo === 'true' || req.body.loopVideo === true;
       }
+      if ('autoExtend' in req.body) updateData.auto_extend = req.body.autoExtend === 'true' || req.body.autoExtend === true || req.body.autoExtend === 1;
+      if ('autoExtendMinViewers' in req.body) updateData.auto_extend_min_viewers = parseInt(req.body.autoExtendMinViewers) || 10;
+      if ('autoExtendDuration' in req.body) updateData.auto_extend_duration = parseInt(req.body.autoExtendDuration) || 60;
+      if ('autoExtendMax' in req.body) updateData.auto_extend_max = parseInt(req.body.autoExtendMax) || 0;
+      if ('autoRedirect' in req.body) updateData.auto_redirect = req.body.autoRedirect === 'true' || req.body.autoRedirect === true || req.body.autoRedirect === 1;
+      if ('autoRedirectMinViewers' in req.body) updateData.auto_redirect_min_viewers = parseInt(req.body.autoRedirectMinViewers) || 10;
       if (req.body.ytMonetization !== undefined) {
         updateData.youtube_monetization = req.body.ytMonetization === 'true' || req.body.ytMonetization === true;
       }
@@ -5376,6 +5458,12 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
     if (req.body.loopVideo !== undefined) {
       updateData.loop_video = req.body.loopVideo === 'true' || req.body.loopVideo === true;
     }
+    if ('autoExtend' in req.body) updateData.auto_extend = req.body.autoExtend === 'true' || req.body.autoExtend === true || req.body.autoExtend === 1;
+    if ('autoExtendMinViewers' in req.body) updateData.auto_extend_min_viewers = parseInt(req.body.autoExtendMinViewers) || 10;
+    if ('autoExtendDuration' in req.body) updateData.auto_extend_duration = parseInt(req.body.autoExtendDuration) || 60;
+    if ('autoExtendMax' in req.body) updateData.auto_extend_max = parseInt(req.body.autoExtendMax) || 0;
+    if ('autoRedirect' in req.body) updateData.auto_redirect = req.body.autoRedirect === 'true' || req.body.autoRedirect === true || req.body.autoRedirect === 1;
+    if ('autoRedirectMinViewers' in req.body) updateData.auto_redirect_min_viewers = parseInt(req.body.autoRedirectMinViewers) || 10;
     updateData.use_advanced_settings = false;
     // STREAMCOPY-ONLY: reject above-package settings/source instead of re-encoding.
     try {
@@ -6475,7 +6563,12 @@ async function checkRotationScheduleConflict(userId, youtubeChannelId, startTime
 
 app.post('/api/rotations', isAuthenticated, uploadThumbnail.any(), async (req, res) => {
   try {
-    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id, global_youtube_altered_content, global_youtube_made_for_kids, rtmp_url, stream_key } = req.body;
+    const {
+      name, repeat_mode, start_time, end_time, items, youtube_channel_id,
+      global_youtube_altered_content, global_youtube_made_for_kids, rtmp_url, stream_key,
+      auto_extend, auto_extend_min_viewers, auto_extend_duration, auto_extend_max,
+      auto_redirect, auto_redirect_min_viewers, auto_redirect_target_stream_id
+    } = req.body;
 
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
 
@@ -6514,7 +6607,15 @@ app.post('/api/rotations', isAuthenticated, uploadThumbnail.any(), async (req, r
       global_youtube_altered_content: global_youtube_altered_content === 'true' || global_youtube_altered_content === true,
       global_youtube_made_for_kids: global_youtube_made_for_kids === 'true' || global_youtube_made_for_kids === true,
       rtmp_url: rtmp_url || null,
-      stream_key: stream_key || null
+      stream_key: stream_key || null,
+      auto_extend: auto_extend === 'true' || auto_extend === true || auto_extend === '1' || auto_extend === 1,
+      auto_extend_min_viewers: parseInt(auto_extend_min_viewers, 10) || 10,
+      auto_extend_duration: parseInt(auto_extend_duration, 10) || 30,
+      auto_extend_count: 0,
+      auto_extend_max: parseInt(auto_extend_max, 10) || 0,
+      auto_redirect: auto_redirect === 'true' || auto_redirect === true || auto_redirect === '1' || auto_redirect === 1,
+      auto_redirect_min_viewers: parseInt(auto_redirect_min_viewers, 10) || 10,
+      auto_redirect_target_stream_id: auto_redirect_target_stream_id || null
     });
 
     const uploadedFiles = req.files || [];
@@ -6577,7 +6678,12 @@ app.put('/api/rotations/:id', isAuthenticated, uploadThumbnail.any(), async (req
       return res.status(403).json({ success: false, error: 'Not authorized' });
     }
 
-    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id, global_youtube_altered_content, global_youtube_made_for_kids, rtmp_url, stream_key } = req.body;
+    const {
+      name, repeat_mode, start_time, end_time, items, youtube_channel_id,
+      global_youtube_altered_content, global_youtube_made_for_kids, rtmp_url, stream_key,
+      auto_extend, auto_extend_min_viewers, auto_extend_duration, auto_extend_max,
+      auto_redirect, auto_redirect_min_viewers, auto_redirect_target_stream_id
+    } = req.body;
 
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
 
@@ -6607,7 +6713,14 @@ app.put('/api/rotations/:id', isAuthenticated, uploadThumbnail.any(), async (req
       global_youtube_altered_content: global_youtube_altered_content === 'true' || global_youtube_altered_content === true,
       global_youtube_made_for_kids: global_youtube_made_for_kids === 'true' || global_youtube_made_for_kids === true,
       rtmp_url: rtmp_url || null,
-      stream_key: stream_key || null
+      stream_key: stream_key || null,
+      auto_extend: auto_extend === 'true' || auto_extend === true || auto_extend === '1' || auto_extend === 1,
+      auto_extend_min_viewers: parseInt(auto_extend_min_viewers, 10) || 10,
+      auto_extend_duration: parseInt(auto_extend_duration, 10) || 30,
+      auto_extend_max: parseInt(auto_extend_max, 10) || 0,
+      auto_redirect: auto_redirect === 'true' || auto_redirect === true || auto_redirect === '1' || auto_redirect === 1,
+      auto_redirect_min_viewers: parseInt(auto_redirect_min_viewers, 10) || 10,
+      auto_redirect_target_stream_id: auto_redirect_target_stream_id || null
     }, req.session.userId);
 
     const existingItems = await Rotation.getItemsByRotationId(req.params.id);
@@ -6750,7 +6863,7 @@ app.get('/order', async (req, res) => {
   const selectedPackage = packages[pkg] || packages['pemula'];
   
   res.render('order', {
-    title: 'Order Layanan PEJUANG MONET',
+    title: 'Order Layanan LIVORA',
     package: selectedPackage,
     pkgId: pkg,
     adminWa: pricingSettings.adminWa

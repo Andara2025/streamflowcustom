@@ -15,6 +15,8 @@ class Rotation {
     row.is_loop = row.is_loop === 1 || row.is_loop === true;
     row.global_youtube_altered_content = row.global_youtube_altered_content === 1 || row.global_youtube_altered_content === true;
     row.global_youtube_made_for_kids = row.global_youtube_made_for_kids === 1 || row.global_youtube_made_for_kids === true;
+    row.auto_extend = row.auto_extend === 1 || row.auto_extend === true;
+    row.auto_redirect = row.auto_redirect === 1 || row.auto_redirect === true;
     return row;
   }
 
@@ -33,14 +35,22 @@ class Rotation {
       global_youtube_altered_content = false,
       global_youtube_made_for_kids = false,
       rtmp_url = null,
-      stream_key = null
+      stream_key = null,
+      auto_extend = false,
+      auto_extend_min_viewers = 10,
+      auto_extend_duration = 60,
+      auto_extend_count = 0,
+      auto_extend_max = 0,
+      auto_redirect = false,
+      auto_redirect_min_viewers = 10,
+      auto_redirect_target_stream_id = null
     } = rotationData;
 
     return new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO stream_rotations (id, user_id, name, gap_minutes, is_loop, status, start_time, end_time, repeat_mode, youtube_channel_id, global_youtube_altered_content, global_youtube_made_for_kids, rtmp_url, stream_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, user_id, name, gap_minutes, is_loop ? 1 : 0, status, start_time, end_time, repeat_mode, youtube_channel_id, global_youtube_altered_content ? 1 : 0, global_youtube_made_for_kids ? 1 : 0, rtmp_url, stream_key],
+        `INSERT INTO stream_rotations (id, user_id, name, gap_minutes, is_loop, status, start_time, end_time, repeat_mode, youtube_channel_id, global_youtube_altered_content, global_youtube_made_for_kids, rtmp_url, stream_key, auto_extend, auto_extend_min_viewers, auto_extend_duration, auto_extend_count, auto_extend_max, auto_redirect, auto_redirect_min_viewers, auto_redirect_target_stream_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, user_id, name, gap_minutes, is_loop ? 1 : 0, status, start_time, end_time, repeat_mode, youtube_channel_id, global_youtube_altered_content ? 1 : 0, global_youtube_made_for_kids ? 1 : 0, rtmp_url, stream_key, (auto_extend === true || auto_extend === 'true') ? 1 : 0, parseInt(auto_extend_min_viewers) || 10, parseInt(auto_extend_duration) || 60, parseInt(auto_extend_count) || 0, parseInt(auto_extend_max) || 0, (auto_redirect === true || auto_redirect === 'true') ? 1 : 0, parseInt(auto_redirect_min_viewers) || 10, auto_redirect_target_stream_id || null],
         function(err) {
           if (err) {
             console.error('Error creating rotation:', err.message);
@@ -143,9 +153,9 @@ class Rotation {
     const values = [];
 
     Object.entries(rotationData).forEach(([key, value]) => {
-      if ((key === 'is_loop' || key === 'global_youtube_altered_content' || key === 'global_youtube_made_for_kids') && (typeof value === 'boolean' || value === 'true' || value === 'false')) {
+      if ((key === 'is_loop' || key === 'global_youtube_altered_content' || key === 'global_youtube_made_for_kids' || key === 'auto_extend' || key === 'auto_redirect') && (typeof value === 'boolean' || value === 'true' || value === 'false' || value === 1 || value === 0 || value === '1' || value === '0')) {
         fields.push(`${key} = ?`);
-        values.push((value === true || value === 'true') ? 1 : 0);
+        values.push((value === true || value === 'true' || value === 1 || value === '1') ? 1 : 0);
       } else {
         fields.push(`${key} = ?`);
         values.push(value);

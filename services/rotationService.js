@@ -8,7 +8,7 @@ const { google } = require('googleapis');
 const { encrypt, decrypt } = require('../utils/encryption');
 const path = require('path');
 const fs = require('fs');
-const { syncBroadcastMonetization, sanitizeYouTubeTags } = require('./youtubeService');
+const { syncBroadcastMonetization, sanitizeYouTubeTags, getLiveViewerCount, sendLiveChatMessage } = require('./youtubeService');
 
 const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
@@ -287,11 +287,98 @@ async function checkRotations() {
       }
 
       if (now >= scheduledEnd) {
-        console.log(`[RotationService] Rotation ${rotation.name} time window has ended (end: ${rotation.end_time}, now: ${now.toLocaleString()})`);
+        console.log(`[RotationService] Rotation ${rotation.name} time window has reached end (end: ${rotation.end_time}, now: ${now.toLocaleString()})`);
 
         const currentItem = items[currentIndex];
+        const streamKey = currentItem ? `${rotation.id}_${currentItem.id}` : null;
+        const streamInfo = streamKey ? activeRotationStreams.get(streamKey) : null;
+        let streamId = streamInfo ? streamInfo.streamId : null;
+
+        // Auto-Extend Evaluation: perpanjang durasi jika penonton aktif masih melampaui ambang batas
+        const isAutoExtendEnabled = rotation.auto_extend === 1 || rotation.auto_extend === true || rotation.auto_extend === '1';
+        const maxExtends = parseInt(rotation.auto_extend_max, 10) || 0;
+        const currentExtends = parseInt(rotation.auto_extend_count, 10) || 0;
+
+        if (isAutoExtendEnabled && streamId && (maxExtends === 0 || currentExtends < maxExtends)) {
+          try {
+            const minViewers = parseInt(rotation.auto_extend_min_viewers, 10) || 10;
+            const liveViewers = await getLiveViewerCount(streamId);
+
+            if (liveViewers !== null && liveViewers >= minViewers) {
+              const extendDurationMinutes = parseInt(rotation.auto_extend_duration, 10) || 30;
+              const newEndTime = new Date(scheduledEnd.getTime() + extendDurationMinutes * 60 * 1000);
+              const newEndTimeStr = formatLocalDateTime(newEndTime);
+              const updatedExtendCount = currentExtends + 1;
+
+              console.log(`[RotationService] 🚀 Auto-extending rotation "${rotation.name}" by ${extendDurationMinutes}m. Current viewers: ${liveViewers} >= ${minViewers} (Extends: ${updatedExtendCount}/${maxExtends || '∞'})`);
+
+              await Rotation.update(rotation.id, {
+                end_time: newEndTimeStr,
+                auto_extend_count: updatedExtendCount
+              }, rotation.user_id);
+
+              await Stream.update(streamId, {
+                end_time: newEndTimeStr,
+                auto_extend_count: updatedExtendCount
+              }, rotation.user_id);
+
+              rotation.end_time = newEndTimeStr;
+              rotation.auto_extend_count = updatedExtendCount;
+
+              try {
+                await sendLiveChatMessage(
+                  streamId,
+                  `📢 Siaran diperpanjang ${extendDurationMinutes} menit karena antusiasme penonton (${liveViewers} penonton aktif)! Terima kasih tetap setia menyaksikan.`
+                );
+              } catch (chatErr) {
+                console.error('[RotationService] Gagal kirim chat extend:', chatErr.message);
+              }
+
+              try {
+                await Notification.create({
+                  user_id: rotation.user_id,
+                  type: 'info',
+                  title: `Rotasi Diperpanjang Otomatis: ${rotation.name}`,
+                  message: `Rotasi "${rotation.name}" otomatis diperpanjang ${extendDurationMinutes} menit hingga ${newEndTimeStr} (Penonton aktif: ${liveViewers}).`,
+                  metadata: { rotationId: rotation.id, viewers: liveViewers, newEndTime: newEndTimeStr }
+                });
+              } catch (nErr) {
+                console.error('[RotationService] Gagal buat notif auto-extend:', nErr.message);
+              }
+
+              // Perpanjangan berhasil, jangan stop stream
+              continue;
+            } else {
+              console.log(`[RotationService] Auto-extend tidak aktif: viewers=${liveViewers}, target=${minViewers}`);
+            }
+          } catch (extendErr) {
+            console.error(`[RotationService] Gagal evaluasi auto-extend:`, extendErr.message);
+          }
+        }
+
+        // Auto-Redirect / Pengalihan Penonton via Live Chat sebelum stream dihentikan
+        const isAutoRedirectEnabled = rotation.auto_redirect === 1 || rotation.auto_redirect === true || rotation.auto_redirect === '1';
+        if (isAutoRedirectEnabled && streamId) {
+          try {
+            const redirectMinViewers = parseInt(rotation.auto_redirect_min_viewers, 10) || 1;
+            const currentViewers = await getLiveViewerCount(streamId);
+            if (currentViewers === null || currentViewers >= redirectMinViewers) {
+              let redirectMessage = `📢 Terima kasih telah menyaksikan siaran kami! Siaran ini akan segera berakhir.`;
+              if (rotation.auto_redirect_target_stream_id) {
+                const targetStream = await Stream.findById(rotation.auto_redirect_target_stream_id);
+                if (targetStream && targetStream.youtube_broadcast_id) {
+                  redirectMessage += ` Silakan beralih ke live stream berikutnya di: https://youtu.be/${targetStream.youtube_broadcast_id}`;
+                }
+              }
+              await sendLiveChatMessage(streamId, redirectMessage);
+              await delay(3000); // Beri jeda 3 detik agar chat sempat tersampaikan
+            }
+          } catch (redirErr) {
+            console.error('[RotationService] Gagal kirim chat redirect:', redirErr.message);
+          }
+        }
+
         if (currentItem) {
-          const streamKey = `${rotation.id}_${currentItem.id}`;
           if (activeRotationStreams.has(streamKey)) {
             await stopRotationStream(rotation, currentItem);
             activeRotationStreams.delete(streamKey);
@@ -299,7 +386,6 @@ async function checkRotations() {
             await Rotation.update(rotation.id, { status: 'active' }, rotation.user_id);
           } else {
             // Map memori bisa hilang habis restart PM2: sapu DB agar tidak molor
-            // berjam-jam (kasus jam 10-11 molor sampai siang).
             try {
               const { db } = require('../db/database');
               const liveRotStreams = await new Promise((resolve) => {
@@ -308,8 +394,16 @@ async function checkRotations() {
                 });
               });
               for (const ls of liveRotStreams) {
-                console.log(`[RotationService] Sweep overdue rotation stream ${ls.id} ("${ls.title}")`);
-                await streamingService.stopStream(ls.id);
+                // Filter cerdas: hanya sapu stream yang memang milik channel/rotasi ini dan end_time-nya sudah terlewati
+                const streamEnd = ls.end_time ? new Date(ls.end_time) : null;
+                const isMatchingChannel = ls.youtube_channel_id && rotation.youtube_channel_id ? (ls.youtube_channel_id === rotation.youtube_channel_id) : true;
+                const isMatchingTitle = currentItem && ls.title === currentItem.title;
+                const isOverdue = streamEnd ? (now.getTime() >= streamEnd.getTime()) : true;
+
+                if (isMatchingChannel && isMatchingTitle && isOverdue) {
+                  console.log(`[RotationService] Sweep overdue rotation stream ${ls.id} ("${ls.title}")`);
+                  await streamingService.stopStream(ls.id);
+                }
               }
             } catch (sweepErr) {
               console.error(`[RotationService] Sweep overdue gagal: ${sweepErr.message}`);
@@ -319,18 +413,20 @@ async function checkRotations() {
         }
 
         if (rotation.repeat_mode && rotation.repeat_mode !== 'none') {
-          // Window ended -> reschedule for next cycle
+          // Window ended -> reschedule for next cycle (reset auto_extend_count)
           const nextSchedule = getNextSchedule(rotation);
           await Rotation.update(rotation.id, {
             current_index: 0,
             start_time: formatLocalDateTime(nextSchedule.start),
             end_time: formatLocalDateTime(nextSchedule.end),
+            auto_extend_count: 0,
             status: 'active'
           }, rotation.user_id);
           console.log(`[RotationService] Time window ended. Rescheduled rotation ${rotation.name} for ${formatLocalDateTime(nextSchedule.start)}`);
         } else {
           await Rotation.update(rotation.id, {
             current_index: 0,
+            auto_extend_count: 0,
             status: 'completed'
           }, rotation.user_id);
           console.log(`[RotationService] Time window ended. Rotation ${rotation.name} completed (non-repeating)`);
@@ -513,7 +609,12 @@ async function startRotationStream(rotation, item) {
         is_youtube_api: false,
         schedule_time: rotation.start_time,
         end_time: rotation.end_time,
-        is_rotation: true
+        is_rotation: true,
+        auto_extend: rotation.auto_extend === 1 || rotation.auto_extend === true || rotation.auto_extend === '1',
+        auto_extend_min_viewers: rotation.auto_extend_min_viewers || 10,
+        auto_extend_duration: rotation.auto_extend_duration || 30,
+        auto_extend_count: rotation.auto_extend_count || 0,
+        auto_extend_max: rotation.auto_extend_max || 0
       });
 
       const startResult = await streamingService.startStream(stream.id);
@@ -599,10 +700,27 @@ async function startRotationStream(rotation, item) {
         is_youtube_api: true,
         schedule_time: rotation.start_time,
         end_time: rotation.end_time,
-        is_rotation: true
+        is_rotation: true,
+        auto_extend: rotation.auto_extend === 1 || rotation.auto_extend === true || rotation.auto_extend === '1',
+        auto_extend_min_viewers: rotation.auto_extend_min_viewers || 10,
+        auto_extend_duration: rotation.auto_extend_duration || 30,
+        auto_extend_count: rotation.auto_extend_count || 0,
+        auto_extend_max: rotation.auto_extend_max || 0,
+        auto_redirect: rotation.auto_redirect === 1 || rotation.auto_redirect === true || rotation.auto_redirect === '1',
+        auto_redirect_min_viewers: rotation.auto_redirect_min_viewers || 10,
+        auto_redirect_target_stream_id: rotation.auto_redirect_target_stream_id || null
       });
     } else {
       console.log(`[RotationService] Found existing local stream record ${stream.id} for rotation item "${item.title}". Will attempt reuse.`);
+      await Stream.update(stream.id, {
+        auto_extend: rotation.auto_extend === 1 || rotation.auto_extend === true || rotation.auto_extend === '1' ? 1 : 0,
+        auto_extend_min_viewers: rotation.auto_extend_min_viewers || 10,
+        auto_extend_duration: rotation.auto_extend_duration || 30,
+        auto_extend_max: rotation.auto_extend_max || 0,
+        auto_redirect: rotation.auto_redirect === 1 || rotation.auto_redirect === true || rotation.auto_redirect === '1' ? 1 : 0,
+        auto_redirect_min_viewers: rotation.auto_redirect_min_viewers || 10,
+        auto_redirect_target_stream_id: rotation.auto_redirect_target_stream_id || null
+      }, rotation.user_id);
     }
 
     const startResult = await streamingService.startStream(stream.id);

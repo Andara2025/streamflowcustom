@@ -79,6 +79,12 @@
             <% } else if (rotation.repeat_mode === 'monthly') { %>
             <span class="text-[10px] text-orange-400">Monthly</span>
             <% } %>
+            <% if (rotation.auto_extend) { %>
+            <span class="text-gray-600 text-[10px]">•</span>
+            <span class="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-medium" title="Smart Auto-Extend jika penonton >= <%= rotation.auto_extend_min_viewers || 10 %>">
+              <i class="ti ti-flame text-[9px]"></i>Extend (<%= rotation.auto_extend_min_viewers || 10 %>+)
+            </span>
+            <% } %>
           </div>
         </div>
       </div>
@@ -210,6 +216,13 @@
               <div class="text-xs text-green-500 font-medium">End: <%= new Date(rotation.end_time).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: false}) %></div>
             <% } else { %>
               <div class="text-sm text-gray-400">--</div>
+            <% } %>
+            <% if (rotation.auto_extend) { %>
+              <div class="mt-1">
+                <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-medium" title="Smart Auto-Extend jika penonton >= <%= rotation.auto_extend_min_viewers || 10 %>">
+                  <i class="ti ti-flame text-[10px]"></i>Auto-Extend (<%= rotation.auto_extend_min_viewers || 10 %>+)
+                </span>
+              </div>
             <% } %>
           </td>
           <td class="px-6 py-4">
@@ -508,6 +521,62 @@
               <p class="text-xs text-gray-400 leading-relaxed border-t border-gray-700/50 pt-2">
                 Set global defaults for YouTube API disclosure settings.
               </p>
+            </div>
+          </div>
+
+          <!-- Smart Audience Automation for Rotation -->
+          <div class="mt-4 p-4 rounded-xl bg-dark-900 border border-gray-700/80 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="ti ti-flame text-primary text-base"></i>
+                <span class="text-sm font-medium text-white">Smart Audience Automation</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-rose-300 border border-primary/30 font-medium">Auto-Extend</span>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="rotationAutoExtendCheckbox" name="autoExtend" class="sr-only peer" onchange="toggleAutoExtendFields('rotationAutoExtendCheckbox', 'rotationAutoExtendOptionsGroup')">
+                <div class="w-11 h-6 bg-dark-700 rounded-full peer peer-checked:bg-primary"></div>
+                <div class="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition-all peer-checked:translate-x-5"></div>
+              </label>
+            </div>
+            <p class="text-xs text-gray-400">Otomatis memperpanjang jam tayang rotasi jika penonton aktif di YouTube masih ramai saat waktu siaran mau habis.</p>
+
+            <div id="rotationAutoExtendOptionsGroup" class="hidden space-y-3 pt-2 border-t border-gray-800">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Minimal Penonton</label>
+                  <div class="relative">
+                    <input type="number" id="rotationAutoExtendMinViewers" name="autoExtendMinViewers" min="1" value="10"
+                      class="w-full h-[38px] pl-8 pr-3 bg-dark-700 border border-gray-600 rounded-lg text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary">
+                    <i class="ti ti-users absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Perpanjang Durasi</label>
+                  <div class="relative">
+                    <input type="number" id="rotationAutoExtendDuration" name="autoExtendDuration" min="15" step="15" value="60"
+                      class="w-full h-[38px] pl-8 pr-12 bg-dark-700 border border-gray-600 rounded-lg text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary">
+                    <i class="ti ti-clock absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">menit</span>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Batas Maks Perpanjang</label>
+                  <select id="rotationAutoExtendMax" name="autoExtendMax"
+                    class="w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary">
+                    <option value="0" selected>Tanpa Batas (Looping)</option>
+                    <option value="1">Maks. 1x Perpanjang</option>
+                    <option value="2">Maks. 2x Perpanjang</option>
+                    <option value="3">Maks. 3x Perpanjang</option>
+                    <option value="5">Maks. 5x Perpanjang</option>
+                  </select>
+                </div>
+              </div>
+              <div class="pt-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="rotationAutoRedirectCheckbox" name="autoRedirect" class="rounded border-gray-600 text-primary focus:ring-primary bg-dark-700">
+                  <span class="text-xs text-gray-300">Kirim pengumuman di Live Chat saat jam rotasi berakhir (Auto-Redirect Announcement)</span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -966,6 +1035,17 @@ window.onRepeatModeChange = function() {
   updateCalculatedStartDate();
 };
 
+function toggleAutoExtendFields(checkboxId, targetGroupId) {
+  const cb = document.getElementById(checkboxId);
+  const grp = document.getElementById(targetGroupId);
+  if (!cb || !grp) return;
+  if (cb.checked) {
+    grp.classList.remove('hidden');
+  } else {
+    grp.classList.add('hidden');
+  }
+}
+
 function openCreateRotationModal() {
   const modal = document.getElementById('createRotationModal');
   document.getElementById('rotationModalTitle').textContent = 'Create New Rotation';
@@ -973,6 +1053,17 @@ function openCreateRotationModal() {
   document.getElementById('rotationId').value = '';
   document.getElementById('rotationDurationBadge').textContent = 'Duration: 00:00';
   document.getElementById('globalMonetization').checked = false;
+
+  const autoExtCb = document.getElementById('rotationAutoExtendCheckbox');
+  if (autoExtCb) {
+    autoExtCb.checked = false;
+    const optGrp = document.getElementById('rotationAutoExtendOptionsGroup');
+    if (optGrp) optGrp.classList.add('hidden');
+    document.getElementById('rotationAutoExtendMinViewers').value = '10';
+    document.getElementById('rotationAutoExtendDuration').value = '60';
+    document.getElementById('rotationAutoExtendMax').value = '0';
+    document.getElementById('rotationAutoRedirectCheckbox').checked = false;
+  }
   
   if (document.getElementById('rotationDestinationType')) {
     document.getElementById('rotationDestinationType').value = 'youtube';
@@ -1598,6 +1689,16 @@ async function saveRotation() {
   formData.append('stream_key', destinationType === 'custom' ? streamKey : '');
   formData.append('global_youtube_altered_content', globalAlteredContent);
   formData.append('global_youtube_made_for_kids', globalMadeForKids);
+  
+  const isAutoExtend = document.getElementById('rotationAutoExtendCheckbox')?.checked ? 'true' : 'false';
+  formData.append('auto_extend', isAutoExtend);
+  formData.append('auto_extend_min_viewers', document.getElementById('rotationAutoExtendMinViewers')?.value || '10');
+  formData.append('auto_extend_duration', document.getElementById('rotationAutoExtendDuration')?.value || '60');
+  formData.append('auto_extend_max', document.getElementById('rotationAutoExtendMax')?.value || '0');
+  const isAutoRedirect = document.getElementById('rotationAutoRedirectCheckbox')?.checked ? 'true' : 'false';
+  formData.append('auto_redirect', isAutoRedirect);
+  formData.append('auto_redirect_min_viewers', document.getElementById('rotationAutoExtendMinViewers')?.value || '10');
+  
   formData.append('items', JSON.stringify(items));
   
   try {
@@ -1706,6 +1807,21 @@ async function editRotation(id) {
         document.getElementById('globalMonetization').checked = false;
         document.querySelector('input[name="globalAlteredContent"][value="false"]').checked = true;
         document.querySelector('input[name="globalMadeForKids"][value="false"]').checked = true;
+      }
+
+      const autoExtCb = document.getElementById('rotationAutoExtendCheckbox');
+      if (autoExtCb) {
+        const isAutoExt = rotation.auto_extend === 1 || rotation.auto_extend === true || rotation.auto_extend === '1';
+        autoExtCb.checked = isAutoExt;
+        const optGrp = document.getElementById('rotationAutoExtendOptionsGroup');
+        if (optGrp) {
+          if (isAutoExt) optGrp.classList.remove('hidden');
+          else optGrp.classList.add('hidden');
+        }
+        document.getElementById('rotationAutoExtendMinViewers').value = rotation.auto_extend_min_viewers || 10;
+        document.getElementById('rotationAutoExtendDuration').value = rotation.auto_extend_duration || 60;
+        document.getElementById('rotationAutoExtendMax').value = rotation.auto_extend_max !== undefined ? rotation.auto_extend_max : 0;
+        document.getElementById('rotationAutoRedirectCheckbox').checked = rotation.auto_redirect === 1 || rotation.auto_redirect === true || rotation.auto_redirect === '1';
       }
       
       if (rotation.rtmp_url && rotation.stream_key && !rotation.youtube_channel_id) {

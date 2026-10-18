@@ -78,7 +78,7 @@ class AppSettings {
       console.error('Error parsing pricing settings:', e);
     }
     return {
-      adminWa: '6285262882706',
+      adminWa: '6285259787016',
       packages: {
         tester: { name: 'Paket Tester', price: '15000', live: '1', storage: '1', label: '15.000', recommended: false },
         pemula: { name: 'Paket Pemula', price: '25000', live: '2', storage: '2', label: '25.000', recommended: false },

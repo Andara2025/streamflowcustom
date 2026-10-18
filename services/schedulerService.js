@@ -87,6 +87,50 @@ async function checkStreamDurations() {
       const timeUntilEnd = endTime.getTime() - now.getTime();
       const overdueMin = Math.round(-timeUntilEnd / 60000);
 
+      // --- SMART AUDIENCE AUTOMATION (AUTO-EXTEND & REDIRECT) ---
+      if (stream.auto_extend && timeUntilEnd <= 60000) {
+        try {
+          const { getLiveViewerCount, sendLiveChatMessage } = require('./youtubeService');
+          const viewers = await getLiveViewerCount(stream);
+          const minViewers = stream.auto_extend_min_viewers || 10;
+          const maxExtends = stream.auto_extend_max || 0;
+          const currentExtends = stream.auto_extend_count || 0;
+
+          if (viewers !== null && viewers >= minViewers && (maxExtends === 0 || currentExtends < maxExtends)) {
+            const extendMinutes = stream.auto_extend_duration || 60;
+            const newEndTime = new Date(now.getTime() + extendMinutes * 60000).toISOString();
+            const newCount = currentExtends + 1;
+
+            console.log(`[Scheduler] 🚀 AUTO-EXTEND TRIGGERED for stream ${stream.id} ("${stream.title}"): Viewers = ${viewers} (min: ${minViewers}). Extending by ${extendMinutes} mins to ${newEndTime} (Extension #${newCount})`);
+
+            await Stream.update(stream.id, {
+              end_time: newEndTime,
+              auto_extend_count: newCount,
+              loop_video: true
+            });
+
+            scheduledTerminations.delete(stream.id);
+
+            if (stream.is_youtube_api) {
+              await sendLiveChatMessage(stream, `🎉 Siaran live diperpanjang otomatis +${extendMinutes} menit karena antusiasme penonton! Tetap nikmati tayangannya.`);
+            }
+
+            continue;
+          } else {
+            if (viewers !== null) {
+              console.log(`[Scheduler] Auto-extend not triggered for stream ${stream.id}: Viewers = ${viewers} (required: >= ${minViewers})`);
+            }
+            if (stream.auto_redirect && (viewers === null || viewers >= (stream.auto_redirect_min_viewers || 10))) {
+              if (stream.is_youtube_api) {
+                await sendLiveChatMessage(stream, `📢 Live streaming ini akan segera berakhir. Terima kasih banyak atas kehadiran Anda!`);
+              }
+            }
+          }
+        } catch (autoErr) {
+          console.error(`[Scheduler] Error evaluating auto-extend for stream ${stream.id}:`, autoErr.message);
+        }
+      }
+
       if (timeUntilEnd <= 0) {
         // HARD STOP: jadwal sudah lewat -> wajib mati sekarang, bukan besok.
         // Kasus "start jam 10 end jam 11 molor sampai siang" terjadi karena
@@ -126,7 +170,7 @@ async function checkStreamDurations() {
             }
           } catch (_) {}
         }
-      } else if (timeUntilEnd <= 60000 && !scheduledTerminations.has(stream.id)) {
+      } else if (timeUntilEnd <= 60000 && !scheduledTerminations.has(stream.id) && !stream.auto_extend) {
         scheduleStreamTermination(stream.id, timeUntilEnd / 60000, stream.user_id);
       }
     }
@@ -158,6 +202,12 @@ function scheduleStreamTermination(streamId, durationMinutes, userId = null) {
     try {
       const stream = await Stream.findById(streamId);
       if (!stream || stream.status !== 'live') {
+        scheduledTerminations.delete(streamId);
+        return;
+      }
+
+      if (stream.auto_extend) {
+        // Biarkan checkStreamDurations yang memproses auto-extend
         scheduledTerminations.delete(streamId);
         return;
       }
