@@ -6863,7 +6863,7 @@ app.get('/order', async (req, res) => {
   const selectedPackage = packages[pkg] || packages['pemula'];
   
   res.render('order', {
-    title: 'Order Layanan LIVORA',
+    title: 'Order Layanan PEJUANG MONET',
     package: selectedPackage,
     pkgId: pkg,
     adminWa: pricingSettings.adminWa
