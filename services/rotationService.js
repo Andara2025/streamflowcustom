@@ -798,9 +798,16 @@ async function stopRotationStream(rotation, item) {
 
 async function activateRotation(rotationId) {
   try {
-    const rotation = await Rotation.findById(rotationId);
+    const rotation = await Rotation.findByIdWithItems(rotationId);
     if (!rotation) {
       return { success: false, error: 'Rotation not found' };
+    }
+
+    // Bersihkan tracking kegagalan sebelumnya agar bisa start fresh
+    for (const item of (rotation.items || [])) {
+      const streamKey = `${rotationId}_${item.id}`;
+      failedRotationStarts.delete(streamKey);
+      loggedAlreadyRunning.delete(streamKey);
     }
 
     const now = new Date();
@@ -829,14 +836,36 @@ async function pauseRotation(rotationId) {
     const rotation = await Rotation.findByIdWithItems(rotationId);
     if (!rotation) return { success: false, error: 'Rotation not found' };
 
-    for (const item of rotation.items) {
+    for (const item of (rotation.items || [])) {
       const streamKey = `${rotationId}_${item.id}`;
-      if (activeRotationStreams.has(streamKey)) {
+      try {
         await stopRotationStream(rotation, item);
-        activeRotationStreams.delete(streamKey);
-        loggedAlreadyRunning.delete(streamKey);
+      } catch (e) {
+        console.warn(`[RotationService] Error pausing item ${item.title}:`, e.message);
       }
+      activeRotationStreams.delete(streamKey);
+      loggedAlreadyRunning.delete(streamKey);
       failedRotationStarts.delete(streamKey);
+    }
+
+    // SAPU DB: Pastikan semua stream live yang terkait rotasi/channel ini di-stop
+    try {
+      const { db } = require('../db/database');
+      const liveStreams = await new Promise((resolve) => {
+        db.all('SELECT * FROM streams WHERE user_id = ? AND is_rotation = 1 AND status = ?', [rotation.user_id, 'live'], (err, rows) => {
+          resolve(rows || []);
+        });
+      });
+      for (const ls of liveStreams) {
+        const isMatchChannel = rotation.youtube_channel_id && ls.youtube_channel_id ? (rotation.youtube_channel_id === ls.youtube_channel_id) : false;
+        const isMatchItem = (rotation.items || []).some(it => it.title === ls.title);
+        if (isMatchChannel || isMatchItem) {
+          console.log(`[RotationService] Force stopping lingering rotation stream ${ls.id} ("${ls.title}")`);
+          await streamingService.stopStream(ls.id);
+        }
+      }
+    } catch (sweepErr) {
+      console.warn('[RotationService] Sweep error during pauseRotation:', sweepErr.message);
     }
 
     await Rotation.update(rotationId, { status: 'paused' }, rotation.user_id);
@@ -852,14 +881,36 @@ async function stopRotation(rotationId) {
     const rotation = await Rotation.findByIdWithItems(rotationId);
     if (!rotation) return { success: false, error: 'Rotation not found' };
 
-    for (const item of rotation.items) {
+    for (const item of (rotation.items || [])) {
       const streamKey = `${rotationId}_${item.id}`;
-      if (activeRotationStreams.has(streamKey)) {
+      try {
         await stopRotationStream(rotation, item);
-        activeRotationStreams.delete(streamKey);
-        loggedAlreadyRunning.delete(streamKey);
+      } catch (e) {
+        console.warn(`[RotationService] Error stopping item ${item.title}:`, e.message);
       }
+      activeRotationStreams.delete(streamKey);
+      loggedAlreadyRunning.delete(streamKey);
       failedRotationStarts.delete(streamKey);
+    }
+
+    // SAPU DB: Pastikan semua stream live yang terkait rotasi/channel ini di-stop tuntas
+    try {
+      const { db } = require('../db/database');
+      const liveStreams = await new Promise((resolve) => {
+        db.all('SELECT * FROM streams WHERE user_id = ? AND is_rotation = 1 AND status = ?', [rotation.user_id, 'live'], (err, rows) => {
+          resolve(rows || []);
+        });
+      });
+      for (const ls of liveStreams) {
+        const isMatchChannel = rotation.youtube_channel_id && ls.youtube_channel_id ? (rotation.youtube_channel_id === ls.youtube_channel_id) : false;
+        const isMatchItem = (rotation.items || []).some(it => it.title === ls.title);
+        if (isMatchChannel || isMatchItem) {
+          console.log(`[RotationService] Force stopping lingering rotation stream ${ls.id} ("${ls.title}")`);
+          await streamingService.stopStream(ls.id);
+        }
+      }
+    } catch (sweepErr) {
+      console.warn('[RotationService] Sweep error during stopRotation:', sweepErr.message);
     }
 
     await Rotation.update(rotationId, { status: 'inactive', current_index: 0 }, rotation.user_id);
