@@ -3350,7 +3350,7 @@ app.post('/settings/pricing', isAuthenticated, isAdmin, async (req, res) => {
     };
     
     await AppSettings.setPricingSettings({
-      adminWa: req.body.adminWa || '6285259787016',
+      adminWa: req.body.adminWa || '6285262882706',
       packages: packages
     });
     
