@@ -4208,6 +4208,15 @@ async function processMediafireImport(jobId, fileKey, userId, folderId = null) {
       const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
       if (!specCheck.valid) {
         if (fs.existsSync(result.localFilePath)) fs.unlinkSync(result.localFilePath);
+        try {
+          const Notification = require('./models/Notification');
+          await Notification.create({
+            user_id: userId,
+            type: 'warning',
+            title: 'Import Mediafire Ditolak (Spesifikasi Melebihi Paket)',
+            message: `Video "${path.basename(result.filename)}" ditolak: ${specCheck.error}`
+          });
+        } catch (nErr) {}
         importJobs[jobId] = {
           status: 'failed',
           progress: 0,
@@ -4363,6 +4372,15 @@ async function processDropboxImport(jobId, dropboxUrl, userId, folderId = null) 
       const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
       if (!specCheck.valid) {
         if (fs.existsSync(result.localFilePath)) fs.unlinkSync(result.localFilePath);
+        try {
+          const Notification = require('./models/Notification');
+          await Notification.create({
+            user_id: userId,
+            type: 'warning',
+            title: 'Import Dropbox Ditolak (Spesifikasi Melebihi Paket)',
+            message: `Video "${path.basename(result.filename)}" ditolak: ${specCheck.error}`
+          });
+        } catch (nErr) {}
         importJobs[jobId] = {
           status: 'failed',
           progress: 0,
@@ -4518,6 +4536,15 @@ async function processMegaImport(jobId, megaUrl, userId, folderId = null) {
       const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
       if (!specCheck.valid) {
         if (fs.existsSync(result.localFilePath)) fs.unlinkSync(result.localFilePath);
+        try {
+          const Notification = require('./models/Notification');
+          await Notification.create({
+            user_id: userId,
+            type: 'warning',
+            title: 'Import MEGA Ditolak (Spesifikasi Melebihi Paket)',
+            message: `Video "${path.basename(result.filename)}" ditolak: ${specCheck.error}`
+          });
+        } catch (nErr) {}
         importJobs[jobId] = {
           status: 'failed',
           progress: 0,
