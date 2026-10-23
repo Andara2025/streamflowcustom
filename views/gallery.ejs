@@ -1234,8 +1234,23 @@ function showImportProgress(jobId) {
         }, 800);
       } else if (status.status === 'failed') {
         document.getElementById('progress-icon').className = 'ti ti-x text-red-400 text-2xl';
-        showToast('error', status.message || 'Import failed');
+        const failMsg = status.message || 'Import failed';
+        const statusEl = document.getElementById('progress-status');
+        if (statusEl) statusEl.textContent = failMsg;
+        showToast('error', failMsg);
         clearInterval(interval);
+        setTimeout(() => {
+          const importModal = document.getElementById('import-progress-modal');
+          if (importModal) importModal.remove();
+          createModalDialog({
+            type: 'danger',
+            icon: 'ti-alert-octagon',
+            title: 'Import Video Gagal / Ditolak',
+            message: `${failMsg}\n\nDetail kesalahan juga telah tercatat di Lonceng Notifikasi Anda.`,
+            confirmText: 'Tutup',
+            confirmClass: 'bg-primary hover:bg-rose-600'
+          });
+        }, 1500);
       }
     } catch (e) { console.error(e); }
   }, 1000);
@@ -1648,20 +1663,26 @@ document.addEventListener('DOMContentLoaded', function() {
           success++;
           updateFileProgress(i, 'success', 100);
         } else {
-          failed.push(file.name);
+          failed.push({ name: file.name, error: result.error || 'Ditolak sistem' });
           updateFileProgress(i, 'error', 0, result.error);
-          showToast('error', `Gagal upload ${file.name}: ${result.error || 'Terjadi kesalahan'}`);
         }
       }
 
-      if (failed.length === 0) {
-        showToast('success', `${success} file${success > 1 ? 's' : ''} uploaded successfully`);
-      } else {
-        showToast('warning', `${success} uploaded, ${failed.length} failed`);
-      }
       closeUploadModal();
       if (window.refreshGalleryData) await window.refreshGalleryData();
-      if (success > 0) {
+
+      if (failed.length > 0) {
+        const errorDetails = failed.map(f => `• ${f.name}\n  Alasan: ${f.error}`).join('\n\n');
+        createModalDialog({
+          type: 'danger',
+          icon: 'ti-alert-octagon',
+          title: 'Upload Ditolak / Spesifikasi Melebihi Paket',
+          message: `${failed.length} video tidak dapat di-upload karena tidak sesuai paket Anda:\n\n${errorDetails}\n\nPeringatan ini juga telah dikirim ke Lonceng Notifikasi akun Anda.`,
+          confirmText: 'Mengerti',
+          confirmClass: 'bg-primary hover:bg-rose-600'
+        });
+      } else if (success > 0) {
+        showToast('success', `${success} file berhasil di-upload!`);
         setTimeout(() => window.location.reload(), 500);
       } else {
         loadDiskUsage();

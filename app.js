@@ -2568,6 +2568,15 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
       const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
       if (!specCheck.valid) {
         if (fs.existsSync(fullFilePath)) fs.unlinkSync(fullFilePath);
+        try {
+          const Notification = require('./models/Notification');
+          await Notification.create({
+            user_id: req.session.userId,
+            type: 'warning',
+            title: 'Upload Ditolak (Spesifikasi Melebihi Paket)',
+            message: `Video "${title}" ditolak: ${specCheck.error}`
+          });
+        } catch (nErr) {}
         return res.status(400).json({ success: false, error: specCheck.error });
       }
     }
@@ -2845,6 +2854,15 @@ app.post('/api/videos/chunk/complete', isAuthenticated, async (req, res) => {
       if (!specCheck.valid) {
         if (fs.existsSync(fullFilePath)) fs.unlinkSync(fullFilePath);
         await chunkUploadService.cleanupUpload(uploadId).catch(() => null);
+        try {
+          const Notification = require('./models/Notification');
+          await Notification.create({
+            user_id: req.session.userId,
+            type: 'warning',
+            title: 'Upload Ditolak (Spesifikasi Melebihi Paket)',
+            message: `Video "${title}" ditolak: ${specCheck.error}`
+          });
+        } catch (nErr) {}
         return res.status(400).json({ success: false, error: specCheck.error });
       }
     }
@@ -3965,10 +3983,23 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
         };
       });
     } catch (downloadError) {
+      let friendlyMsg = downloadError.message || 'Failed to download file';
+      if (friendlyMsg.includes('EAI_AGAIN') || friendlyMsg.includes('ENOTFOUND')) {
+        friendlyMsg = 'Koneksi server ke Google Drive mengalami gangguan jaringan/DNS timeout. Silakan coba sesaat lagi atau upload file secara langsung.';
+      }
+      try {
+        const Notification = require('./models/Notification');
+        await Notification.create({
+          user_id: userId,
+          type: 'error',
+          title: 'Import Google Drive Gagal',
+          message: friendlyMsg
+        });
+      } catch (nErr) {}
       importJobs[jobId] = {
         status: 'failed',
         progress: 0,
-        message: downloadError.message || 'Failed to download file'
+        message: friendlyMsg
       };
       setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
       return;
@@ -4014,6 +4045,15 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
       const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
       if (!specCheck.valid) {
         if (fs.existsSync(result.localFilePath)) fs.unlinkSync(result.localFilePath);
+        try {
+          const Notification = require('./models/Notification');
+          await Notification.create({
+            user_id: userId,
+            type: 'warning',
+            title: 'Import Google Drive Ditolak (Spesifikasi Melebihi Paket)',
+            message: `Video "${path.basename(result.filename)}" ditolak: ${specCheck.error}`
+          });
+        } catch (nErr) {}
         importJobs[jobId] = {
           status: 'failed',
           progress: 0,
