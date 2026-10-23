@@ -1633,8 +1633,14 @@ document.addEventListener('DOMContentLoaded', function() {
           result = useChunked ? await uploadChunked(file, i, selectedFiles.length) : await uploadSimple(file, i, selectedFiles.length);
         }
         
-        if (result.success) { success++; updateFileProgress(i, 'success', 100); }
-        else { failed.push(file.name); updateFileProgress(i, 'error', 0); }
+        if (result.success) {
+          success++;
+          updateFileProgress(i, 'success', 100);
+        } else {
+          failed.push(file.name);
+          updateFileProgress(i, 'error', 0, result.error);
+          showToast('error', `Gagal upload ${file.name}: ${result.error || 'Terjadi kesalahan'}`);
+        }
       }
 
       if (failed.length === 0) showToast('success', `${success} file${success > 1 ? 's' : ''} uploaded successfully`);
@@ -1645,13 +1651,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  function updateFileProgress(index, status, percent) {
+  function updateFileProgress(index, status, percent, errorMsg = '') {
     const items = uploadFilesList.children;
     if (items[index]) {
       const el = items[index].querySelector('.file-status');
       if (status === 'uploading') { el.textContent = `${percent}%`; el.className = 'file-status text-xs text-primary'; }
       else if (status === 'success') { el.textContent = '✓'; el.className = 'file-status text-xs text-green-400'; }
-      else if (status === 'error') { el.textContent = '✗'; el.className = 'file-status text-xs text-red-400'; }
+      else if (status === 'error') {
+        el.textContent = '✗';
+        el.className = 'file-status text-xs text-red-400';
+        if (errorMsg) el.title = errorMsg;
+      }
     }
   }
 
@@ -1669,16 +1679,25 @@ document.addEventListener('DOMContentLoaded', function() {
           uploadProgressBar.style.width = overall + '%';
           uploadProgressPercent.textContent = overall + '%';
           updateFileProgress(index, 'uploading', pct);
+          if (pct >= 100) {
+            uploadProgressStatus.textContent = `Processing ${file.name} on server...`;
+          }
         }
       });
       xhr.addEventListener('load', () => {
-        if (xhr.status === 200) {
-          try { const r = JSON.parse(xhr.responseText); resolve({ success: r.success }); }
-          catch { resolve({ success: false }); }
-        } else resolve({ success: false });
+        try {
+          const r = JSON.parse(xhr.responseText);
+          if (xhr.status === 200 && r.success) {
+            resolve({ success: true, video: r.video });
+          } else {
+            resolve({ success: false, error: r.error || r.details || 'Upload failed' });
+          }
+        } catch {
+          resolve({ success: false, error: `Upload failed (Status ${xhr.status})` });
+        }
       });
-      xhr.addEventListener('error', () => resolve({ success: false }));
-      xhr.addEventListener('timeout', () => resolve({ success: false }));
+      xhr.addEventListener('error', () => resolve({ success: false, error: 'Network error during upload' }));
+      xhr.addEventListener('timeout', () => resolve({ success: false, error: 'Upload request timed out' }));
       xhr.open('POST', '/api/videos/upload', true);
       xhr.send(formData);
     });
@@ -1752,16 +1771,21 @@ document.addEventListener('DOMContentLoaded', function() {
         updateFileProgress(index, 'uploading', pct);
       }
 
+      uploadProgressStatus.textContent = `Processing & finalizing ${file.name} on server...`;
       const complete = await fetch('/api/videos/chunk/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uploadId })
       });
       const completeData = await complete.json();
-      return { success: completeData.success };
+      if (completeData.success) {
+        return { success: true, video: completeData.video };
+      } else {
+        return { success: false, error: completeData.error || completeData.details || 'Failed to complete upload' };
+      }
     } catch (e) {
       console.error(e);
-      return { success: false };
+      return { success: false, error: e.message || 'Chunk upload failed' };
     }
   }
 

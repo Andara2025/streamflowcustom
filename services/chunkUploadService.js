@@ -124,8 +124,12 @@ async function mergeChunks(uploadId) {
   const writeStream = fs.createWriteStream(finalPath);
   for (let i = 0; i < info.totalChunks; i++) {
     const chunkPath = getChunkPath(uploadId, i);
-    const chunkData = await fs.readFile(chunkPath);
-    writeStream.write(chunkData);
+    await new Promise((resolveChunk, rejectChunk) => {
+      const readStream = fs.createReadStream(chunkPath);
+      readStream.pipe(writeStream, { end: false });
+      readStream.on('end', resolveChunk);
+      readStream.on('error', rejectChunk);
+    });
   }
   await new Promise((resolve, reject) => {
     writeStream.on('finish', resolve);

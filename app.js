@@ -97,6 +97,20 @@ try {
   globalFfmpegPath = execSync(process.platform === 'win32' ? 'where ffmpeg' : 'which ffmpeg', { stdio: 'pipe' }).toString().split('\n')[0].trim() || globalFfmpegPath;
 } catch (e) {}
 ffmpeg.setFfmpegPath(globalFfmpegPath);
+process.env.FFMPEG_PATH = globalFfmpegPath;
+
+let globalFfprobePath;
+try {
+  globalFfprobePath = require('@ffprobe-installer/ffprobe').path;
+} catch (e) {}
+try {
+  const systemFfprobe = execSync(process.platform === 'win32' ? 'where ffprobe' : 'which ffprobe', { stdio: 'pipe' }).toString().split('\n')[0].trim();
+  if (systemFfprobe) globalFfprobePath = systemFfprobe;
+} catch (e) {}
+if (globalFfprobePath) {
+  ffmpeg.setFfprobePath(globalFfprobePath);
+  process.env.FFPROBE_PATH = globalFfprobePath;
+}
 process.on('unhandledRejection', (reason, promise) => {
   console.error('-----------------------------------');
   console.error('UNHANDLED REJECTION AT:', promise);
@@ -1887,9 +1901,14 @@ app.get('/api/system-stats', isAuthenticated, async (req, res) => {
   }
 });
 function validateVideoSpecs(metadata, pkg = 'tester') {
-  if (!metadata || !metadata.streams) return { valid: false, error: 'Metadata video tidak valid.' };
-  const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-  if (!videoStream) return { valid: false, error: 'Tidak ditemukan stream video.' };
+  if (!metadata || !metadata.streams) return { valid: true };
+  const videoStream = (metadata.streams || []).find(s => s.codec_type === 'video');
+  if (!videoStream) return { valid: true };
+
+  // Admin bypass all restrictions
+  if (pkg === 'admin' || pkg === 'custom') {
+    return { valid: true };
+  }
 
   let maxFps = 30;
   let maxBitrate = 5000;
@@ -1902,21 +1921,19 @@ function validateVideoSpecs(metadata, pkg = 'tester') {
     maxWidth = 1280;
     maxResStr = '720p';
     maxBitrate = 5000;
+    maxFps = 30;
   } else if (pkg === 'expert') {
     maxHeight = 1080;
     maxWidth = 1920;
     maxResStr = '1080p';
-    maxBitrate = 6000;
+    maxBitrate = 6500;
+    maxFps = 60;
   } else if (pkg === 'master') {
     maxHeight = 1080;
     maxWidth = 1920;
     maxResStr = '1080p';
-    maxBitrate = 6500;
-  } else if (pkg === 'custom' || pkg === 'admin') {
-    maxHeight = 1080;
-    maxWidth = 1920;
-    maxResStr = '1080p';
-    maxBitrate = 6500;
+    maxBitrate = 8000;
+    maxFps = 60;
   }
 
   const width = videoStream.width || 0;
@@ -2522,77 +2539,50 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
     const filePath = `/uploads/videos/${req.file.filename}`;
     const fullFilePath = path.join(__dirname, 'public', filePath);
     const fileSize = req.file.size;
-    await new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(fullFilePath, (err, metadata) => {
-        if (err) {
-          console.error('Error extracting metadata:', err);
-          return reject(err);
-        }
-        const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-        const duration = metadata.format.duration || 0;
-        const format = metadata.format.format_name || '';
-        const resolution = videoStream ? `${videoStream.width}x${videoStream.height}` : '';
-        const bitrate = metadata.format.bit_rate ?
-          Math.round(parseInt(metadata.format.bit_rate) / 1000) :
-          null;
-        let fps = null;
-        if (videoStream && videoStream.avg_frame_rate) {
-          const fpsRatio = videoStream.avg_frame_rate.split('/');
-          if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
-            fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
-          } else {
-            fps = parseInt(fpsRatio[0]) || null;
-          }
-        }
-        
-        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
-        if (!specCheck.valid) {
-          const fs = require('fs');
-          if (fs.existsSync(fullFilePath)) fs.unlinkSync(fullFilePath);
-          return res.status(400).json({ success: false, error: specCheck.error });
-        }
-        const thumbnailFilename = `thumb-${path.parse(req.file.filename).name}.jpg`;
-        const thumbnailPath = `/uploads/thumbnails/${thumbnailFilename}`;
-        const fullThumbnailPath = path.join(__dirname, 'public', thumbnailPath);
-        ffmpeg(fullFilePath)
-          .screenshots({
-            timestamps: ['10%'],
-            filename: thumbnailFilename,
-            folder: path.join(__dirname, 'public', 'uploads', 'thumbnails'),
-            size: '854x480'
-          })
-          .on('end', async () => {
-            try {
-              const videoData = {
-                title,
-                filepath: filePath,
-                thumbnail_path: thumbnailPath,
-                file_size: fileSize,
-                duration,
-                format,
-                resolution,
-                bitrate,
-                fps,
-                user_id: req.session.userId,
-                folder_id: folderId
-              };
-              const video = await Video.create(videoData);
-              res.json({
-                success: true,
-                message: 'Video uploaded successfully',
-                video
-              });
-              resolve();
-            } catch (dbError) {
-              console.error('Database error:', dbError);
-              reject(dbError);
-            }
-          })
-          .on('error', (err) => {
-            console.error('Error creating thumbnail:', err);
-            reject(err);
-          });
-      });
+    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
+
+    const videoInfo = await getVideoInfo(fullFilePath);
+    if (videoInfo.rawMetadata) {
+      const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
+      if (!specCheck.valid) {
+        if (fs.existsSync(fullFilePath)) fs.unlinkSync(fullFilePath);
+        return res.status(400).json({ success: false, error: specCheck.error });
+      }
+    }
+
+    const thumbnailFilename = `thumb-${path.parse(req.file.filename).name}.jpg`;
+    let thumbnailRelativePath = null;
+    try {
+      const thumb = await generateThumbnail(fullFilePath, thumbnailFilename);
+      if (thumb) {
+        thumbnailRelativePath = `/uploads/thumbnails/${thumbnailFilename}`;
+      }
+    } catch (thumbError) {
+      console.warn('Thumbnail generation skipped (non-fatal):', thumbError.message);
+    }
+
+    let format = path.extname(req.file.filename).toLowerCase().replace('.', '') || 'mp4';
+    let resolution = (videoInfo.width && videoInfo.height) ? `${videoInfo.width}x${videoInfo.height}` : '';
+
+    const videoData = {
+      title,
+      filepath: filePath,
+      thumbnail_path: thumbnailRelativePath,
+      file_size: fileSize,
+      duration: videoInfo.duration || 0,
+      format,
+      resolution,
+      bitrate: videoInfo.bitrate ? Math.round(videoInfo.bitrate / 1000) : null,
+      fps: videoInfo.fps || null,
+      user_id: req.session.userId,
+      folder_id: folderId
+    };
+
+    const video = await Video.create(videoData);
+    return res.json({
+      success: true,
+      message: 'Video uploaded successfully',
+      video
     });
   } catch (error) {
     console.error('Upload error details:', error);
@@ -2825,65 +2815,49 @@ app.post('/api/videos/chunk/complete', isAuthenticated, async (req, res) => {
 
     const title = path.parse(info.filename).name;
     const fullFilePath = result.fullPath;
-    const videoData = await new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(fullFilePath, (err, metadata) => {
-        if (err) {
-          console.error('Error extracting metadata:', err);
-          return reject(err);
-        }
-        
-        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
-        if (!specCheck.valid) {
-          return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
-        }
+    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
 
-        const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-        const duration = metadata.format.duration || 0;
-        const format = metadata.format.format_name || '';
-        const resolution = videoStream ? `${videoStream.width}x${videoStream.height}` : '';
-        const bitrate = metadata.format.bit_rate ? Math.round(parseInt(metadata.format.bit_rate) / 1000) : null;
-        let fps = null;
-        if (videoStream && videoStream.avg_frame_rate) {
-          const fpsRatio = videoStream.avg_frame_rate.split('/');
-          if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
-            fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
-          } else {
-            fps = parseInt(fpsRatio[0]) || null;
-          }
-        }
-        const thumbnailFilename = `thumb-${path.parse(result.filename).name}.jpg`;
-        const thumbnailPath = `/uploads/thumbnails/${thumbnailFilename}`;
-        ffmpeg(fullFilePath)
-          .screenshots({
-            timestamps: ['10%'],
-            filename: thumbnailFilename,
-            folder: path.join(__dirname, 'public', 'uploads', 'thumbnails'),
-            size: '854x480'
-          })
-          .on('end', async () => {
-            resolve({
-              title,
-              filepath: result.filepath,
-              thumbnail_path: thumbnailPath,
-              file_size: result.fileSize,
-              duration,
-              format,
-              resolution,
-              bitrate,
-              fps,
-              user_id: req.session.userId,
-              folder_id: info.folderId || null
-            });
-          })
-          .on('error', (err) => {
-            console.error('Error creating thumbnail:', err);
-            reject(err);
-          });
-      });
-    });
+    const videoInfo = await getVideoInfo(fullFilePath);
+    if (videoInfo.rawMetadata) {
+      const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
+      if (!specCheck.valid) {
+        if (fs.existsSync(fullFilePath)) fs.unlinkSync(fullFilePath);
+        await chunkUploadService.cleanupUpload(uploadId).catch(() => null);
+        return res.status(400).json({ success: false, error: specCheck.error });
+      }
+    }
+
+    const thumbnailFilename = `thumb-${path.parse(result.filename).name}.jpg`;
+    let thumbnailRelativePath = null;
+    try {
+      const thumb = await generateThumbnail(fullFilePath, thumbnailFilename);
+      if (thumb) {
+        thumbnailRelativePath = `/uploads/thumbnails/${thumbnailFilename}`;
+      }
+    } catch (thumbError) {
+      console.warn('Thumbnail generation skipped (non-fatal):', thumbError.message);
+    }
+
+    let format = path.extname(result.filename).toLowerCase().replace('.', '') || 'mp4';
+    let resolution = (videoInfo.width && videoInfo.height) ? `${videoInfo.width}x${videoInfo.height}` : '';
+
+    const videoData = {
+      title,
+      filepath: result.filepath,
+      thumbnail_path: thumbnailRelativePath,
+      file_size: result.fileSize,
+      duration: videoInfo.duration || 0,
+      format,
+      resolution,
+      bitrate: videoInfo.bitrate ? Math.round(videoInfo.bitrate / 1000) : null,
+      fps: videoInfo.fps || null,
+      user_id: req.session.userId,
+      folder_id: info.folderId || null
+    };
+
     const video = await Video.create(videoData);
     await chunkUploadService.cleanupUpload(uploadId);
-    res.json({ success: true, message: 'Video uploaded successfully', video });
+    return res.json({ success: true, message: 'Video uploaded successfully', video });
   } catch (error) {
     console.error('Chunk complete error:', error);
     if (error.message && error.message.startsWith('VIDEO_SPEC_REJECTED:')) {
@@ -4011,51 +3985,21 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
       message: 'Processing video...'
     };
 
-    let videoInfo;
-    try {
-      videoInfo = await getVideoInfo(result.localFilePath);
-    } catch (infoError) {
-      videoInfo = { duration: 0 };
-    }
+    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
+    const videoInfo = await getVideoInfo(result.localFilePath);
 
-    let resolution = '';
-    let bitrate = null;
-
-    try {
-      const metadata = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('ffprobe timeout')), 30000);
-        ffmpeg.ffprobe(result.localFilePath, (err, metadata) => {
-          clearTimeout(timeout);
-          if (err) return reject(err);
-          const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
-          if (!specCheck.valid) {
-            return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
-          }
-          resolve(metadata);
-        });
-      });
-
-      const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-      if (videoStream) {
-        resolution = `${videoStream.width}x${videoStream.height}`;
-      }
-
-      if (metadata.format && metadata.format.bit_rate) {
-        bitrate = Math.round(parseInt(metadata.format.bit_rate) / 1000);
-      }
-    } catch (probeError) {
-      if (probeError.message && probeError.message.startsWith('VIDEO_SPEC_REJECTED:')) {
-        const fs = require('fs');
+    if (videoInfo.rawMetadata) {
+      const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
+      if (!specCheck.valid) {
         if (fs.existsSync(result.localFilePath)) fs.unlinkSync(result.localFilePath);
         importJobs[jobId] = {
           status: 'failed',
           progress: 0,
-          message: probeError.message.replace('VIDEO_SPEC_REJECTED: ', '')
+          message: specCheck.error
         };
         setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
         return;
       }
-      console.log('ffprobe error (non-fatal):', probeError.message);
     }
 
     const thumbnailBaseName = path.basename(result.filename, path.extname(result.filename));
@@ -4063,14 +4007,16 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
     let thumbnailRelativePath = null;
 
     try {
-      await generateThumbnail(result.localFilePath, thumbnailName);
-      thumbnailRelativePath = `/uploads/thumbnails/${thumbnailName}`;
+      const thumb = await generateThumbnail(result.localFilePath, thumbnailName);
+      if (thumb) {
+        thumbnailRelativePath = `/uploads/thumbnails/${thumbnailName}`;
+      }
     } catch (thumbError) {
-      console.log('Thumbnail generation failed (non-fatal):', thumbError.message);
+      console.log('Thumbnail generation skipped (non-fatal):', thumbError.message);
     }
 
-    let format = path.extname(result.filename).toLowerCase().replace('.', '');
-    if (!format) format = 'mp4';
+    let format = path.extname(result.filename).toLowerCase().replace('.', '') || 'mp4';
+    let resolution = (videoInfo.width && videoInfo.height) ? `${videoInfo.width}x${videoInfo.height}` : '';
 
     const videoData = {
       title: path.basename(result.filename, path.extname(result.filename)),
@@ -4080,7 +4026,8 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
       duration: videoInfo.duration || 0,
       format: format,
       resolution: resolution,
-      bitrate: bitrate,
+      bitrate: videoInfo.bitrate ? Math.round(videoInfo.bitrate / 1000) : null,
+      fps: videoInfo.fps || null,
       user_id: userId,
       folder_id: folderId
     };
@@ -4192,49 +4139,48 @@ async function processMediafireImport(jobId, fileKey, userId, folderId = null) {
       message: 'Processing video...'
     };
 
+    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
     const videoInfo = await getVideoInfo(result.localFilePath);
 
-    const metadata = await new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(result.localFilePath, (err, metadata) => {
-        if (err) return reject(err);
-        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
-        if (!specCheck.valid) {
-          return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
-        }
-        resolve(metadata);
-      });
-    });
-
-    let resolution = '';
-    let bitrate = null;
-
-    const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-    if (videoStream) {
-      resolution = `${videoStream.width}x${videoStream.height}`;
-    }
-
-    if (metadata.format && metadata.format.bit_rate) {
-      bitrate = Math.round(parseInt(metadata.format.bit_rate) / 1000);
+    if (videoInfo.rawMetadata) {
+      const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
+      if (!specCheck.valid) {
+        if (fs.existsSync(result.localFilePath)) fs.unlinkSync(result.localFilePath);
+        importJobs[jobId] = {
+          status: 'failed',
+          progress: 0,
+          message: specCheck.error
+        };
+        setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+        return;
+      }
     }
 
     const thumbnailBaseName = path.basename(result.filename, path.extname(result.filename));
     const thumbnailName = thumbnailBaseName + '.jpg';
-    const thumbnailRelativePath = await generateThumbnail(result.localFilePath, thumbnailName)
-      .then(() => `/uploads/thumbnails/${thumbnailName}`)
-      .catch(() => null);
+    let thumbnailRelativePath = null;
+    try {
+      const thumb = await generateThumbnail(result.localFilePath, thumbnailName);
+      if (thumb) {
+        thumbnailRelativePath = `/uploads/thumbnails/${thumbnailName}`;
+      }
+    } catch (thumbError) {
+      console.log('Thumbnail generation skipped (non-fatal):', thumbError.message);
+    }
 
-    let format = path.extname(result.filename).toLowerCase().replace('.', '');
-    if (!format) format = 'mp4';
+    let format = path.extname(result.filename).toLowerCase().replace('.', '') || 'mp4';
+    let resolution = (videoInfo.width && videoInfo.height) ? `${videoInfo.width}x${videoInfo.height}` : '';
 
     const videoData = {
       title: path.basename(result.filename, path.extname(result.filename)),
       filepath: `/uploads/videos/${result.filename}`,
       thumbnail_path: thumbnailRelativePath,
       file_size: result.fileSize,
-      duration: videoInfo.duration,
+      duration: videoInfo.duration || 0,
       format: format,
       resolution: resolution,
-      bitrate: bitrate,
+      bitrate: videoInfo.bitrate ? Math.round(videoInfo.bitrate / 1000) : null,
+      fps: videoInfo.fps || null,
       user_id: userId,
       folder_id: folderId
     };
@@ -4348,49 +4294,48 @@ async function processDropboxImport(jobId, dropboxUrl, userId, folderId = null) 
       message: 'Processing video...'
     };
 
+    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
     const videoInfo = await getVideoInfo(result.localFilePath);
 
-    const metadata = await new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(result.localFilePath, (err, metadata) => {
-        if (err) return reject(err);
-        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
-        if (!specCheck.valid) {
-          return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
-        }
-        resolve(metadata);
-      });
-    });
-
-    let resolution = '';
-    let bitrate = null;
-
-    const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-    if (videoStream) {
-      resolution = `${videoStream.width}x${videoStream.height}`;
-    }
-
-    if (metadata.format && metadata.format.bit_rate) {
-      bitrate = Math.round(parseInt(metadata.format.bit_rate) / 1000);
+    if (videoInfo.rawMetadata) {
+      const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
+      if (!specCheck.valid) {
+        if (fs.existsSync(result.localFilePath)) fs.unlinkSync(result.localFilePath);
+        importJobs[jobId] = {
+          status: 'failed',
+          progress: 0,
+          message: specCheck.error
+        };
+        setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+        return;
+      }
     }
 
     const thumbnailBaseName = path.basename(result.filename, path.extname(result.filename));
     const thumbnailName = thumbnailBaseName + '.jpg';
-    const thumbnailRelativePath = await generateThumbnail(result.localFilePath, thumbnailName)
-      .then(() => `/uploads/thumbnails/${thumbnailName}`)
-      .catch(() => null);
+    let thumbnailRelativePath = null;
+    try {
+      const thumb = await generateThumbnail(result.localFilePath, thumbnailName);
+      if (thumb) {
+        thumbnailRelativePath = `/uploads/thumbnails/${thumbnailName}`;
+      }
+    } catch (thumbError) {
+      console.log('Thumbnail generation skipped (non-fatal):', thumbError.message);
+    }
 
-    let format = path.extname(result.filename).toLowerCase().replace('.', '');
-    if (!format) format = 'mp4';
+    let format = path.extname(result.filename).toLowerCase().replace('.', '') || 'mp4';
+    let resolution = (videoInfo.width && videoInfo.height) ? `${videoInfo.width}x${videoInfo.height}` : '';
 
     const videoData = {
       title: path.basename(result.filename, path.extname(result.filename)),
       filepath: `/uploads/videos/${result.filename}`,
       thumbnail_path: thumbnailRelativePath,
       file_size: result.fileSize,
-      duration: videoInfo.duration,
+      duration: videoInfo.duration || 0,
       format: format,
       resolution: resolution,
-      bitrate: bitrate,
+      bitrate: videoInfo.bitrate ? Math.round(videoInfo.bitrate / 1000) : null,
+      fps: videoInfo.fps || null,
       user_id: userId,
       folder_id: folderId
     };
@@ -4504,49 +4449,48 @@ async function processMegaImport(jobId, megaUrl, userId, folderId = null) {
       message: 'Processing video...'
     };
 
+    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
     const videoInfo = await getVideoInfo(result.localFilePath);
 
-    const metadata = await new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(result.localFilePath, (err, metadata) => {
-        if (err) return reject(err);
-        const specCheck = validateVideoSpecs(metadata, user.package_name || 'tester');
-        if (!specCheck.valid) {
-          return reject(new Error('VIDEO_SPEC_REJECTED: ' + specCheck.error));
-        }
-        resolve(metadata);
-      });
-    });
-
-    let resolution = '';
-    let bitrate = null;
-
-    const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-    if (videoStream) {
-      resolution = `${videoStream.width}x${videoStream.height}`;
-    }
-
-    if (metadata.format && metadata.format.bit_rate) {
-      bitrate = Math.round(parseInt(metadata.format.bit_rate) / 1000);
+    if (videoInfo.rawMetadata) {
+      const specCheck = validateVideoSpecs(videoInfo.rawMetadata, effectivePkg);
+      if (!specCheck.valid) {
+        if (fs.existsSync(result.localFilePath)) fs.unlinkSync(result.localFilePath);
+        importJobs[jobId] = {
+          status: 'failed',
+          progress: 0,
+          message: specCheck.error
+        };
+        setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+        return;
+      }
     }
 
     const thumbnailBaseName = path.basename(result.filename, path.extname(result.filename));
     const thumbnailName = thumbnailBaseName + '.jpg';
-    const thumbnailRelativePath = await generateThumbnail(result.localFilePath, thumbnailName)
-      .then(() => `/uploads/thumbnails/${thumbnailName}`)
-      .catch(() => null);
+    let thumbnailRelativePath = null;
+    try {
+      const thumb = await generateThumbnail(result.localFilePath, thumbnailName);
+      if (thumb) {
+        thumbnailRelativePath = `/uploads/thumbnails/${thumbnailName}`;
+      }
+    } catch (thumbError) {
+      console.log('Thumbnail generation skipped (non-fatal):', thumbError.message);
+    }
 
-    let format = path.extname(result.filename).toLowerCase().replace('.', '');
-    if (!format) format = 'mp4';
+    let format = path.extname(result.filename).toLowerCase().replace('.', '') || 'mp4';
+    let resolution = (videoInfo.width && videoInfo.height) ? `${videoInfo.width}x${videoInfo.height}` : '';
 
     const videoData = {
       title: path.basename(result.filename, path.extname(result.filename)),
       filepath: `/uploads/videos/${result.filename}`,
       thumbnail_path: thumbnailRelativePath,
       file_size: result.fileSize,
-      duration: videoInfo.duration,
+      duration: videoInfo.duration || 0,
       format: format,
       resolution: resolution,
-      bitrate: bitrate,
+      bitrate: videoInfo.bitrate ? Math.round(videoInfo.bitrate / 1000) : null,
+      fps: videoInfo.fps || null,
       user_id: userId,
       folder_id: folderId
     };
