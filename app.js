@@ -4018,7 +4018,7 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
     const fs = require('fs');
     const stats = fs.statSync(result.localFilePath);
     const user = await require('./models/User').findById(userId);
-    if (user.disk_limit > 0) {
+    if (user && user.disk_limit > 0) {
       const currentUsage = await require('./models/User').getDiskUsage(userId);
       if (currentUsage + stats.size > user.disk_limit) {
         fs.unlinkSync(result.localFilePath);
@@ -4038,7 +4038,7 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
       message: 'Processing video...'
     };
 
-    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
+    const effectivePkg = (user && user.role === 'admin') ? 'admin' : ((user && user.package_name) || 'tester');
     const videoInfo = await getVideoInfo(result.localFilePath);
 
     if (videoInfo.rawMetadata) {
@@ -4181,7 +4181,7 @@ async function processMediafireImport(jobId, fileKey, userId, folderId = null) {
     const fs = require('fs');
     const stats = fs.statSync(result.localFilePath);
     const user = await require('./models/User').findById(userId);
-    if (user.disk_limit > 0) {
+    if (user && user.disk_limit > 0) {
       const currentUsage = await require('./models/User').getDiskUsage(userId);
       if (currentUsage + stats.size > user.disk_limit) {
         fs.unlinkSync(result.localFilePath);
@@ -4201,7 +4201,7 @@ async function processMediafireImport(jobId, fileKey, userId, folderId = null) {
       message: 'Processing video...'
     };
 
-    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
+    const effectivePkg = (user && user.role === 'admin') ? 'admin' : ((user && user.package_name) || 'tester');
     const videoInfo = await getVideoInfo(result.localFilePath);
 
     if (videoInfo.rawMetadata) {
@@ -4336,7 +4336,7 @@ async function processDropboxImport(jobId, dropboxUrl, userId, folderId = null) 
     const fs = require('fs');
     const stats = fs.statSync(result.localFilePath);
     const user = await require('./models/User').findById(userId);
-    if (user.disk_limit > 0) {
+    if (user && user.disk_limit > 0) {
       const currentUsage = await require('./models/User').getDiskUsage(userId);
       if (currentUsage + stats.size > user.disk_limit) {
         fs.unlinkSync(result.localFilePath);
@@ -4356,7 +4356,7 @@ async function processDropboxImport(jobId, dropboxUrl, userId, folderId = null) 
       message: 'Processing video...'
     };
 
-    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
+    const effectivePkg = (user && user.role === 'admin') ? 'admin' : ((user && user.package_name) || 'tester');
     const videoInfo = await getVideoInfo(result.localFilePath);
 
     if (videoInfo.rawMetadata) {
@@ -4491,7 +4491,7 @@ async function processMegaImport(jobId, megaUrl, userId, folderId = null) {
     const fs = require('fs');
     const stats = fs.statSync(result.localFilePath);
     const user = await require('./models/User').findById(userId);
-    if (user.disk_limit > 0) {
+    if (user && user.disk_limit > 0) {
       const currentUsage = await require('./models/User').getDiskUsage(userId);
       if (currentUsage + stats.size > user.disk_limit) {
         fs.unlinkSync(result.localFilePath);
@@ -4511,7 +4511,7 @@ async function processMegaImport(jobId, megaUrl, userId, folderId = null) {
       message: 'Processing video...'
     };
 
-    const effectivePkg = (user.role === 'admin') ? 'admin' : (user.package_name || 'tester');
+    const effectivePkg = (user && user.role === 'admin') ? 'admin' : ((user && user.package_name) || 'tester');
     const videoInfo = await getVideoInfo(result.localFilePath);
 
     if (videoInfo.rawMetadata) {

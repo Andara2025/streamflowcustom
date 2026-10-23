@@ -512,6 +512,10 @@ function formatDuration(seconds) {
   data-user-role="<%= typeof user !== 'undefined' ? user.role : 'user' %>">
 </div>
 
+<div id="toast" class="fixed top-16 right-4 bg-dark-800 text-white px-4 py-3 rounded-lg shadow-lg z-50 hidden flex items-center border-l-4">
+  <i id="toast-icon" class="mr-2"></i>
+  <span id="toast-message"></span>
+</div>
 
 <script>
   const initData = document.getElementById('gallery-init-data').dataset;
@@ -663,25 +667,47 @@ function switchUploadTab(type) {
 }
 
 function showToast(type, message) {
-  const toast = document.getElementById('toast');
-  const toastIcon = document.getElementById('toast-icon');
-  const toastMessage = document.getElementById('toast-message');
+  let toast = document.getElementById('toast');
+  let toastIcon = document.getElementById('toast-icon');
+  let toastMessage = document.getElementById('toast-message');
+
+  if (!toast || !toastIcon || !toastMessage) {
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'toast';
+      toast.className = 'fixed top-16 right-4 bg-dark-800 text-white px-4 py-3 rounded-lg shadow-lg z-50 hidden flex items-center border-l-4';
+      document.body.appendChild(toast);
+    }
+    if (!toastIcon) {
+      toastIcon = document.createElement('i');
+      toastIcon.id = 'toast-icon';
+      toastIcon.className = 'mr-2';
+      toast.appendChild(toastIcon);
+    }
+    if (!toastMessage) {
+      toastMessage = document.createElement('span');
+      toastMessage.id = 'toast-message';
+      toast.appendChild(toastMessage);
+    }
+  }
+
   if (type === 'success') {
     toastIcon.className = 'ti ti-check text-green-400 text-xl mr-2 font-loaded';
     toast.classList.add('border-l-4', 'border-green-400');
-    toast.classList.remove('border-l-4', 'border-red-400', 'border-yellow-400');
+    toast.classList.remove('border-red-400', 'border-yellow-400');
   } else if (type === 'error') {
     toastIcon.className = 'ti ti-x text-red-400 text-xl mr-2 font-loaded';
     toast.classList.add('border-l-4', 'border-red-400');
-    toast.classList.remove('border-l-4', 'border-green-400', 'border-yellow-400');
+    toast.classList.remove('border-green-400', 'border-yellow-400');
   } else if (type === 'warning') {
     toastIcon.className = 'ti ti-alert-triangle text-yellow-400 text-xl mr-2 font-loaded';
     toast.classList.add('border-l-4', 'border-yellow-400');
-    toast.classList.remove('border-l-4', 'border-green-400', 'border-red-400');
+    toast.classList.remove('border-green-400', 'border-red-400');
   }
   toastMessage.textContent = message;
   toast.classList.remove('hidden');
-  setTimeout(() => toast.classList.add('hidden'), 3000);
+  clearTimeout(window.__toastTimeout);
+  window.__toastTimeout = setTimeout(() => toast.classList.add('hidden'), 3500);
 }
 
 function applyGalleryViewMode() {
@@ -978,6 +1004,9 @@ async function moveVideoToFolder(videoId, folderId) {
 }
 
 function createModalDialog(options) {
+  const existingModal = document.getElementById('custom-modal');
+  if (existingModal) existingModal.remove();
+
   const dialog = document.createElement('div');
   dialog.id = 'custom-modal';
   dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm modal-overlay';
@@ -985,18 +1014,20 @@ function createModalDialog(options) {
     'info': { icon: options.icon || 'ti-info-circle', color: 'text-primary', bg: 'bg-primary/10', button: 'bg-primary hover:bg-rose-600' },
     'danger': { icon: options.icon || 'ti-alert-triangle', color: 'text-red-400', bg: 'bg-red-500/10', button: 'bg-red-500 hover:bg-red-600' }
   };
-  const theme = themes[options.type || 'info'];
+  const theme = themes[options.type || 'info'] || themes['info'];
+  const hideCancel = options.hideCancel || false;
+
   dialog.innerHTML = `
     <div class="max-w-md w-full mx-4">
-      <div class="bg-dark-800 rounded-lg shadow-xl overflow-hidden">
+      <div class="bg-dark-800 rounded-lg shadow-xl overflow-hidden border border-gray-700">
         <div class="p-6">
           <div class="flex items-start gap-4">
             <div class="w-12 h-12 rounded-full ${theme.bg} flex items-center justify-center shrink-0">
               <i class="ti ${theme.icon} ${theme.color} text-2xl"></i>
             </div>
             <div class="flex-1">
-              <h3 class="text-lg font-semibold">${options.title}</h3>
-              <p class="text-gray-400 text-sm mt-1">${options.message}</p>
+              <h3 class="text-lg font-semibold text-white">${options.title}</h3>
+              <p class="text-gray-300 text-sm mt-2 whitespace-pre-line leading-relaxed">${options.message}</p>
             </div>
           </div>
           ${options.hasInput ? `
@@ -1004,7 +1035,7 @@ function createModalDialog(options) {
           ` : ''}
         </div>
         <div class="flex justify-end gap-3 p-4 border-t border-gray-700">
-          <button id="modal-cancel-btn" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>
+          ${!hideCancel ? `<button id="modal-cancel-btn" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>` : ''}
           <button id="modal-confirm-btn" class="${options.confirmClass || theme.button} px-4 py-2 text-white rounded-lg transition-colors">${options.confirmText || 'Confirm'}</button>
         </div>
       </div>
@@ -1019,17 +1050,21 @@ function createModalDialog(options) {
       dialog.remove();
       resolve({ confirmed, value });
     };
-    document.getElementById('modal-confirm-btn').addEventListener('click', () => {
-      const value = options.hasInput ? document.getElementById('modal-input').value : null;
+    document.getElementById('modal-confirm-btn')?.addEventListener('click', () => {
+      const value = options.hasInput ? document.getElementById('modal-input')?.value : null;
       close(true, value);
     });
-    document.getElementById('modal-cancel-btn').addEventListener('click', () => close());
-    dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
+    if (!hideCancel) {
+      document.getElementById('modal-cancel-btn')?.addEventListener('click', () => close(false));
+    }
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) close(false); });
     if (options.hasInput) {
       const input = document.getElementById('modal-input');
-      input.focus();
-      input.select();
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') close(true, input.value); });
+      if (input) {
+        input.focus();
+        input.select();
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') close(true, input.value); });
+      }
     }
   });
 }
@@ -1194,65 +1229,89 @@ function initCloudModal(type) {
 }
 
 function showImportProgress(jobId) {
+  const existingModal = document.getElementById('import-progress-modal');
+  if (existingModal) existingModal.remove();
+
   const modal = document.createElement('div');
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm modal-overlay';
   modal.id = 'import-progress-modal';
   modal.innerHTML = `
-    <div class="bg-dark-800 rounded-lg p-6 w-full max-w-sm mx-4">
+    <div class="bg-dark-800 rounded-lg p-6 w-full max-w-sm mx-4 border border-gray-700 shadow-2xl">
       <div class="text-center">
         <div class="w-16 h-16 mb-4 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
           <i id="progress-icon" class="ti ti-download text-primary text-2xl"></i>
         </div>
-        <p id="progress-status" class="text-sm text-gray-300 mb-4">Starting download...</p>
-        <div class="w-full bg-dark-700 rounded-full h-2.5 mb-4">
-          <div id="progress-bar" class="bg-primary h-2.5 rounded-full transition-all" style="width: 0%"></div>
+        <p id="progress-status" class="text-sm text-gray-300 mb-4 font-medium">Starting download...</p>
+        <div class="w-full bg-dark-700 rounded-full h-2.5 mb-4 overflow-hidden">
+          <div id="progress-bar" class="bg-primary h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
         </div>
-        <button onclick="document.getElementById('import-progress-modal').remove()" class="text-sm text-gray-500 hover:text-white">Close</button>
+        <button id="close-import-progress-btn" class="text-sm text-gray-500 hover:text-white px-3 py-1 rounded transition-colors">Tutup</button>
       </div>
     </div>
   `;
   document.body.appendChild(modal);
+
+  let interval = null;
+  const cleanup = () => {
+    if (interval) {
+      clearInterval(interval);
+      interval = null;
+    }
+    const importModal = document.getElementById('import-progress-modal');
+    if (importModal) importModal.remove();
+  };
+
+  document.getElementById('close-import-progress-btn')?.addEventListener('click', cleanup);
   
-  const interval = setInterval(async () => {
+  interval = setInterval(async () => {
     try {
       const response = await fetch(`/api/videos/import-status/${jobId}`);
+      if (!response.ok) {
+        cleanup();
+        showToast('error', 'Status import tidak ditemukan atau server di-restart.');
+        return;
+      }
       const data = await response.json();
-      if (!data.success) { clearInterval(interval); return; }
+      if (!data || !data.success) {
+        cleanup();
+        return;
+      }
       const status = data.status;
-      document.getElementById('progress-bar').style.width = `${status.progress}%`;
-      document.getElementById('progress-status').textContent = status.message;
+      const progressBar = document.getElementById('progress-bar');
+      const progressStatus = document.getElementById('progress-status');
+      const progressIcon = document.getElementById('progress-icon');
+
+      if (progressBar && status.progress !== undefined) {
+        progressBar.style.width = `${status.progress}%`;
+      }
+      if (progressStatus && status.message) {
+        progressStatus.textContent = status.message;
+      }
+
       if (status.status === 'complete') {
-        document.getElementById('progress-icon').className = 'ti ti-check text-green-400 text-2xl';
-        const statusEl = document.getElementById('progress-status');
-        if (statusEl) statusEl.textContent = 'Import complete! Refreshing gallery...';
-        showToast('success', 'Video imported successfully');
-        clearInterval(interval);
+        cleanup();
+        if (progressIcon) progressIcon.className = 'ti ti-check text-green-400 text-2xl';
+        showToast('success', 'Video berhasil di-import!');
         setTimeout(() => {
-          const importModal = document.getElementById('import-progress-modal');
-          if (importModal) importModal.remove();
           window.location.reload();
         }, 800);
       } else if (status.status === 'failed') {
-        document.getElementById('progress-icon').className = 'ti ti-x text-red-400 text-2xl';
+        cleanup();
         const failMsg = status.message || 'Import failed';
-        const statusEl = document.getElementById('progress-status');
-        if (statusEl) statusEl.textContent = failMsg;
         showToast('error', failMsg);
-        clearInterval(interval);
-        setTimeout(() => {
-          const importModal = document.getElementById('import-progress-modal');
-          if (importModal) importModal.remove();
-          createModalDialog({
-            type: 'danger',
-            icon: 'ti-alert-octagon',
-            title: 'Import Video Gagal / Ditolak',
-            message: `${failMsg}\n\nDetail kesalahan juga telah tercatat di Lonceng Notifikasi Anda.`,
-            confirmText: 'Tutup',
-            confirmClass: 'bg-primary hover:bg-rose-600'
-          });
-        }, 1500);
+        createModalDialog({
+          type: 'danger',
+          icon: 'ti-alert-octagon',
+          title: 'Import Video Gagal / Ditolak',
+          message: `${failMsg}\n\nDetail kesalahan juga telah tercatat di Lonceng Notifikasi Akun Anda.`,
+          confirmText: 'Tutup',
+          hideCancel: true,
+          confirmClass: 'bg-primary hover:bg-rose-600'
+        });
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error('Import progress error:', e);
+    }
   }, 1000);
 }
 
@@ -1679,6 +1738,7 @@ document.addEventListener('DOMContentLoaded', function() {
           title: 'Upload Ditolak / Spesifikasi Melebihi Paket',
           message: `${failed.length} video tidak dapat di-upload karena tidak sesuai paket Anda:\n\n${errorDetails}\n\nPeringatan ini juga telah dikirim ke Lonceng Notifikasi akun Anda.`,
           confirmText: 'Mengerti',
+          hideCancel: true,
           confirmClass: 'bg-primary hover:bg-rose-600'
         });
       } else if (success > 0) {

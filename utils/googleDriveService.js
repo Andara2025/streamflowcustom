@@ -4,18 +4,24 @@ const axios = require('axios');
 const { paths, getUniqueFilenameWithNumber } = require('./storage');
 
 function extractFileId(driveUrl) {
-  let match = driveUrl.match(/\/file\/d\/([^\/]+)/);
+  if (!driveUrl) throw new Error('Invalid Google Drive URL format');
+  const str = driveUrl.trim();
+
+  let match = str.match(/\/file\/d\/([a-zA-Z0-9_-]{25,})/);
   if (match) return match[1];
 
-  match = driveUrl.match(/\?id=([^&]+)/);
+  match = str.match(/[?&]id=([a-zA-Z0-9_-]{25,})/);
   if (match) return match[1];
 
-  match = driveUrl.match(/\/d\/([^\/]+)/);
+  match = str.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
   if (match) return match[1];
 
-  if (/^[a-zA-Z0-9_-]{25,}$/.test(driveUrl.trim())) {
-    return driveUrl.trim();
+  if (/^[a-zA-Z0-9_-]{25,}$/.test(str)) {
+    return str;
   }
+
+  match = str.match(/\/file\/d\/([^\/\?#&]+)/) || str.match(/[?&]id=([^&]+)/) || str.match(/\/d\/([^\/\?#&]+)/);
+  if (match) return match[1];
 
   throw new Error('Invalid Google Drive URL format');
 }
@@ -100,6 +106,15 @@ function parseConfirmationPage(html, fileId) {
       urls.push(formAction + (formAction.includes('?') ? '&' : '?') + paramStr);
     }
   }
+
+  const linkMatches = html.matchAll(/href="([^"]*(?:download|export=download)[^"]*)"/gi);
+  for (const match of linkMatches) {
+    let href = match[1].replace(/&amp;/g, '&');
+    if (href.startsWith('/')) {
+      href = 'https://drive.google.com' + href;
+    }
+    if (!urls.includes(href)) urls.push(href);
+  }
   
   const confirmMatch = html.match(/confirm=([0-9A-Za-z_-]+)/);
   const uuidMatch = html.match(/uuid=([0-9a-f-]+)/i);
@@ -107,7 +122,7 @@ function parseConfirmationPage(html, fileId) {
   let baseUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`;
   if (confirmMatch) baseUrl += `&confirm=${confirmMatch[1]}`;
   if (uuidMatch) baseUrl += `&uuid=${uuidMatch[1]}`;
-  urls.push(baseUrl);
+  if (!urls.includes(baseUrl)) urls.push(baseUrl);
   
   urls.push(`https://drive.usercontent.google.com/download?id=${fileId}&export=download&authuser=0&confirm=t`);
   urls.push(`https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`);
@@ -215,6 +230,10 @@ async function downloadFile(fileId, progressCallback = null) {
           downloadSuccess = true;
           console.log(`Download started, content-type: ${result.contentType}`);
         } else {
+          if (result.response.headers && result.response.headers['set-cookie']) {
+            const newCookies = extractCookies(result.response);
+            if (newCookies) cookies = cookies ? `${cookies}; ${newCookies}` : newCookies;
+          }
           cleanupStream(result.response);
           
           if (result.response.status === 200) {
@@ -357,7 +376,8 @@ async function downloadFile(fileId, progressCallback = null) {
             [0x1A, 0x45, 0xDF, 0xA3],
             [0x00, 0x00, 0x01, 0xBA],
             [0x00, 0x00, 0x01, 0xB3],
-            [0x46, 0x4C, 0x56, 0x01]
+            [0x46, 0x4C, 0x56, 0x01],
+            [0x52, 0x49, 0x46, 0x46] // RIFF (AVI/WAV)
           ];
           
           let isValidVideo = false;
@@ -375,7 +395,7 @@ async function downloadFile(fileId, progressCallback = null) {
             }
           }
           
-          if (!isValidVideo && !buffer.includes(Buffer.from('ftyp'))) {
+          if (!isValidVideo && !buffer.includes(Buffer.from('ftyp')) && !buffer.includes(Buffer.from('moov')) && !buffer.includes(Buffer.from('AVI '))) {
             safeReject(new Error('Downloaded file is not a valid video format.'));
             return;
           }
