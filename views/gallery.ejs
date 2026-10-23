@@ -811,7 +811,8 @@ async function showRenameDialog(videoId, currentTitle) {
       const data = await response.json();
       if (data.success) {
         showToast('success', 'Video renamed successfully');
-        await window.refreshGalleryData?.();
+        if (window.refreshGalleryData) await window.refreshGalleryData();
+        setTimeout(() => window.location.reload(), 400);
       } else {
         showToast('error', data.error || 'Failed to rename video');
       }
@@ -836,7 +837,8 @@ async function showDeleteDialog(videoId, videoTitle) {
       const data = await response.json();
       if (data.success) {
         showToast('success', 'Video deleted successfully');
-        await window.refreshGalleryData?.();
+        if (window.refreshGalleryData) await window.refreshGalleryData();
+        setTimeout(() => window.location.reload(), 400);
       } else {
         showToast('error', data.error || 'Failed to delete video');
       }
@@ -908,7 +910,8 @@ async function showRenameFolderDialog(folderId, currentName) {
     const data = await response.json();
     if (data.success) {
       showToast('success', 'Folder renamed successfully');
-      await window.refreshGalleryData?.();
+      if (window.refreshGalleryData) await window.refreshGalleryData();
+      setTimeout(() => window.location.reload(), 400);
     } else {
       showToast('error', data.error || 'Failed to rename folder');
     }
@@ -941,7 +944,8 @@ async function showDeleteFolderDialog(folderId, folderName) {
     const data = await response.json();
     if (data.success) {
       showToast('success', 'Folder deleted successfully');
-      await window.refreshGalleryData?.();
+      if (window.refreshGalleryData) await window.refreshGalleryData();
+      setTimeout(() => window.location.reload(), 400);
     } else {
       showToast('error', data.error || 'Failed to delete folder');
     }
@@ -963,7 +967,8 @@ async function moveVideoToFolder(videoId, folderId) {
     const data = await response.json();
     if (data.success) {
       showToast('success', folderId ? 'File moved to folder' : 'File moved to root');
-      await window.refreshGalleryData?.();
+      if (window.refreshGalleryData) await window.refreshGalleryData();
+      setTimeout(() => window.location.reload(), 400);
     } else {
       showToast('error', data.error || 'Failed to move file');
     }
@@ -1218,9 +1223,15 @@ function showImportProgress(jobId) {
       document.getElementById('progress-status').textContent = status.message;
       if (status.status === 'complete') {
         document.getElementById('progress-icon').className = 'ti ti-check text-green-400 text-2xl';
+        const statusEl = document.getElementById('progress-status');
+        if (statusEl) statusEl.textContent = 'Import complete! Refreshing gallery...';
         showToast('success', 'Video imported successfully');
-        await window.refreshGalleryData?.();
         clearInterval(interval);
+        setTimeout(() => {
+          const importModal = document.getElementById('import-progress-modal');
+          if (importModal) importModal.remove();
+          window.location.reload();
+        }, 800);
       } else if (status.status === 'failed') {
         document.getElementById('progress-icon').className = 'ti ti-x text-red-400 text-2xl';
         showToast('error', status.message || 'Import failed');
@@ -1643,11 +1654,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
 
-      if (failed.length === 0) showToast('success', `${success} file${success > 1 ? 's' : ''} uploaded successfully`);
-      else showToast('warning', `${success} uploaded, ${failed.length} failed`);
-      await window.refreshGalleryData?.();
+      if (failed.length === 0) {
+        showToast('success', `${success} file${success > 1 ? 's' : ''} uploaded successfully`);
+      } else {
+        showToast('warning', `${success} uploaded, ${failed.length} failed`);
+      }
       closeUploadModal();
-      loadDiskUsage();
+      if (window.refreshGalleryData) await window.refreshGalleryData();
+      if (success > 0) {
+        setTimeout(() => window.location.reload(), 500);
+      } else {
+        loadDiskUsage();
+      }
     });
   }
 
