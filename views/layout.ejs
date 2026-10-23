@@ -85,6 +85,12 @@
         <span class="text-gray-600">•</span>
         <span id="mobile-server-clock" class="tabular-nums">--:--:--</span>
       </div>
+      <% if (req.session && req.session.user_role === 'admin') { %>
+        <button onclick="openBroadcastModal()" class="p-2 text-gray-400 hover:text-amber-400 transition-colors relative mr-1" title="Broadcast Pesan / Banner Header">
+          <i class="ti ti-speakerphone text-lg"></i>
+          <span id="mobile-broadcast-badge" class="<%= (typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.enabled) ? '' : 'hidden' %> absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full animate-ping"></span>
+        </button>
+      <% } %>
       <div class="relative">
         <button id="mobile-notification-btn" class="p-2 text-gray-400 hover:text-white transition-colors relative">
           <i class="ti ti-bell text-lg"></i>
@@ -182,6 +188,12 @@
           <span class="text-gray-600">•</span>
           <span id="server-clock" class="tabular-nums">--:--:--</span>
         </div>
+        <% if (req.session && req.session.user_role === 'admin') { %>
+          <button onclick="openBroadcastModal()" class="p-2 text-gray-400 hover:text-amber-400 transition-colors relative mr-2" title="Broadcast Pesan / Banner Header">
+            <i class="ti ti-speakerphone text-lg"></i>
+            <span id="desktop-broadcast-badge" class="<%= (typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.enabled) ? '' : 'hidden' %> absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full animate-ping"></span>
+          </button>
+        <% } %>
         <div class="relative">
           <button id="notification-btn" class="p-2 text-gray-400 hover:text-white transition-colors relative">
             <i class="ti ti-bell text-lg"></i>
@@ -197,7 +209,33 @@
           </div>
         </div>
       </div>
-      <div class="p-6 pt-20 lg:pt-22 flex-1">
+      <!-- BROADCAST BANNER HEADER -->
+      <div id="broadcast-banner-container" class="<%= (typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.enabled && broadcastBanner.message) ? '' : 'hidden' %> fixed top-16 lg:top-14 left-0 lg:left-20 right-0 z-30 shadow-lg transition-all duration-300">
+        <div id="broadcast-banner-inner" class="px-4 py-2.5 flex items-center justify-between gap-3 text-sm font-medium border-b <%= (typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.type === 'danger') ? 'bg-rose-600 text-white border-rose-700' : ((typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.type === 'info') ? 'bg-blue-600 text-white border-blue-700' : 'bg-amber-600 text-white border-amber-700') %>">
+          <div class="flex items-center gap-2.5 flex-1 min-w-0">
+            <span class="w-7 h-7 rounded-full bg-black/20 flex items-center justify-center flex-shrink-0 animate-pulse">
+              <i id="broadcast-banner-icon" class="ti <%= (typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.type === 'danger') ? 'ti-alert-octagon' : ((typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.type === 'info') ? 'ti-info-circle' : 'ti-tool') %> text-base"></i>
+            </span>
+            <div class="truncate sm:whitespace-normal flex-1">
+              <span id="broadcast-banner-tag" class="font-bold mr-2 uppercase tracking-wide text-xs bg-black/30 px-2 py-0.5 rounded shadow-sm">
+                <%= (typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.type === 'danger') ? 'PENTING' : ((typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.type === 'info') ? 'INFORMASI' : 'MAINTENANCE') %>
+              </span>
+              <span id="broadcast-banner-text"><%= (typeof broadcastBanner !== 'undefined' && broadcastBanner) ? broadcastBanner.message : '' %></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <% if (req.session && req.session.user_role === 'admin') { %>
+              <button onclick="openBroadcastModal()" class="text-xs bg-black/25 hover:bg-black/40 px-2.5 py-1 rounded transition-colors text-white flex items-center gap-1 font-semibold" title="Edit Pesan Broadcast">
+                <i class="ti ti-edit"></i> Edit
+              </button>
+            <% } %>
+            <button onclick="dismissBroadcastBanner()" class="text-white/80 hover:text-white p-1 rounded hover:bg-black/20 transition-colors" title="Sembunyikan Banner">
+              <i class="ti ti-x text-base"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="main-content-body" class="p-6 pt-20 lg:pt-22 flex-1 <%= (typeof broadcastBanner !== 'undefined' && broadcastBanner && broadcastBanner.enabled && broadcastBanner.message) ? '!pt-28 lg:!pt-32' : '' %>">
         <%- body %>
       </div>
       <div class="hidden lg:flex justify-end pr-6 py-4">
@@ -362,6 +400,109 @@
       </div>
     </div>
   </div>
+
+  <% if (req.session && req.session.user_role === 'admin') { %>
+  <!-- ADMIN BROADCAST BANNER MODAL -->
+  <div id="broadcastAdminModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-dark-800 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700 overflow-hidden transform transition-all">
+      <div class="p-4 border-b border-gray-700 flex items-center justify-between bg-dark-750">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+            <i class="ti ti-speakerphone text-xl"></i>
+          </div>
+          <div>
+            <h3 class="font-semibold text-white">Broadcast Message &amp; Banner</h3>
+            <p class="text-xs text-gray-400">Tampilkan pengumuman / info maintenance di header web</p>
+          </div>
+        </div>
+        <button onclick="closeBroadcastModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-dark-700 transition-colors">
+          <i class="ti ti-x text-lg"></i>
+        </button>
+      </div>
+
+      <form id="broadcast-banner-form" class="p-5 space-y-4" onsubmit="submitBroadcastBanner(event)">
+        <!-- TOGGLE ON/OFF -->
+        <div class="flex items-center justify-between p-3.5 bg-dark-900/60 rounded-lg border border-gray-700/60">
+          <div>
+            <div class="font-medium text-sm text-white">Status Banner di Header</div>
+            <div class="text-xs text-gray-400">Aktifkan untuk langsung menampilkan banner ke semua user</div>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="broadcast-enabled-toggle" class="sr-only peer">
+            <div class="w-11 h-6 bg-dark-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+          </label>
+        </div>
+
+        <!-- TIPE BANNER -->
+        <div>
+          <label class="block text-xs font-medium text-gray-300 mb-2">Jenis Pesan / Tampilan Warna</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex flex-col items-center justify-center p-2.5 rounded-lg border cursor-pointer transition-all bg-dark-900 border-gray-700 hover:border-amber-500 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/10">
+              <input type="radio" name="broadcastType" value="warning" class="sr-only" checked>
+              <i class="ti ti-tool text-amber-400 text-lg mb-1"></i>
+              <span class="text-xs font-medium text-gray-200">Maintenance</span>
+              <span class="text-[10px] text-amber-400/80">Kuning Amber</span>
+            </label>
+            <label class="flex flex-col items-center justify-center p-2.5 rounded-lg border cursor-pointer transition-all bg-dark-900 border-gray-700 hover:border-rose-500 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-500/10">
+              <input type="radio" name="broadcastType" value="danger" class="sr-only">
+              <i class="ti ti-alert-octagon text-rose-400 text-lg mb-1"></i>
+              <span class="text-xs font-medium text-gray-200">Penting</span>
+              <span class="text-[10px] text-rose-400/80">Merah Urgent</span>
+            </label>
+            <label class="flex flex-col items-center justify-center p-2.5 rounded-lg border cursor-pointer transition-all bg-dark-900 border-gray-700 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-500/10">
+              <input type="radio" name="broadcastType" value="info" class="sr-only">
+              <i class="ti ti-info-circle text-blue-400 text-lg mb-1"></i>
+              <span class="text-xs font-medium text-gray-200">Informasi</span>
+              <span class="text-[10px] text-blue-400/80">Biru Info</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- TEMPLATE CEPAT & TEXTAREA -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-medium text-gray-300">Isi Pesan Manual</label>
+            <span class="text-[11px] text-gray-400">Pilih template cepat:</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <button type="button" onclick="setBroadcastTemplate('maintenance')" class="text-[11px] px-2 py-0.5 rounded bg-dark-700 hover:bg-dark-600 text-gray-300 border border-gray-600 transition-colors">
+              🛠️ Maintenance Server
+            </button>
+            <button type="button" onclick="setBroadcastTemplate('restart')" class="text-[11px] px-2 py-0.5 rounded bg-dark-700 hover:bg-dark-600 text-gray-300 border border-gray-600 transition-colors">
+              🔄 Restart Server
+            </button>
+            <button type="button" onclick="setBroadcastTemplate('normal')" class="text-[11px] px-2 py-0.5 rounded bg-dark-700 hover:bg-dark-600 text-gray-300 border border-gray-600 transition-colors">
+              ✅ Maintenance Selesai
+            </button>
+          </div>
+          <textarea id="broadcast-message-input" rows="3" class="w-full bg-dark-900 border border-gray-700 rounded-lg p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary resize-none" placeholder="Ketik pesan Anda di sini, misalnya: Server akan segera direstart untuk pemeliharaan rutin pukul 16:00 WIB..."></textarea>
+        </div>
+
+        <!-- KIRIM NOTIFIKASI JUGA -->
+        <label class="flex items-start gap-2.5 p-3 rounded-lg bg-dark-900/40 border border-gray-700/50 cursor-pointer">
+          <input type="checkbox" id="broadcast-send-notif" class="mt-0.5 rounded bg-dark-800 border-gray-600 text-primary focus:ring-primary">
+          <span class="text-xs text-gray-300">
+            <strong class="text-white block mb-0.5">Kirim juga ke Lonceng Notifikasi Semua User</strong>
+            Pesan ini juga akan masuk ke riwayat notifikasi akun masing-masing user.
+          </span>
+        </label>
+
+        <!-- ACTION BUTTONS -->
+        <div class="flex items-center justify-between pt-2 border-t border-gray-700/60">
+          <button type="button" onclick="disableBroadcastBanner()" class="px-3 py-2 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors flex items-center gap-1">
+            <i class="ti ti-trash"></i> Matikan Banner
+          </button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="closeBroadcastModal()" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 text-xs rounded-lg transition-colors">Batal</button>
+            <button type="submit" id="btn-save-broadcast" class="px-4 py-2 bg-primary hover:bg-rose-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5">
+              <i class="ti ti-device-floppy"></i> Simpan &amp; Terapkan
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <% } %>
 </body>
 
 </html>
@@ -878,7 +1019,173 @@
     initServerTime();
     // Polling notifikasi user setiap 30 detik agar update realtime jika ada rotasi gagal
     setInterval(loadUserNotifications, 30 * 1000);
+    setInterval(pollBroadcastBanner, 30 * 1000);
   });
+
+  // --- BROADCAST BANNER LOGIC ---
+  function dismissBroadcastBanner() {
+    const banner = document.getElementById('broadcast-banner-container');
+    const mainBody = document.getElementById('main-content-body');
+    if (banner) banner.classList.add('hidden');
+    if (mainBody) {
+      mainBody.classList.remove('!pt-28', 'lg:!pt-32');
+    }
+  }
+
+  function applyBroadcastBanner(banner) {
+    const container = document.getElementById('broadcast-banner-container');
+    const inner = document.getElementById('broadcast-banner-inner');
+    const icon = document.getElementById('broadcast-banner-icon');
+    const tag = document.getElementById('broadcast-banner-tag');
+    const text = document.getElementById('broadcast-banner-text');
+    const mainBody = document.getElementById('main-content-body');
+    const mobileBadge = document.getElementById('mobile-broadcast-badge');
+    const desktopBadge = document.getElementById('desktop-broadcast-badge');
+
+    if (!container || !inner) return;
+
+    if (banner && banner.enabled && banner.message) {
+      container.classList.remove('hidden');
+      if (mainBody) mainBody.classList.add('!pt-28', 'lg:!pt-32');
+      if (mobileBadge) mobileBadge.classList.remove('hidden');
+      if (desktopBadge) desktopBadge.classList.remove('hidden');
+
+      text.textContent = banner.message;
+      inner.className = 'px-4 py-2.5 flex items-center justify-between gap-3 text-sm font-medium border-b text-white';
+
+      if (banner.type === 'danger') {
+        inner.classList.add('bg-rose-600', 'border-rose-700');
+        icon.className = 'ti ti-alert-octagon text-base';
+        tag.textContent = 'PENTING';
+      } else if (banner.type === 'info') {
+        inner.classList.add('bg-blue-600', 'border-blue-700');
+        icon.className = 'ti ti-info-circle text-base';
+        tag.textContent = 'INFORMASI';
+      } else {
+        inner.classList.add('bg-amber-600', 'border-amber-700');
+        icon.className = 'ti ti-tool text-base';
+        tag.textContent = 'MAINTENANCE';
+      }
+    } else {
+      container.classList.add('hidden');
+      if (mainBody) mainBody.classList.remove('!pt-28', 'lg:!pt-32');
+      if (mobileBadge) mobileBadge.classList.add('hidden');
+      if (desktopBadge) desktopBadge.classList.add('hidden');
+    }
+  }
+
+  async function pollBroadcastBanner() {
+    try {
+      const res = await fetch('/api/broadcast-banner');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && data.banner) {
+        applyBroadcastBanner(data.banner);
+      }
+    } catch (e) {}
+  }
+
+  async function openBroadcastModal() {
+    const modal = document.getElementById('broadcastAdminModal');
+    if (!modal) return;
+    try {
+      const res = await fetch('/api/broadcast-banner');
+      const data = await res.json();
+      if (data.success && data.banner) {
+        const b = data.banner;
+        const toggle = document.getElementById('broadcast-enabled-toggle');
+        const msg = document.getElementById('broadcast-message-input');
+        if (toggle) toggle.checked = !!b.enabled;
+        if (msg) msg.value = b.message || '';
+        const radio = document.querySelector(`input[name="broadcastType"][value="${b.type || 'warning'}"]`);
+        if (radio) radio.checked = true;
+      }
+    } catch (e) {}
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeBroadcastModal() {
+    const modal = document.getElementById('broadcastAdminModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.style.overflow = 'auto';
+    }
+  }
+
+  function setBroadcastTemplate(kind) {
+    const msgInput = document.getElementById('broadcast-message-input');
+    const toggle = document.getElementById('broadcast-enabled-toggle');
+    if (toggle) toggle.checked = true;
+
+    if (kind === 'maintenance') {
+      const radio = document.querySelector('input[name="broadcastType"][value="warning"]');
+      if (radio) radio.checked = true;
+      msgInput.value = 'Pemberitahuan: Sistem sedang dalam pemeliharaan (maintenance). Beberapa fitur mungkin mengalami jeda sementara.';
+    } else if (kind === 'restart') {
+      const radio = document.querySelector('input[name="broadcastType"][value="warning"]');
+      if (radio) radio.checked = true;
+      msgInput.value = 'Perhatian: Server akan direstart sebentar lagi untuk pemeliharaan rutin. Estimasi offline 2-5 menit.';
+    } else if (kind === 'normal') {
+      const radio = document.querySelector('input[name="broadcastType"][value="info"]');
+      if (radio) radio.checked = true;
+      msgInput.value = 'Pemeliharaan server telah selesai. Seluruh sistem kini beroperasi normal kembali.';
+    }
+  }
+
+  async function submitBroadcastBanner(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-save-broadcast');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader animate-spin"></i> Menyimpan...';
+
+    const enabled = document.getElementById('broadcast-enabled-toggle').checked;
+    const message = document.getElementById('broadcast-message-input').value.trim();
+    const typeRadio = document.querySelector('input[name="broadcastType"]:checked');
+    const type = typeRadio ? typeRadio.value : 'warning';
+    const sendNotif = document.getElementById('broadcast-send-notif').checked;
+
+    try {
+      const res = await fetch('/api/admin/broadcast-banner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, message, type, sendNotification: sendNotif })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('success', data.message || 'Broadcast banner berhasil diperbarui!');
+        applyBroadcastBanner(data.banner);
+        closeBroadcastModal();
+      } else {
+        showToast('error', data.error || 'Gagal menyimpan banner');
+      }
+    } catch (err) {
+      showToast('error', 'Terjadi kesalahan saat menyimpan banner');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+
+  async function disableBroadcastBanner() {
+    if (!confirm('Apakah Anda yakin ingin mematikan banner pengumuman ini?')) return;
+    try {
+      const res = await fetch('/api/admin/broadcast-banner', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToast('info', 'Broadcast banner telah dinonaktifkan.');
+        applyBroadcastBanner({ enabled: false });
+        closeBroadcastModal();
+      } else {
+        showToast('error', data.error || 'Gagal menonaktifkan banner');
+      }
+    } catch (e) {
+      showToast('error', 'Terjadi kesalahan');
+    }
+  }
 
   let serverTimeOffset = 0;
   let serverTimezoneOffset = 0;

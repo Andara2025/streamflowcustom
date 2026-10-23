@@ -124,6 +124,23 @@ process.on('uncaughtException', (error) => {
 });
 const app = express();
 app.set("trust proxy", 1);
+
+let cachedBroadcastBanner = null;
+let lastBannerFetchTime = 0;
+async function getGlobalBroadcastBanner() {
+  const now = Date.now();
+  if (cachedBroadcastBanner !== null && (now - lastBannerFetchTime < 10000)) {
+    return cachedBroadcastBanner;
+  }
+  try {
+    const AppSettings = require('./models/AppSettings');
+    cachedBroadcastBanner = await AppSettings.getBroadcastBanner();
+    lastBannerFetchTime = now;
+  } catch (e) {
+    cachedBroadcastBanner = { enabled: false, message: '', type: 'warning' };
+  }
+  return cachedBroadcastBanner;
+}
 const port = process.env.PORT || 7575;
 const tokens = new csrf();
 
@@ -228,6 +245,11 @@ app.use(async (req, res, next) => {
   }
   res.locals.req = req;
   res.locals.appVersion = packageJson.version;
+  try {
+    res.locals.broadcastBanner = await getGlobalBroadcastBanner();
+  } catch (e) {
+    res.locals.broadcastBanner = { enabled: false, message: '', type: 'warning' };
+  }
   try {
     const AppSettings = require('./models/AppSettings');
     const licenseKey = await AppSettings.get('pro_license_key');
@@ -6054,6 +6076,84 @@ app.delete('/api/notifications/:id', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Error deleting notification:', error);
     res.status(500).json({ success: false, error: 'Failed to delete notification' });
+  }
+});
+
+// --- Broadcast Banner & Announcement APIs ---
+app.get('/api/broadcast-banner', async (req, res) => {
+  try {
+    const banner = await getGlobalBroadcastBanner();
+    res.json({ success: true, banner });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch banner' });
+  }
+});
+
+app.post('/api/admin/broadcast-banner', isAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.session.userId);
+    if (!user || user.user_role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Hanya Admin yang dapat mengelola broadcast banner' });
+    }
+
+    const { enabled, message, type, sendNotification } = req.body;
+    const AppSettings = require('./models/AppSettings');
+    
+    const bannerData = {
+      enabled: enabled === true || enabled === 'true' || enabled === '1' || enabled === 1,
+      message: (message || '').trim(),
+      type: ['warning', 'danger', 'info'].includes(type) ? type : 'warning'
+    };
+
+    const saved = await AppSettings.setBroadcastBanner(bannerData);
+    cachedBroadcastBanner = saved;
+    lastBannerFetchTime = Date.now();
+
+    // Jika dicentang, kirim juga notifikasi ke lonceng semua user
+    if (saved.enabled && (sendNotification === true || sendNotification === 'true') && saved.message) {
+      try {
+        const users = await User.findAll();
+        const Notification = require('./models/Notification');
+        const notifType = saved.type === 'danger' ? 'error' : (saved.type === 'info' ? 'info' : 'warning');
+        const notifTitle = saved.type === 'danger' ? 'Pemberitahuan Mendesak' : (saved.type === 'info' ? 'Informasi Sistem' : 'Pemberitahuan Maintenance');
+        
+        for (const u of (users || [])) {
+          await Notification.create({
+            user_id: u.id,
+            type: notifType,
+            title: notifTitle,
+            message: saved.message
+          }).catch(() => null);
+        }
+      } catch (notifErr) {
+        console.warn('Failed to broadcast notifications to users:', notifErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: saved.enabled ? 'Broadcast banner berhasil diaktifkan!' : 'Broadcast banner telah dinonaktifkan.',
+      banner: saved
+    });
+  } catch (error) {
+    console.error('Error saving broadcast banner:', error);
+    res.status(500).json({ success: false, error: 'Gagal menyimpan broadcast banner' });
+  }
+});
+
+app.delete('/api/admin/broadcast-banner', isAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.session.userId);
+    if (!user || user.user_role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const AppSettings = require('./models/AppSettings');
+    const saved = await AppSettings.setBroadcastBanner({ enabled: false, message: '', type: 'warning' });
+    cachedBroadcastBanner = saved;
+    lastBannerFetchTime = Date.now();
+    res.json({ success: true, message: 'Broadcast banner dinonaktifkan', banner: saved });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Gagal menonaktifkan banner' });
   }
 });
 

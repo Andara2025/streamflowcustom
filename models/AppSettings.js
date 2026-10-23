@@ -92,6 +92,34 @@ class AppSettings {
   static async setPricingSettings(settings) {
     await this.set('pricing_settings', JSON.stringify(settings));
   }
+
+  static async getBroadcastBanner() {
+    try {
+      const bannerStr = await this.get('broadcast_banner');
+      if (bannerStr) {
+        return JSON.parse(bannerStr);
+      }
+    } catch (e) {
+      console.error('Error parsing broadcast banner:', e);
+    }
+    return {
+      enabled: false,
+      message: '',
+      type: 'warning',
+      updated_at: null
+    };
+  }
+
+  static async setBroadcastBanner(data) {
+    const payload = {
+      enabled: !!data.enabled,
+      message: (data.message || '').trim(),
+      type: data.type || 'warning',
+      updated_at: new Date().toISOString()
+    };
+    await this.set('broadcast_banner', JSON.stringify(payload));
+    return payload;
+  }
 }
 
 module.exports = AppSettings;
