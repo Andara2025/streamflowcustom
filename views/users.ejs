@@ -18,9 +18,11 @@
     </button>
     <input type="file" id="importCsvInput" accept=".csv" class="hidden" onchange="importUsersCsv(this)">
     <button onclick="blastWhatsApp()" 
-      class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors flex items-center shadow-lg shadow-green-500/20">
-      <i class="ti ti-brand-whatsapp mr-1.5"></i>
-      <span>Blast WA Expired</span>
+      class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors flex items-center shadow-lg shadow-emerald-500/20"
+      title="Buka panel broadcast WhatsApp untuk user yang sedang tampil di tabel">
+      <i class="ti ti-brand-whatsapp mr-1.5 text-lg"></i>
+      <span>Broadcast WA</span>
+      <span id="btnBlastFilterCount" class="ml-1.5 px-2 py-0.5 bg-black/30 rounded-full text-xs font-bold"><%= users ? users.length : 0 %></span>
     </button>
     <button onclick="openCreateModal()" 
       class="px-4 py-2 bg-primary hover:bg-rose-600 text-white rounded-lg transition-colors flex items-center">
@@ -199,9 +201,11 @@
             %>
             <tr class="hover:bg-dark-700/50 transition-colors user-row" 
                 data-username="<%= user.username.toLowerCase() %>" 
+                data-display-name="<%= user.username %>"
                 data-role="<%= user.user_role %>" 
                 data-status="<%= user.status %>"
                 data-phone="<%= user.phone || '' %>"
+                data-package="<%= user.package_name || 'custom' %>"
                 data-expired-state="<%= rowExpState %>"
                 data-days-left="<%= rowDaysLeft %>"
                 data-expired-timestamp="<%= rowExpTimestamp %>"
@@ -710,33 +714,81 @@
   </div>
 </div>
 
-<div id="blastModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden transition-opacity">
-  <div class="flex items-center justify-center min-h-screen p-4">
-    <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-lg border border-gray-600/50 transform transition-all opacity-0 scale-95 flex flex-col max-h-[80vh]" id="blastModalContent">
-      <div class="flex items-center justify-between p-4 border-b border-gray-600/50 flex-shrink-0">
-        <div class="flex items-center gap-2">
-          <i class="ti ti-brand-whatsapp text-green-400 text-xl"></i>
-          <h3 class="text-lg font-medium">Blast WhatsApp - <span id="blastCount">0</span> User</h3>
+<div id="blastModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden transition-opacity">
+  <div class="flex items-center justify-center min-h-screen p-2 sm:p-4">
+    <div class="bg-dark-800 rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-700/80 transform transition-all opacity-0 scale-95 flex flex-col max-h-[92vh] overflow-hidden" id="blastModalContent">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-700/80 bg-dark-900/50 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner flex-shrink-0">
+            <i class="ti ti-brand-whatsapp text-2xl"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="text-base sm:text-lg font-bold text-white">Broadcast WhatsApp User</h3>
+              <span id="blastCountBadge" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span id="blastCount">0</span> User Terfilter
+              </span>
+            </div>
+            <p id="blastSubtitle" class="text-xs text-gray-400 mt-0.5">Memuat seluruh user yang saat ini sedang tampil di tabel</p>
+          </div>
         </div>
-        <button onclick="closeBlastModal()" class="rounded-full w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors">
-          <i class="ti ti-x"></i>
+        <button onclick="closeBlastModal()" class="rounded-full w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition-colors">
+          <i class="ti ti-x text-lg"></i>
         </button>
       </div>
-      <div class="px-4 py-3 bg-dark-900/60 border-b border-gray-700/60 flex-shrink-0">
-        <div class="flex items-center justify-between mb-1.5">
-          <label for="blastCustomMessage" class="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
-            <i class="ti ti-edit text-primary"></i> Template Pesan WhatsApp:
+
+      <!-- Message Template Area (Wider, Taller, Responsive) -->
+      <div class="px-5 py-3.5 bg-dark-900/70 border-b border-gray-700/80 flex-shrink-0 space-y-2.5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <label for="blastCustomMessage" class="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
+            <i class="ti ti-message-dots text-emerald-400"></i> Template Pesan Broadcast:
           </label>
-          <span class="text-[10px] text-gray-400">Variabel: <code class="text-primary">{name}</code>, <code class="text-yellow-400">{days}</code></span>
+          <!-- Quick Preset Buttons -->
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-[11px] text-gray-400 mr-1 hidden sm:inline">Preset:</span>
+            <button type="button" onclick="setBlastTemplate('expired')" class="px-2.5 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-500/40 rounded-md text-[11px] font-medium transition-colors flex items-center gap-1">
+              <span>🚨</span> Expired
+            </button>
+            <button type="button" onclick="setBlastTemplate('soon')" class="px-2.5 py-1 bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-500/40 rounded-md text-[11px] font-medium transition-colors flex items-center gap-1">
+              <span>⚠️</span> Segera Habis
+            </button>
+            <button type="button" onclick="setBlastTemplate('announcement')" class="px-2.5 py-1 bg-blue-950/60 hover:bg-blue-900 text-blue-300 border border-blue-500/40 rounded-md text-[11px] font-medium transition-colors flex items-center gap-1">
+              <span>📢</span> Pengumuman
+            </button>
+          </div>
         </div>
-        <textarea id="blastCustomMessage" rows="2" 
-          class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary resize-none transition-colors"
-          placeholder="Tulis format pesan..."></textarea>
-        <p class="text-[10px] text-gray-400 mt-1">Mengubah pesan di atas akan otomatis memperbarui teks pada seluruh tombol WhatsApp di bawah.</p>
+
+        <div class="relative">
+          <textarea id="blastCustomMessage" rows="4" 
+            class="w-full bg-dark-800 border border-gray-600 focus:border-emerald-500 text-white px-3.5 py-2.5 rounded-xl text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-y min-h-[95px] max-h-[170px] transition-all font-sans placeholder-gray-500 shadow-inner"
+            placeholder="Tulis pesan broadcast di sini..."></textarea>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-400">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span>Variabel:</span>
+            <button type="button" onclick="insertVariable('{name}')" class="px-1.5 py-0.5 bg-dark-800 hover:bg-dark-700 text-emerald-400 border border-gray-600 rounded font-mono hover:border-emerald-500 transition-colors" title="Sisipkan Nama User">+{name}</button>
+            <button type="button" onclick="insertVariable('{days}')" class="px-1.5 py-0.5 bg-dark-800 hover:bg-dark-700 text-amber-400 border border-gray-600 rounded font-mono hover:border-amber-500 transition-colors" title="Sisipkan Sisa Hari">+{days}</button>
+            <button type="button" onclick="insertVariable('{package}')" class="px-1.5 py-0.5 bg-dark-800 hover:bg-dark-700 text-yellow-400 border border-gray-600 rounded font-mono hover:border-yellow-500 transition-colors" title="Sisipkan Nama Paket">+{package}</button>
+          </div>
+          <span class="text-gray-400 italic">Pesan otomatis terupdate ke link WhatsApp di bawah</span>
+        </div>
       </div>
-      <div class="p-4 overflow-y-auto" id="blastList"></div>
-      <div class="p-4 border-t border-gray-600/50 flex-shrink-0">
-        <p class="text-xs text-gray-500">Klik "Kirim" pada setiap user untuk membuka WhatsApp. Kirim pesan secara manual ke setiap user.</p>
+
+      <!-- Scroller Area for Filtered Users -->
+      <div class="px-5 py-3 overflow-y-auto flex-1 min-h-[160px] max-h-[46vh] space-y-2 bg-dark-900/30" id="blastList">
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-3 border-t border-gray-700/80 bg-dark-900/60 flex-shrink-0 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+        <div class="text-xs text-gray-400 flex items-center gap-2">
+          <i class="ti ti-info-circle text-emerald-400 text-sm"></i>
+          <span id="blastSummaryText">Klik tombol Kirim WA pada setiap user untuk membuka chat WhatsApp.</span>
+        </div>
+        <button type="button" onclick="closeBlastModal()" class="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-semibold transition-colors">
+          Tutup Panel
+        </button>
       </div>
     </div>
   </div>
@@ -1250,6 +1302,11 @@ function sortAndFilterUsers() {
     }
   });
 
+  const btnBlastBadge = document.getElementById('btnBlastFilterCount');
+  if (btnBlastBadge) {
+    btnBlastBadge.textContent = visibleCount;
+  }
+
   if (defaultEmptyState) {
     defaultEmptyState.style.display = 'none';
   }
@@ -1445,31 +1502,113 @@ function formatDate(dateString) {
 
     let blastTargetUsers = [];
 
+    function formatWaPhoneNumber(raw) {
+      if (!raw) return '';
+      let clean = raw.replace(/[^0-9]/g, '');
+      if (clean.startsWith('0')) {
+        clean = '62' + clean.slice(1);
+      } else if (!clean.startsWith('62') && clean.length > 0) {
+        clean = '62' + clean;
+      }
+      return clean;
+    }
+
+    function setBlastTemplate(type) {
+      const el = document.getElementById('blastCustomMessage');
+      if (!el) return;
+      if (type === 'expired') {
+        el.value = 'Halo {name},\n\nMasa aktif akun StreamFlow paket {package} Anda telah Expired. Silakan segera melakukan perpanjangan agar live streaming dapat terus berjalan tanpa gangguan.\n\nTerima kasih.';
+      } else if (type === 'soon') {
+        el.value = 'Halo {name},\n\nMasa aktif akun StreamFlow paket {package} Anda akan berakhir dalam {days} hari lagi. Segera perpanjang paket Anda agar jadwal live stream tetap berjalan lancar.\n\nTerima kasih.';
+      } else if (type === 'announcement') {
+        el.value = 'Halo {name},\n\nAda informasi penting untuk seluruh member StreamFlow (Paket {package}):\n\n[Tulis pesan pengumuman Anda di sini]\n\nTerima kasih.';
+      }
+      renderBlastList(el.value);
+    }
+
+    function insertVariable(v) {
+      const el = document.getElementById('blastCustomMessage');
+      if (!el) return;
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const text = el.value;
+      if (start !== undefined && end !== undefined) {
+        el.value = text.substring(0, start) + v + text.substring(end);
+        el.focus();
+        el.selectionStart = el.selectionEnd = start + v.length;
+      } else {
+        el.value += ' ' + v;
+      }
+      renderBlastList(el.value);
+    }
+
+    function markBlastSent(btn) {
+      if (!btn) return;
+      btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500', 'shadow-md', 'shadow-emerald-600/25');
+      btn.classList.add('bg-gray-700', 'text-emerald-300', 'border', 'border-emerald-500/40');
+      btn.innerHTML = '<i class="ti ti-check text-sm text-emerald-400"></i> Terkirim';
+    }
+
     function renderBlastList(customTemplate) {
-      const template = customTemplate || document.getElementById('blastCustomMessage')?.value || 'Halo {name}, akun StreamFlow Anda telah Expired. Silakan perpanjang paket untuk melanjutkan streaming.\n\nTerima kasih.';
+      const template = customTemplate !== undefined ? customTemplate : (document.getElementById('blastCustomMessage')?.value || 'Halo {name}, akun StreamFlow Anda telah Expired. Silakan perpanjang paket untuk melanjutkan streaming.\n\nTerima kasih.');
       
-      let html = '<div class="space-y-2.5">';
+      if (!blastTargetUsers || blastTargetUsers.length === 0) {
+        const blastListEl = document.getElementById('blastList');
+        if (blastListEl) {
+          blastListEl.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm"><i class="ti ti-users-minus text-3xl mb-2 text-gray-500 block"></i>Tidak ada user pada hasil filter saat ini.</div>';
+        }
+        return;
+      }
+
+      let html = '<div class="space-y-2">';
+      let withPhoneCount = 0;
+
       blastTargetUsers.forEach((user, i) => {
-        let msg = template.replace(/\{name\}/g, user.name);
-        msg = msg.replace(/\{days\}/g, user.daysLeft > 0 ? user.daysLeft : 0);
+        let msg = template
+          .replace(/\{name\}/g, user.name)
+          .replace(/\{username\}/g, user.username)
+          .replace(/\{package\}/g, user.package)
+          .replace(/\{days\}/g, user.daysLeft > 0 ? user.daysLeft : 0);
+        
+        const hasPhone = !!user.waPhone;
+        if (hasPhone) withPhoneCount++;
+        const waUrl = hasPhone ? `https://wa.me/${user.waPhone}?text=${encodeURIComponent(msg)}` : '#';
         
         html += `
-          <div class="flex items-center justify-between p-3 bg-dark-700/80 hover:bg-dark-700 border border-gray-700/50 rounded-lg transition-colors gap-3">
-            <div class="flex items-center gap-2.5 min-w-0 flex-1">
-              <span class="text-gray-400 text-xs font-semibold w-5 text-right flex-shrink-0">${i + 1}.</span>
+          <div class="flex items-center justify-between p-3 bg-dark-800 hover:bg-dark-700/80 border border-gray-700/60 rounded-xl transition-all gap-3 shadow-sm">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <span class="text-gray-400 text-xs font-semibold w-6 text-right flex-shrink-0">${i + 1}.</span>
               <div class="truncate">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <p class="text-white text-sm font-medium truncate">${user.name}</p>
-                  <span class="inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${user.statusBadge}">${user.statusText}</span>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="text-white text-sm font-semibold truncate">${escapeHtml(user.name)}</p>
+                  <span class="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full uppercase bg-yellow-500/15 text-yellow-300 border border-yellow-500/30">
+                    ${escapeHtml(user.package)}
+                  </span>
+                  <span class="inline-flex px-2 py-0.5 text-[10px] font-semibold rounded-full ${user.statusBadge}">
+                    ${user.statusText}
+                  </span>
                 </div>
-                <p class="text-gray-400 text-xs mt-0.5 font-mono">${user.phone}</p>
+                <div class="flex items-center gap-2 mt-1 text-xs">
+                  <span class="font-mono ${hasPhone ? 'text-emerald-400' : 'text-gray-500 italic'}">
+                    ${hasPhone ? ('+' + user.waPhone) : 'Belum ada nomor WA'}
+                  </span>
+                </div>
               </div>
             </div>
-            <a href="https://wa.me/${user.phone}?text=${encodeURIComponent(msg)}" 
-               target="_blank"
-               class="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 flex-shrink-0 shadow-md shadow-green-600/20 hover:scale-105">
-              <i class="ti ti-brand-whatsapp text-sm"></i> Kirim
-            </a>
+            <div>
+              ${hasPhone ? `
+                <a href="${waUrl}" 
+                   target="_blank"
+                   onclick="markBlastSent(this)"
+                   class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 flex-shrink-0 shadow-md shadow-emerald-600/25 hover:scale-105 active:scale-95">
+                  <i class="ti ti-brand-whatsapp text-sm"></i> Kirim WA
+                </a>
+              ` : `
+                <span class="px-2.5 py-1.5 bg-gray-700/40 text-gray-400 text-xs rounded-lg flex items-center gap-1 flex-shrink-0 border border-gray-700 cursor-not-allowed">
+                  <i class="ti ti-phone-off text-xs"></i> Tanpa WA
+                </span>
+              `}
+            </div>
           </div>`;
       });
       html += '</div>';
@@ -1478,68 +1617,87 @@ function formatDate(dateString) {
       if (blastListEl) blastListEl.innerHTML = html;
       const countEl = document.getElementById('blastCount');
       if (countEl) countEl.textContent = blastTargetUsers.length;
+      const summaryEl = document.getElementById('blastSummaryText');
+      if (summaryEl) {
+        summaryEl.textContent = `${withPhoneCount} dari ${blastTargetUsers.length} user memiliki nomor WhatsApp siap kirim.`;
+      }
     }
 
     function blastWhatsApp() {
       const rows = document.querySelectorAll('.user-row');
-      const expiredFilter = document.getElementById('expiredFilter')?.value || '';
       blastTargetUsers = [];
+      let withPhone = 0;
       
+      // Ambil seluruh user yang SEDANG TAMPIL di tabel (lolos semua filter saat ini)
       rows.forEach(row => {
-        // If filter is active, only include visible rows
-        if (expiredFilter && row.style.display === 'none') {
-          return;
+        if (row.style.display === 'none') {
+          return; // Skip baris yang disembunyikan oleh filter search, status, role, atau expired
         }
 
-        const username = row.dataset.username || '';
-        const phone = row.dataset.phone || '';
+        const username = row.dataset.displayName || row.dataset.username || '';
+        const rawPhone = row.dataset.phone || '';
         const expState = row.dataset.expiredState || 'none';
         const daysLeft = parseInt(row.dataset.daysLeft || '999999');
+        const packageName = row.dataset.package || 'custom';
+        const waPhone = formatWaPhoneNumber(rawPhone);
 
-        // If no filter selected, target expired & expiring soon users by default
-        if (!expiredFilter && expState !== 'expired' && expState !== 'soon') {
-          return;
+        let statusBadge = '';
+        let statusText = '';
+        if (daysLeft <= 0 && expState === 'expired') {
+          statusBadge = 'bg-red-900/50 text-red-300 border border-red-500/30';
+          statusText = 'Expired';
+        } else if (daysLeft <= 7 && expState === 'soon') {
+          statusBadge = 'bg-yellow-900/50 text-yellow-300 border border-yellow-500/30';
+          statusText = `${daysLeft} hr lagi`;
+        } else if (expState === 'none') {
+          statusBadge = 'bg-gray-700 text-gray-300 border border-gray-600/50';
+          statusText = 'Tanpa Expired';
+        } else {
+          statusBadge = 'bg-green-900/50 text-green-300 border border-green-500/30';
+          statusText = 'Aktif';
         }
 
-        if (phone) {
-          const cleanPhone = phone.replace(/[^0-9]/g, '');
-          if (cleanPhone) {
-            const name = username.charAt(0).toUpperCase() + username.slice(1);
-            let statusBadge = '';
-            let statusText = '';
-            if (daysLeft <= 0) {
-              statusBadge = 'bg-red-900/50 text-red-300';
-              statusText = 'Expired';
-            } else if (daysLeft <= 7) {
-              statusBadge = 'bg-yellow-900/50 text-yellow-300';
-              statusText = `${daysLeft} hr lagi`;
-            } else {
-              statusBadge = 'bg-green-900/50 text-green-300';
-              statusText = 'Aktif';
-            }
-            blastTargetUsers.push({ name, phone: cleanPhone, daysLeft, statusText, statusBadge });
-          }
-        }
+        if (waPhone) withPhone++;
+
+        blastTargetUsers.push({
+          name: username,
+          username: username,
+          phone: rawPhone,
+          waPhone: waPhone,
+          daysLeft,
+          package: packageName,
+          statusText,
+          statusBadge
+        });
       });
       
       if (blastTargetUsers.length === 0) {
-        showToast('Tidak ada user expired/segera expired yang memiliki nomor WhatsApp pada daftar ini.', 'error');
+        showToast('Tidak ada user yang tampil pada tabel untuk dibroadcast.', 'error');
         return;
       }
       
       const customMsgEl = document.getElementById('blastCustomMessage');
       if (customMsgEl) {
-        // Default text depending on whether target is mostly expired or soon
-        const isMostlyExpired = blastTargetUsers.some(u => u.daysLeft <= 0);
-        if (isMostlyExpired) {
-          customMsgEl.value = 'Halo {name},\n\nMasa aktif akun StreamFlow Anda telah Expired. Silakan perpanjang paket untuk melanjutkan streaming tanpa gangguan.\n\nTerima kasih.';
+        // Tentukan template bawaan berdasarkan mayoritas status user yang difilter
+        const hasExpired = blastTargetUsers.some(u => u.statusText === 'Expired');
+        const hasSoon = blastTargetUsers.some(u => u.statusText.includes('hr lagi'));
+        
+        if (hasExpired && !hasSoon) {
+          customMsgEl.value = 'Halo {name},\n\nMasa aktif akun StreamFlow paket {package} Anda telah Expired. Silakan perpanjang paket untuk melanjutkan streaming tanpa gangguan.\n\nTerima kasih.';
+        } else if (hasSoon) {
+          customMsgEl.value = 'Halo {name},\n\nMasa aktif akun StreamFlow paket {package} Anda akan berakhir dalam {days} hari lagi. Segera perpanjang paket Anda agar live stream tetap berjalan lancar.\n\nTerima kasih.';
         } else {
-          customMsgEl.value = 'Halo {name},\n\nMasa aktif akun StreamFlow Anda akan berakhir dalam {days} hari lagi. Segera perpanjang paket Anda agar live stream tetap berjalan lancar.\n\nTerima kasih.';
+          customMsgEl.value = 'Halo {name},\n\nSalam dari PEJUANG MONET. Berikut adalah informasi terbaru terkait layanan StreamFlow paket {package} Anda.\n\nTerima kasih.';
         }
         
         customMsgEl.oninput = function() {
           renderBlastList(this.value);
         };
+      }
+
+      const subtitleEl = document.getElementById('blastSubtitle');
+      if (subtitleEl) {
+        subtitleEl.textContent = `Memuat ${blastTargetUsers.length} user hasil filter tabel (${withPhone} memiliki nomor WhatsApp)`;
       }
 
       renderBlastList();
