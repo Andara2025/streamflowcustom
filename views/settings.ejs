@@ -295,6 +295,30 @@
 
     <div id="integration-tab" class="settings-content hidden">
       <div class="bg-gray-800 rounded-lg p-6">
+        <!-- Tutorial Video Banner -->
+        <div class="mb-6 p-4 rounded-xl bg-gradient-to-r from-emerald-950/60 via-dark-800 to-dark-800 border border-emerald-500/40 shadow-lg">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-start sm:items-center gap-3.5">
+              <div class="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-400 shadow-inner">
+                <i class="ti ti-video text-2xl"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h4 class="text-sm font-bold text-white">Tutorial Pembuatan Client ID & Konek Channel</h4>
+                  <span class="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Panduan Video</span>
+                </div>
+                <p class="text-xs text-gray-300 mt-1">
+                  Untuk menggunakan fitur auto start stop dan multi-channel, silakan tonton panduan video pembuatan ID Client & Secret serta cara menghubungkan channel.
+                </p>
+              </div>
+            </div>
+            <a href="https://drive.google.com/drive/folders/1d5P-0n-dEoAHogaQNZZvX2hD2g6LS9Jm?usp=drive_link" target="_blank" rel="noopener noreferrer"
+              class="flex-shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-md transition-all hover:scale-[1.02]">
+              <i class="ti ti-player-play text-sm"></i> Tonton Tutorial (Drive)
+            </a>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:divide-x lg:divide-gray-700">
           <div class="lg:pr-8">
             <h3 class="text-lg font-semibold mb-6">YouTube Integration</h3>
@@ -566,10 +590,10 @@
                       <i class="ti ti-external-link"></i>
                       Open Google Cloud Console
                     </a>
-                    <a href="https://youtu.be/K_tHNRaSO0E" target="_blank" rel="noopener noreferrer" 
-                      class="inline-flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-xs">
-                      <i class="ti ti-brand-youtube-filled"></i>
-                      Tutorial
+                    <a href="https://drive.google.com/drive/folders/1d5P-0n-dEoAHogaQNZZvX2hD2g6LS9Jm?usp=drive_link" target="_blank" rel="noopener noreferrer" 
+                      class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold">
+                      <i class="ti ti-player-play"></i>
+                      Tutorial Video (Google Drive)
                     </a>
                   </div>
                 </div>
@@ -593,6 +617,17 @@
           </div>
 
           <div class="space-y-4 text-sm">
+            <div class="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-lg flex items-center justify-between gap-2 text-xs">
+              <span class="text-gray-300 flex items-center gap-2">
+                <i class="ti ti-info-circle text-emerald-400 text-sm flex-shrink-0"></i>
+                <span>Belum tahu cara buat ID Client & Secret?</span>
+              </span>
+              <a href="https://drive.google.com/drive/folders/1d5P-0n-dEoAHogaQNZZvX2hD2g6LS9Jm?usp=drive_link" target="_blank" rel="noopener noreferrer"
+                class="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 flex-shrink-0 hover:underline">
+                Lihat Video Tutorial <i class="ti ti-external-link"></i>
+              </a>
+            </div>
+
             <p class="text-gray-300">
               Pilih apakah ingin menggunakan <strong>Default Client ID Akun</strong> atau <strong>Project Google Cloud Baru (Custom)</strong> untuk channel ini.
             </p>
